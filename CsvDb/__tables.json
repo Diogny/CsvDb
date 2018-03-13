@@ -1,0 +1,453 @@
+{
+	"Version": "1.01",
+	"Description": "Implementing a system hidden variables",
+	"Name": "NJTransit",
+	"PageSize": 255,
+	"Tables":
+	[
+		{
+			"Name": "agency",
+			"FileName": "agency.csv",
+			"Generate": true,
+			"Multikey": false,
+			"Rows": 1,
+			"Pager":
+			{
+				"PagerSize": 1024,
+				"Count": 1,
+				"File": "agency.pager"
+			},
+			"Count": 6,
+			"Columns":
+			[
+				{
+					"Indexer": "agency.agency_id.index",
+					"Unique": false,
+					"Name": "agency_id",
+					"Index": 0,
+					"Type": "String",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Name": "agency_name",
+					"Index": 1,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "agency_url",
+					"Index": 2,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "agency_timezone",
+					"Index": 3,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "agency_lang",
+					"Index": 4,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "agency_phone",
+					"Index": 5,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				}
+			]
+		},
+		{
+			"Name": "routes",
+			"FileName": "routes.csv",
+			"Generate": true,
+			"Multikey": false,
+			"Rows": 253,
+			"Pager":
+			{
+				"PagerSize": 1024,
+				"Count": 1,
+				"File": "routes.pager"
+			},
+			"Count": 7,
+			"Columns":
+			[
+				{
+					"Indexer": "routes.route_id.index",
+					"Unique": false,
+					"Name": "route_id",
+					"Index": 0,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Name": "agency_id",
+					"Index": 1,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Indexer": "routes.route_short_name.index",
+					"Unique": false,
+					"Name": "route_short_name",
+					"Index": 2,
+					"Type": "String",
+					"Key": false,
+					"Indexed": true
+				},
+				{
+					"Name": "route_long_name",
+					"Index": 3,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "route_type",
+					"Index": 4,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "route_url",
+					"Index": 5,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "route_color",
+					"Index": 6,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				}
+			]
+		},
+		{
+			"Name": "stops",
+			"FileName": "stops.csv",
+			"Generate": true,
+			"Multikey": false,
+			"Rows": 16552,
+			"Pager":
+			{
+				"PagerSize": 1024,
+				"Count": 17,
+				"File": "stops.pager"
+			},
+			"Count": 7,
+			"Columns":
+			[
+				{
+					"Indexer": "stops.stop_id.index",
+					"Unique": false,
+					"Name": "stop_id",
+					"Index": 0,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Indexer": "stops.stop_code.index",
+					"Unique": false,
+					"Name": "stop_code",
+					"Index": 1,
+					"Type": "String",
+					"Key": false,
+					"Indexed": true
+				},
+				{
+					"Name": "stop_name",
+					"Index": 2,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "stop_desc",
+					"Index": 3,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "stop_lat",
+					"Index": 4,
+					"Type": "Double",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "stop_lon",
+					"Index": 5,
+					"Type": "Double",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "zone_id",
+					"Index": 6,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				}
+			]
+		},
+		{
+			"Name": "calendar_dates",
+			"FileName": "calendar_dates.csv",
+			"Generate": true,
+			"Multikey": false,
+			"Rows": 1293,
+			"Pager":
+			{
+				"PagerSize": 1024,
+				"Count": 2,
+				"File": "calendar_dates.pager"
+			},
+			"Count": 3,
+			"Columns":
+			[
+				{
+					"Name": "service_id",
+					"Index": 0,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Indexer": "calendar_dates.date.index",
+					"Unique": false,
+					"Name": "date",
+					"Index": 1,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Name": "exception_type",
+					"Index": 2,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				}
+			]
+		},
+		{
+			"Name": "trips",
+			"FileName": "trips.csv",
+			"Generate": true,
+			"Multikey": false,
+			"Rows": 61794,
+			"Pager":
+			{
+				"PagerSize": 1024,
+				"Count": 61,
+				"File": "trips.pager"
+			},
+			"Count": 7,
+			"Columns":
+			[
+				{
+					"Indexer": "trips.route_id.index",
+					"Unique": false,
+					"Name": "route_id",
+					"Index": 0,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Indexer": "trips.service_id.index",
+					"Unique": false,
+					"Name": "service_id",
+					"Index": 1,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Indexer": "trips.trip_id.index",
+					"Unique": false,
+					"Name": "trip_id",
+					"Index": 2,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Name": "trip_headsign",
+					"Index": 3,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "direction_id",
+					"Index": 4,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "block_id",
+					"Index": 5,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "shape_id",
+					"Index": 6,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				}
+			]
+		},
+		{
+			"Name": "stop_times",
+			"FileName": "stop_times.csv",
+			"Generate": false,
+			"Multikey": false,
+			"Rows": 3229261,
+			"Pager":
+			{
+				"PagerSize": 1024,
+				"Count": 0,
+				"File": ""
+			},
+			"Count": 8,
+			"Columns":
+			[
+				{
+					"Indexer": "stop_times.trip_id.index",
+					"Unique": false,
+					"Name": "trip_id",
+					"Index": 0,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Name": "arrival_time",
+					"Index": 1,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "departure_time",
+					"Index": 2,
+					"Type": "String",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Indexer": "stop_times.stop_id.index",
+					"Unique": false,
+					"Name": "stop_id",
+					"Index": 3,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Name": "stop_sequence",
+					"Index": 4,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "pickup_type",
+					"Index": 5,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "drop_off_type",
+					"Index": 6,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "shape_dist_traveled",
+					"Index": 7,
+					"Type": "Double",
+					"Key": false,
+					"Indexed": false
+				}
+			]
+		},
+		{
+			"Name": "shapes",
+			"FileName": "shapes.csv",
+			"Generate": false,
+			"Multikey": false,
+			"Rows": 3934053,
+			"Pager":
+			{
+				"PagerSize": 1024,
+				"Count": 0,
+				"File": ""
+			},
+			"Count": 5,
+			"Columns":
+			[
+				{
+					"Indexer": "shapes.shape_id.index",
+					"Unique": false,
+					"Name": "shape_id",
+					"Index": 0,
+					"Type": "Int32",
+					"Key": true,
+					"Indexed": true
+				},
+				{
+					"Name": "shape_pt_lat",
+					"Index": 1,
+					"Type": "Double",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "shape_pt_lon",
+					"Index": 2,
+					"Type": "Double",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "shape_pt_sequence",
+					"Index": 3,
+					"Type": "Int32",
+					"Key": false,
+					"Indexed": false
+				},
+				{
+					"Name": "shape_dist_traveled",
+					"Index": 4,
+					"Type": "Double",
+					"Key": false,
+					"Indexed": false
+				}
+			]
+		}
+	]
+}
