@@ -36,6 +36,20 @@ Later I'll include the PHP classes used to read this schema.
 
 And an index data with all key and its value(s).
 
+	path\bin\
+		__tables.json
+		[table].csv
+		[table].pager
+		[table].[index].index
+		[table].[index].index.bin
+		
+	path\
+		[table].[index].index.txt
+		[table].[index].index.tree.txt
+		[table].[index].index.duplicates.txt
+		
+		[table].log
+
 To locate a record inside the CSV data, the engine first locate the index, and then search the tree structure for a matching node entry. Then goes to the mapping page where the record is.
 
 This way the engine can locate a csv record super fast. Currently it supports a single key entry value, and a multiple key value. So a key can have multiple values, the index support this.

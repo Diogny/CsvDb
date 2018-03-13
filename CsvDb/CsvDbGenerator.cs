@@ -13,8 +13,6 @@ namespace CsvDb
 
 		public CsvDb Database { get; protected internal set; }
 
-		//public String OutputPath { get; protected internal set; }
-
 		public static Int32 ItemsPageStart => 8;
 
 		public CsvDbGenerator(CsvDb db, string zipfilepath, bool removeAll = true)
@@ -26,23 +24,7 @@ namespace CsvDb
 			}
 			// remove all but the __tables.json file
 
-			//if (!io.Directory.Exists(OutputPath = outputpath))
-			//{
-			//	io.Directory.CreateDirectory(outputpath);
-			//}
-			//else if (removeAll)
-			//{
-			//	//delete everything -clean output
-			//	var di = new io.DirectoryInfo(outputpath);
-			//	foreach (io.FileInfo file in di.EnumerateFiles())
-			//	{
-			//		file.Delete();
-			//	}
-			//	foreach (io.DirectoryInfo dir in di.EnumerateDirectories())
-			//	{
-			//		dir.Delete(true);
-			//	}
-			//}
+
 		}
 
 		#region Text Data Generator
@@ -88,12 +70,6 @@ namespace CsvDb
 					Console.WriteLine($"error-> {ex.Message}");
 				}
 			}
-			////finally write __tables.json file
-			//var json = Newtonsoft.Json.JsonConvert.SerializeObject(
-			//								 Database.Tables,
-			//								 Newtonsoft.Json.Formatting.Indented);
-			//io.File.WriteAllText(io.Path.Combine(OutputPath, "__tables.json"), json);
-
 		}
 
 		CsvHelper.CsvReader OpenCsvFile(io.Compression.ZipArchiveEntry entry)
@@ -234,13 +210,10 @@ namespace CsvDb
 						{
 							var indexColValue = csvParser.Values[index.column.Index];
 
-							// .GetValue(table);
-							// table.GetColumn<int>(index.meta.Name);
 							//position index: $"{value}|{position}"
 							//row index:			$"{value}|{globalRow}"
 							//if index is key, store its position
-							//  otherwise its line number 1-based
-							//  must be the key value for single key table.
+							//  otherwise its line number 1-based   must be the key value for single key table.
 							string indexLine = null;
 							if (index.column.Key)
 							{
@@ -253,7 +226,6 @@ namespace CsvDb
 							}
 							//write line
 							index.writer.WriteLine(indexLine);
-							//index.meta.PropInfo
 						}
 
 						//calculate values for next row
@@ -322,9 +294,6 @@ namespace CsvDb
 		{
 			Console.WriteLine($"\r\nCompiling table pagers:");
 			//load __tables.json
-			//var json = io.File.ReadAllText(tablesFile);
-			//var tables = Newtonsoft.Json.JsonConvert.DeserializeObject<List<CsvTableInMemory>>(json);
-			//
 			foreach (var table in Database.Tables)
 			{
 				Console.WriteLine($"\r\n[{table.Name}]");
@@ -382,8 +351,7 @@ namespace CsvDb
 			var thisType = this.GetType();
 			//
 			MethodInfo generateIndexCollection_Method = thisType
-					//.GetMethod(nameof(generateIndexCollectionKeysValues), BindingFlags.Instance | BindingFlags.NonPublic);
-					.GetMethod(nameof(generateIndexCollectionKeysMultipleValues), BindingFlags.Instance | BindingFlags.NonPublic);
+				.GetMethod(nameof(generateIndexCollectionKeysMultipleValues), BindingFlags.Instance | BindingFlags.NonPublic);
 			//
 			MethodInfo compileIndex_Method = thisType
 					.GetMethod(nameof(compileIndex), BindingFlags.Instance | BindingFlags.NonPublic);
@@ -417,7 +385,7 @@ namespace CsvDb
 						var rootPage = genericCompileIndex.Invoke(this,
 							new object[] {
 								collection,
-								Database.PageSize,//	pageSize,
+								Database.PageSize,
 								index
 						});
 						Console.WriteLine($"   compiled.");
@@ -433,9 +401,7 @@ namespace CsvDb
 								rootPage,
 								index
 							});
-
 					}
-
 				}
 				else
 				{
@@ -450,60 +416,6 @@ namespace CsvDb
 				Database.Save();
 			}
 		}
-
-		//List<KeyValuePair<T, int>> generateIndexCollectionKeysValues<T>(
-		//	CsvDbColumn index,
-		//	Type indexType
-		//	)
-		//{
-		//	//Creating the Type for Generic List.
-		//	Type kp = typeof(KeyValuePair<,>);
-
-		//	Type[] kpArgs = { indexType, typeof(int) };
-		//	//create generic list type
-		//	Type kpType = kp.MakeGenericType(kpArgs);
-
-		//	var list = new List<KeyValuePair<T, int>>();
-
-		//	var listAdd = list.GetType().GetMethod("Add");
-
-		//	string line;
-		//	//read index data in .TXT file
-		//	var textIndexPath = io.Path.Combine(Database.LogPath, $"{index.Indexer}.txt");
-		//	using (var reader = new io.StreamReader(io.File.OpenRead(textIndexPath)))
-		//	{
-		//		while ((line = reader.ReadLine()) != null)
-		//		{
-		//			var columns = line.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
-		//			//create kp object
-		//			var objvalue = System.Convert.ChangeType(columns[0], indexType);
-
-		//			var kpObj = Activator.CreateInstance(kpType,
-		//				new object[] {
-		//						System.Convert.ChangeType(columns[0], indexType),
-		//						Int32.Parse(columns[1])
-		//				});
-		//			listAdd.Invoke(list, new object[] { kpObj });
-		//		}
-		//	}
-
-		//	//return new list ordered by its Key
-		//	list = list.OrderBy(i => i.Key).ToList();
-		//	//save ordered index
-		//	using (var writer =
-		//		new io.StreamWriter(io.File.Create(textIndexPath)))
-		//	{
-		//		foreach (var pair in list)
-		//		{
-		//			writer.WriteLine($"{pair.Key.ToString()}|{pair.Value}");
-		//		}
-		//	}
-		//	//group by key, to see if any duplicates
-		//	//  if any save save as: {index.Indexer}.duplicates.txt
-		//	var grouped = list.GroupBy(i => i.Key);
-
-		//	return list;
-		//}
 
 		List<KeyValuePair<T, List<int>>> generateIndexCollectionKeysMultipleValues<T>(
 			CsvDbColumn index,
@@ -588,7 +500,6 @@ namespace CsvDb
 		}
 
 		BTreePageBase<T> compileIndex<T>(
-			//List<KeyValuePair<T, int>> collection,
 			List<KeyValuePair<T, List<int>>> collection,
 			int pageSize,
 			CsvDbColumn index
@@ -645,7 +556,6 @@ namespace CsvDb
 		}
 
 		BTreePageBase<T> SplitPages<T>(
-			//ref List<KeyValuePair<T, int>> collection,
 			ref List<KeyValuePair<T, List<int>>> collection,
 			int pageSize,
 			int start,
@@ -744,9 +654,9 @@ namespace CsvDb
 				//index.Unique
 				//index.Key
 				valueInt32 =
-					(index.Unique ? Consts.IndexHeaderIsUnique : 0) |   //(index.Unique ? 1 : 0) |
-					(index.Key ? Consts.IndexHeaderIsKey : 0) |         //(index.Key ? 2 : 0) | 
-					 (rootPage.IsLeaf ? Consts.IndexHeaderIsLeaf : 0);  // (rootPage.IsLeaf ? 4 : 0);
+					(index.Unique ? Consts.IndexHeaderIsUnique : 0) |
+					(index.Key ? Consts.IndexHeaderIsKey : 0) |
+					 (rootPage.IsLeaf ? Consts.IndexHeaderIsLeaf : 0);
 
 				//index.Type
 				//valueInt32 = valueInt32 << 8;
@@ -765,9 +675,7 @@ namespace CsvDb
 				{
 					StoreTreePage<T>(rootPage, writer);
 				}
-
 			}
-
 		}
 
 		IEnumerable<BTreePageItems<T>> getNodeItemPages<T>(BTreePageBase<T> rootPage)
@@ -805,7 +713,7 @@ namespace CsvDb
 			if (rootPage.IsLeaf)
 			{
 				//store id of left
-				Int32 valueInt32 = Consts.BTreePageNodeItemsFlag; // 0b00000011;
+				Int32 valueInt32 = Consts.BTreePageNodeItemsFlag;
 				writer.Write(valueInt32);
 				//offset
 				/////////////////  TO BE USED AS AN ID //////////////////////////
@@ -878,7 +786,6 @@ namespace CsvDb
 							writer.WriteLine("----------------------");
 
 							//header CsvDbColumnHeader
-							//var header = CsvDbColumnHeader.FromArray()
 							var headerBuffer = new byte[CsvDbColumnHeader.Size];
 							//
 							var read = reader.Read(headerBuffer, 0, headerBuffer.Length);

@@ -70,7 +70,7 @@ namespace CsvDb
 				throw new ArgumentException($"Invalid databse structure");
 			}
 			Structure = Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(structure);
-			//Tables = Newtonsoft.Json.JsonConvert.DeserializeObject<List<CsvDbTable>>(text);
+
 			//link
 			Tables.ForEach(t =>
 			{
@@ -137,8 +137,6 @@ namespace CsvDb
 							 Newtonsoft.Json.JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.Indented);
 				//
 				io.File.WriteAllText(FileStructurePath, json);
-
-				//throw new ArgumentException($"Csv Database structure json file do not exists: {Path}");
 			}
 			//Name = io.Path.GetFileNameWithoutExtension(Path = path);
 			//
@@ -156,7 +154,6 @@ namespace CsvDb
 				var text = io.File.ReadAllText(FileStructurePath);
 				//
 				Structure = Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
-				//Tables = Newtonsoft.Json.JsonConvert.DeserializeObject<List<CsvDbTable>>(text);
 				//link
 				Tables.ForEach(t =>
 				{
@@ -180,7 +177,6 @@ namespace CsvDb
 			try
 			{
 				var json =
- //Newtonsoft.Json.JsonConvert.SerializeObject(Tables, Newtonsoft.Json.Formatting.Indented);
  Newtonsoft.Json.JsonConvert.SerializeObject(Structure, Newtonsoft.Json.Formatting.Indented);
 				//
 				io.File.WriteAllText(FileStructurePath, json);
@@ -248,11 +244,11 @@ namespace CsvDb
 
 	public class CsvDbColumn
 	{
-		public string Indexer { get; set; }  //"agency.agency_id.index"
+		public string Indexer { get; set; }
 
 		public bool Unique { get; set; }
 
-		public string Name { get; set; }  //"agency_id"
+		public string Name { get; set; }
 
 		public int Index { get; set; }
 
@@ -299,7 +295,7 @@ namespace CsvDb
 
 		public int Count { get; set; }
 
-		public string File { get; set; } //"agency.pager"
+		public string File { get; set; }
 
 		public override string ToString()
 		{

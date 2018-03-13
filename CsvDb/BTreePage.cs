@@ -63,11 +63,9 @@ namespace CsvDb
 		}
 
 		public KeyValuePair<T, List<int>> Root { get; set; }
-		//public KeyValuePair<T, int> Root { get; set; }
 
 		public override bool HasRoot { get { return true; } }
 
-		//public BTreePageNode(KeyValuePair<T, int> root)
 		public BTreePageNode(KeyValuePair<T, List<int>> root)
 			: base(true)
 		{
@@ -86,10 +84,10 @@ namespace CsvDb
 
 			//flags
 			//This's a Page Node
-			Int32 valueInt32 = Consts.BTreePageNodeFlag; // 0b00000001;
+			Int32 valueInt32 = Consts.BTreePageNodeFlag;
 
 			var uniqueKeyValue = Root.Value.Count == 1;
-			var uniqueFlag = uniqueKeyValue ? Consts.BTreeUniqueKeyValueFlag : 0; // 0b00000100 : 0;
+			var uniqueFlag = uniqueKeyValue ? Consts.BTreeUniqueKeyValueFlag : 0;
 			valueInt32 |= uniqueFlag;
 			//
 			writer.Write(valueInt32);
@@ -149,14 +147,12 @@ namespace CsvDb
 		/// </summary>
 		public int Offset { get; set; }
 
-		//public List<KeyValuePair<T, int>> Items { get; set; }
 		public List<KeyValuePair<T, List<int>>> Items { get; set; }
 
 		public BTreePageItems(IEnumerable<KeyValuePair<T, List<int>>> items = null)
-			//public BTreePageItems(IEnumerable<KeyValuePair<T, int>> items = null)
 			: base(false)
 		{
-			Items = new List<KeyValuePair<T, List<int>>>();   //new List<KeyValuePair<T, int>>();
+			Items = new List<KeyValuePair<T, List<int>>>();
 			if (items != null)
 			{
 				Items.AddRange(items);
@@ -164,7 +160,6 @@ namespace CsvDb
 		}
 
 		public bool Add(KeyValuePair<T, List<int>> item)
-		//public bool Add(KeyValuePair<T, int> item)
 		{
 			Func<bool> fn = () =>
 			{
@@ -181,10 +176,10 @@ namespace CsvDb
 			var writer = new io.BinaryWriter(stream);
 
 			//flags
-			Int32 valueInt32 = Consts.BTreePageItemsFlag;  // 0b00000010;
+			Int32 valueInt32 = Consts.BTreePageItemsFlag;  
 
 			var uniqueKeyValue = Items.All(i => i.Value.Count == 1);
-			var uniqueFlag = uniqueKeyValue ? Consts.BTreeUniqueKeyValueFlag : 0; // 0b00000100 : 0;
+			var uniqueFlag = uniqueKeyValue ? Consts.BTreeUniqueKeyValueFlag : 0; 
 			valueInt32 |= uniqueFlag;
 			//
 			writer.Write(valueInt32);
