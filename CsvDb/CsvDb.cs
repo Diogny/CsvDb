@@ -189,14 +189,14 @@ namespace CsvDb
 			}
 		}
 
+		public CsvDbTable Table(string tableName)
+		{
+			return Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
+		}
+
 		public CsvDbColumn Index(string tableName, string columnName)
 		{
-			var tble = Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
-			if (tble == null)
-			{
-				return null;
-			}
-			return tble.Columns.FirstOrDefault(c => String.Compare(c.Name, columnName) == 0);
+			return Table(tableName)?.Columns.FirstOrDefault(c => String.Compare(c.Name, columnName) == 0);
 		}
 
 		public override string ToString()
@@ -234,6 +234,11 @@ namespace CsvDb
 				var key = Columns.FirstOrDefault(col => col.Key);
 				return (key == null) ? null : Type.GetType($"System.{key.Type}");
 			}
+		}
+
+		public CsvDbColumn Column(string name)
+		{
+			return Columns.FirstOrDefault(c => c.Name == name);
 		}
 
 		public override string ToString()

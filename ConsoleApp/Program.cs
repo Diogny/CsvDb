@@ -11,7 +11,8 @@ namespace ConsoleApp
 		{
 
 			//Generators();
-			TestHeaders();
+			//TestHeaders();
+			SqlQueryTests();
 
 			Console.WriteLine("Press enter to finish!");
 			Console.ReadLine();
@@ -20,9 +21,9 @@ namespace ConsoleApp
 		static void Generators()
 		{
 			string rootPath =
-		@"C:\Users\Diogny\Desktop\NJTransit\data\";
+			//@"C:\Users\Diogny\Desktop\NJTransit\data\";
 			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
+			@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
 			//
 			//@"C:\Users\Diogny\Desktop\NJTransit\test\";
 
@@ -36,9 +37,9 @@ namespace ConsoleApp
 
 			var gen = new CsvDbGenerator(
 				db,
-				@"C:\Users\Diogny\Desktop\NJTransit\bus_data.zip",
+				//@"C:\Users\Diogny\Desktop\NJTransit\bus_data.zip",
 				//@"C:\Users\Diogny\Desktop\NJTransit\bus_data-light.zip",
-				//@"C:\Users\Diogny\Desktop\NJTransit\bus_data-extra-light.zip",
+				@"C:\Users\Diogny\Desktop\NJTransit\bus_data-extra-light.zip",
 
 				//comment this when uncommented: gen.GenerateTxtData(); for a clean output
 				removeAll: false
@@ -52,7 +53,7 @@ namespace ConsoleApp
 			gen.GenerateTreeStructure();
 		}
 
-		static void TestHeaders()
+		static void SqlQueryTests()
 		{
 			string rootPath =
 		//@"C:\Users\Diogny\Desktop\NJTransit\data\";
@@ -60,18 +61,53 @@ namespace ConsoleApp
 		@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
 
 			var db = new CsvDb.CsvDb(rootPath);
+
+			Console.WriteLine($"\r\nDatabase: {db.Name}");
+
+			var query = "select * from routes where route_id = 5 and agency_id = \"NJB\" skip 2 limit 5"
+				//"select * from routes where"
+				//"select * from routes"
+				//"select * from"
+				//"select *"
+				//"select"
+				//""
+				;
+			//select trip_headsign,block_id, trip_id,  route_id,service_id from trips where a> 7 and "p" = 8 skip 3 limit  10
+
+			Console.WriteLine($"\r\nIn query: {query}");
+
+			var dbQuery = CsvDb.CsvDbQuery.Parse(db, query);
+
+			var outQuery = dbQuery.ToString();
+			//"SELECT * FROM routes WHERE route_id = 5 and agency_id = \"NJB\""
+			Console.WriteLine($"\r\nOut query: {outQuery}");
+		}
+
+		static void TestHeaders()
+		{
+			string rootPath =
+		@"C:\Users\Diogny\Desktop\NJTransit\data\";
+			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
+			//@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
+
+			var db = new CsvDb.CsvDb(rootPath);
+
+			//this is just for testing
 			var vis = new Visualizer(db);
 
-			//test.TestIndexTrees();
+			//vis.TestIndexTrees();
 			vis.TestIndexTreeShape();
 
-			//	test.TestOverwrite();
+			//	vis.TestOverwrite();
 
-			//test.TestIndexItems();
-			//test.TestIndexReader("routes", "route_id", (Int32)180);
+			//vis.TestIndexItems();
+			vis.TestIndexReader("routes", "route_id", (Int32)180);
 			//		"routes", "route_id", (Int32)180				//offset: 1320,		180|3073
 			// only for \data\
 			//		"trips", "trip_id", (Int32)61584				//offset: 494480		61584|3796690
+
+			//with this value(s), we go the .csv to get the record(s)
+
 		}
 
 	}

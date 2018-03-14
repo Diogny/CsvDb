@@ -16,6 +16,10 @@ namespace CsvDb
 	{
 		//https://msdn.microsoft.com/en-us/magazine/mt808499.aspx
 
+		//any of these chars should be wrapped by ""
+		//	"	,	line-break
+		internal static char[] CvsChars = new char[] { '"', ',', (Char)10, ' ' };
+
 		public static string ToYesNo(this bool value)
 		{
 			return value ? "Yes" : "No";
@@ -126,7 +130,18 @@ namespace CsvDb
 			{
 				return text == null ? "" : text;
 			}
-			return text.IndexOf(',') < 0 ? text : $"\"{text}\"";
+
+			var ndx = text.IndexOfAny(CvsChars);
+			if (ndx == 0)
+			{
+				//any double-quote char " must be doubled: ""
+				text = text.Replace("\"", "\"\"");
+			}
+			// double-quotes (") comma (,) line-breaks (10) or column:String should be doubled quoted ""
+			return (ndx >= 0) ? // || column.Type == "String") ?
+				$"\"{text}\"" :
+				text;
+			//text.IndexOf(',') < 0 ? text : $"\"{text}\"";
 		}
 
 		public static string CsvStringValue(this string text, CsvDbColumn column)
