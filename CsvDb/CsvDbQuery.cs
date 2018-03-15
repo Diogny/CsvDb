@@ -42,11 +42,14 @@ namespace CsvDb
 			{
 				throw new ArgumentException("Database is undefined");
 			}
-			Table = table;
-			Columns = columns;
-			Where = where;
-			Skip = skip;
-			Limit = limit;
+			if ((Table = table) == null || (Columns = columns) == null)
+			{
+				throw new ArgumentException("Csv Db Query must has a table and a column(s)");
+			}
+			//ensure always has value
+			Where = where ?? new List<CsvDbQueryExpressionBase>();
+			Skip = skip <= 0 ? -1 : skip;
+			Limit = limit <= 0 ? -1 : limit;
 			//	SELECT * FROM [table] t
 			//		WHERE t.Name == ""
 		}
@@ -86,10 +89,6 @@ namespace CsvDb
 		//					r.route_type == 2
 		// route_id,route_short_name\t[routes]\t[agency_id],==,"NJT"\tAND\t[route_type],==,2
 
-		public abstract class CsvDbQueryExpressionBase
-		{
-
-		}
 
 		public class CsvDbQueryColumnSelector
 		{
@@ -103,99 +102,111 @@ namespace CsvDb
 				IsFull = isFull;
 			}
 
-			public override string ToString() => IsFull ? "*" : String.Join(", ", Columns.Select(c => c.Name));
-
+			public override string ToString() => IsFull ? "*" : String.Join(",", Columns.Select(c => c.Name));
 		}
 
 		#region Operands
 
+		public enum CsvDbQueryOperandType
+		{
+			TableColumn,
+			String,
+			Number
+		}
+
 		public abstract class CsvDbQueryOperand
 		{
 
-			public string Name { get; protected internal set; }
+			public abstract string Name { get; }
 
-			public abstract bool IsTable { get; }
-			public abstract bool isConstant { get; }
-			//later return type
-			public abstract bool isNumber { get; protected internal set; }
-			public abstract bool isString { get; protected internal set; }
+			public abstract CsvDbQueryOperandType Type { get; }
 
-			protected internal CsvDbQueryOperand(string oper)
-			{
-				//check later for table name and or operand type
-				if (String.IsNullOrWhiteSpace(oper))
-				{
-					throw new ArgumentException($"Invalid query operand: {oper}");
-				}
-				Name = oper;
-			}
+			protected internal CsvDbQueryOperand()
+			{ }
 
 			public override string ToString() => $"{Name}";
 
-			protected internal static CsvDbQueryOperand Parse(CsvDbTable table, string oper)
+			protected internal static CsvDbQueryOperand Parse(CsvDbTable table, string name)
 			{
 				//first test for:
 				//	number
-				//	string
-				bool isNumber = false;
-				bool isString = false;
-				if ((isNumber = Double.TryParse(oper, out double value)) ||
-					(isString = oper.StartsWith('"') && oper.EndsWith('"')))
+				if (Double.TryParse(name, out double value))
 				{
-					return new CsvDbQueryOperandConstant(oper, isNumber, isString);
+					return new CsvDbQueryNumberOperand(value);
+				}
+				//string
+				else if (name.StartsWith('"') && name.EndsWith('"'))
+				{
+					return new CsvDbQueryStringOperand(name);
 				}
 				//now test for table column's name
-				var column = table.Columns.FirstOrDefault(c => c.Name == oper);
+				var column = table.Columns.FirstOrDefault(c => c.Name == name);
 				if (column != null)
 				{
-					return new CsvDbQueryOperandTableColumn(column, oper);
+					return new CsvDbQueryTableColumnOperand(column, name);
 				}
 				return null;
 			}
 
 		}
 
-		public class CsvDbQueryOperandTableColumn : CsvDbQueryOperand
+		public class CsvDbQueryTableColumnOperand : CsvDbQueryOperand
 		{
 			public CsvDbColumn Column { get; protected internal set; }
 
-			public override bool IsTable => true;
-			public override bool isConstant => false;
+			public override CsvDbQueryOperandType Type => CsvDbQueryOperandType.TableColumn;
 
-			public override bool isNumber { get; protected internal set; }
-			public override bool isString { get; protected internal set; }
+			public override string Name { get => Column.Name; }
 
-			protected internal CsvDbQueryOperandTableColumn(CsvDbColumn column, string tableName)
-				: base(tableName)
+			protected internal CsvDbQueryTableColumnOperand(CsvDbColumn column, string tableName)
 			{
 				Column = column;
 			}
 		}
 
-		public class CsvDbQueryOperandConstant : CsvDbQueryOperand
+		public abstract class CsvDbQueryConstantOperand : CsvDbQueryOperand
 		{
-			public override bool IsTable => false;
-			public override bool isConstant => true;
+			// "#.##";
+			// "" means full number
+			static string format = "";
+			//later test for format
+			public static string Format { get => format; set => format = value; }
+		}
 
-			public override bool isNumber { get; protected internal set; }
-			public override bool isString { get; protected internal set; }
+		public class CsvDbQueryStringOperand : CsvDbQueryConstantOperand
+		{
+			public override CsvDbQueryOperandType Type => CsvDbQueryOperandType.String;
 
-			protected internal CsvDbQueryOperandConstant(string oper, bool isnumber, bool isstring)
-				: base(oper)
+			string name;
+			public override string Name => name;
+
+			public CsvDbQueryStringOperand(string name)
 			{
-				isNumber = isnumber;
-				isString = isstring;
+				this.name = name;
 			}
+		}
 
+		public class CsvDbQueryNumberOperand : CsvDbQueryConstantOperand
+		{
+			public override CsvDbQueryOperandType Type => CsvDbQueryOperandType.Number;
+
+			double value;
+			public override string Name => value.ToString(CsvDbQueryConstantOperand.Format);
+
+			public CsvDbQueryNumberOperand(double value)
+			{
+				this.value = value;
+			}
 		}
 
 		#endregion
 
-		#region Conditions =, >, >=, <, <=
+		#region Conditions supported =, >, >=, <, <=
 
 		public enum CsvDbQueryConditionOper
 		{
 			Equal,
+			NotEqual,
 			Greater,
 			GreaterOrEqual,
 			Less,
@@ -214,6 +225,9 @@ namespace CsvDb
 				{
 					case "=":
 						Type = CsvDbQueryConditionOper.Equal;
+						break;
+					case "<>":
+						Type = CsvDbQueryConditionOper.NotEqual;
 						break;
 					case ">":
 						Type = CsvDbQueryConditionOper.Greater;
@@ -237,6 +251,9 @@ namespace CsvDb
 
 		#endregion
 
+		public abstract class CsvDbQueryExpressionBase
+		{ }
+
 		public class CsvDbQueryExpression : CsvDbQueryExpressionBase
 		{
 
@@ -259,7 +276,7 @@ namespace CsvDb
 			public override string ToString() => $"{Left} {Operator} {Right}";
 		}
 
-		#region logical operand AND, OR
+		#region Logical Operands supported AND, OR
 
 		public enum CsvDbQueryLogic
 		{
@@ -273,22 +290,22 @@ namespace CsvDb
 
 			public string Name { get; protected internal set; }
 
-			protected internal CsvDbQueryLogical(string cond)
+			protected internal CsvDbQueryLogical(string condition)
 			{
-				if (String.IsNullOrWhiteSpace(cond))
+				if (String.IsNullOrWhiteSpace(condition))
 				{
 					throw new ArgumentException($"Invalid condition, cannot be null or empty");
 				}
-				switch (Name = cond)
+				switch (Name = condition.ToUpper())
 				{
-					case "and":
+					case "AND":
 						Type = CsvDbQueryLogic.AND;
 						break;
-					case "or":
+					case "OR":
 						Type = CsvDbQueryLogic.OR;
 						break;
 					default:
-						throw new ArgumentException($"Invalid condition [{cond}]");
+						throw new ArgumentException($"Invalid condition [{Name}]");
 				}
 			}
 
@@ -297,15 +314,15 @@ namespace CsvDb
 
 		#endregion
 
-		static string pattern = @"select\s+(?<columns>\*|(?:\w+\s*,\s*)*\w+)\s+from\s+(?<table>\w+)\s*"
-			+ "(?:where\\s+(?<where>(?:(?:(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?:=|[><]=?)\\s*(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?:and|or))\\s*)*))?"
-			+ @"(?:\s*skip\s+(?<skip>\d+))?"
-			+ @"(?:\s*limit\s+(?<limit>\d+))?";
+		static string pattern = @"SELECT\s+(?<columns>\*|(?:\w+\s*,\s*)*\w+)\s+FROM\s+(?<table>\w+)\s*"
+			+ "(?:WHERE\\s+(?<where>(?:(?:(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?:=|<>|[><]=?)\\s*(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?:and|or))\\s*)*))?"
+			+ @"(?:\s*SKIP\s+(?<skip>\d+))?"
+			+ @"(?:\s*LIMIT\s+(?<limit>\d+))?";
 
 		static Regex patterRegEx = new Regex(pattern, RegexOptions.Multiline | RegexOptions.Compiled);
 
 		static string paramPattern =
-			"(?:(?<left>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?<oper>=|(?:>|<)=?)\\s*(?<right>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?<cond>and|or)";
+			"(?:(?<left>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?<oper>=|<>|[><]=?)\\s*(?<right>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?<cond>and|or)";
 
 		static Regex regexWhere = new Regex(paramPattern, RegexOptions.Multiline | RegexOptions.Compiled);
 
@@ -320,7 +337,7 @@ namespace CsvDb
 			}
 
 			//Table
-			var table = db.Table(match.Groups["table"].Value);
+			var table = db.Table(match.Groups["table"].Value.Trim());
 			if (table == null)
 			{
 				throw new ArgumentException($"Cannot find table name of database.");
@@ -339,7 +356,7 @@ namespace CsvDb
 			{
 				foreach (var colName in group.Value.Split(","))
 				{
-					var c = table.Column(colName);
+					var c = table.Column(colName.Trim());
 					if (c == null)
 					{
 						throw new ArgumentException($"Cannot find {colName} in [{table.Name}] name of database.");

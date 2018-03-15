@@ -25,6 +25,11 @@ namespace CsvDb
 
 		List<MetaItemsPage> Pages = new List<MetaItemsPage>();
 
+		public bool ValidPage(int offset)
+		{
+			return Pages.Any(p => p.Offset == offset);
+		}
+
 		public CsvDbIndexItemsReader(CsvDb db, string tableName, string columnName)
 		{
 			if ((Database = db) == null)

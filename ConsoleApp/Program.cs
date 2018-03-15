@@ -12,7 +12,8 @@ namespace ConsoleApp
 
 			//Generators();
 			//TestHeaders();
-			SqlQueryTests();
+			//SqlQueryTests();
+			TestSearch();
 
 			Console.WriteLine("Press enter to finish!");
 			Console.ReadLine();
@@ -64,7 +65,8 @@ namespace ConsoleApp
 
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
 
-			var query = "select * from routes where route_id = 5 and agency_id = \"NJB\" skip 2 limit 5"
+			var query = //"SELECT * FROM routes WHERE route_id >= 5 and agency_id <> \"NJB\" SKIP 2 LIMIT 5"
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 and agency_id <> \"NJB\" SKIP 2 LIMIT 5"
 				//"select * from routes where"
 				//"select * from routes"
 				//"select * from"
@@ -81,6 +83,22 @@ namespace ConsoleApp
 			var outQuery = dbQuery.ToString();
 			//"SELECT * FROM routes WHERE route_id = 5 and agency_id = \"NJB\""
 			Console.WriteLine($"\r\nOut query: {outQuery}");
+		}
+
+		static void TestSearch()
+		{
+			string rootPath =
+		@"C:\Users\Diogny\Desktop\NJTransit\data\";
+			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
+			//@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
+
+			var db = new CsvDb.CsvDb(rootPath);
+
+			var r = new CsvRecordReader(db);
+			var res = r.Find("routes", "route_id", (Int32)180);
+			/*
+			 record = {string[7]}
+			 */
 		}
 
 		static void TestHeaders()

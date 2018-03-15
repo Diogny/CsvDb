@@ -282,11 +282,29 @@ namespace CsvDb
 		protected internal CsvDbTable Table { get; set; }
 
 		[Newtonsoft.Json.JsonIgnore]
-		public CsvDbIndexItemsReader IndexSearcher { get; protected internal set; }
+		private Lazy<CsvDbIndexItemsReader> _indexItemReader;
 
 		[Newtonsoft.Json.JsonIgnore]
-		public CsvDbIndexTreeReader PageItemSearcher { get; protected internal set; }
+		public CsvDbIndexItemsReader PageItemReader { get { return _indexItemReader.Value; } }
 
+		[Newtonsoft.Json.JsonIgnore]
+		private Lazy<CsvDbIndexTreeReader> _treeIndexReader;
+
+		[Newtonsoft.Json.JsonIgnore]
+		public CsvDbIndexTreeReader TreeIndexReader { get { return _treeIndexReader.Value; } }
+
+		public CsvDbColumn()
+		{
+			//load only if needed
+			_indexItemReader = new Lazy<CsvDbIndexItemsReader>(() =>
+				{
+					return new CsvDbIndexItemsReader(Table.Database, Table.Name, Name);
+				});
+			_treeIndexReader = new Lazy<CsvDbIndexTreeReader>(() =>
+				{
+					return new CsvDbIndexTreeReader(Table.Database, Table.Name, Name);
+				});
+		}
 
 		public override string ToString()
 		{
