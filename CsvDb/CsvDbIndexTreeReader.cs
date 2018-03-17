@@ -214,22 +214,22 @@ namespace CsvDb
 				}
 			}
 
-			var stack = new Stack<MetaIndexBase>();
-			stack.Push(root);
-			while (stack.Count > 0)
-			{
-				var page = stack.Pop();
-				//compare keys
-				if (page.Type == MetaIndexType.Items)
-				{
+			//var stack = new Stack<MetaIndexBase>();
+			//stack.Push(root);
+			//while (stack.Count > 0)
+			//{
+			//	var page = stack.Pop();
+			//	//compare keys
+			//	if (page.Type == MetaIndexType.Items)
+			//	{
 
-					return page;
-				}
-				else
-				{
+			//		return page;
+			//	}
+			//	else
+			//	{
 
-				}
-			}
+			//	}
+			//}
 			return null;
 		}
 

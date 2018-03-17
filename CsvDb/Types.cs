@@ -97,7 +97,7 @@ namespace CsvDb
 
 	}
 
-	public class CsvDbKeyValue<T>
+	public class CsvDbKeyValues<T>
 	{
 		public T Key { get; set; }
 

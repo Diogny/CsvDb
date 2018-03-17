@@ -102,7 +102,7 @@ namespace CsvDb
 			}
 		}
 
-		public CsvDbKeyValue<object> Find(int offset, object key)
+		public CsvDbKeyValues<object> Find(int offset, object key)
 		{
 			var page = Pages.FirstOrDefault(p => p.Offset == offset);
 
@@ -113,7 +113,7 @@ namespace CsvDb
 			var pair = page.Items.FirstOrDefault(i => i.Key.Equals(key));
 			return (pair.Key == null) ?
 				null :
-				new CsvDbKeyValue<object>()
+				new CsvDbKeyValues<object>()
 				{
 					Key = pair.Key,
 					Values = pair.Value

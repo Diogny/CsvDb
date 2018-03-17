@@ -8,6 +8,9 @@ using consts = CsvDb.Consts;
 
 namespace ConsoleApp
 {
+	/// <summary>
+	/// A Simple test class, due for deleting soon
+	/// </summary>
 	public class Visualizer
 	{
 

@@ -12,6 +12,7 @@ namespace ConsoleApp
 
 			//Generators();
 			//TestHeaders();
+
 			//SqlQueryTests();
 			TestSearch();
 
@@ -65,8 +66,8 @@ namespace ConsoleApp
 
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
 
-			var query = //"SELECT * FROM routes WHERE route_id >= 5 and agency_id <> \"NJB\" SKIP 2 LIMIT 5"
-				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 and agency_id <> \"NJB\" SKIP 2 LIMIT 5"
+			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
 				//"select * from routes where"
 				//"select * from routes"
 				//"select * from"
@@ -95,10 +96,24 @@ namespace ConsoleApp
 			var db = new CsvDb.CsvDb(rootPath);
 
 			var r = new CsvRecordReader(db);
-			var res = r.Find("routes", "route_id", (Int32)180);
+			var res = r.Find("calendar_dates", "date", (Int32)20180422);
+			//"agency", "agency_id", (String)"NJB"
+			//		NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
+			//"stops", "stop_id", (Int32)307
+			//		307,10863,"SHORE RD AT MEYRAN AVE",,39.324568,-74.587541,0
+			//"routes", "route_id", (Int32)180
+			//		180,NJB,74,,3,,
+			//"calendar_dates", "date", (Int32)20180422
+			//		2,20180422,1
+			//		8,20180422,1
 			/*
 			 record = {string[7]}
 			 */
+			Console.WriteLine("Output>");
+			foreach (var col in res)
+			{
+				Console.WriteLine($"{String.Join(",", col)}");
+			}
 		}
 
 		static void TestHeaders()

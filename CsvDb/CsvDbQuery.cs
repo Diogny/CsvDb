@@ -107,19 +107,14 @@ namespace CsvDb
 
 		#region Operands
 
-		public enum CsvDbQueryOperandType
-		{
-			TableColumn,
-			String,
-			Number
-		}
-
 		public abstract class CsvDbQueryOperand
 		{
 
 			public abstract string Name { get; }
 
-			public abstract CsvDbQueryOperandType Type { get; }
+			public abstract CsvDbColumnTypeEnum Type { get; }
+
+			public abstract object Value(ref object[] values);
 
 			protected internal CsvDbQueryOperand()
 			{ }
@@ -128,14 +123,8 @@ namespace CsvDb
 
 			protected internal static CsvDbQueryOperand Parse(CsvDbTable table, string name)
 			{
-				//first test for:
-				//	number
-				if (Double.TryParse(name, out double value))
-				{
-					return new CsvDbQueryNumberOperand(value);
-				}
 				//string
-				else if (name.StartsWith('"') && name.EndsWith('"'))
+				if (name.StartsWith('"') && name.EndsWith('"'))
 				{
 					return new CsvDbQueryStringOperand(name);
 				}
@@ -145,18 +134,20 @@ namespace CsvDb
 				{
 					return new CsvDbQueryTableColumnOperand(column, name);
 				}
-				return null;
+				//	number
+				return new CsvDbQueryNumberOperand(name);
 			}
-
 		}
 
 		public class CsvDbQueryTableColumnOperand : CsvDbQueryOperand
 		{
 			public CsvDbColumn Column { get; protected internal set; }
 
-			public override CsvDbQueryOperandType Type => CsvDbQueryOperandType.TableColumn;
+			public override CsvDbColumnTypeEnum Type => Column.TypeEnum;
 
 			public override string Name { get => Column.Name; }
+
+			public override object Value(ref object[] values) { return values[Column.Index]; }
 
 			protected internal CsvDbQueryTableColumnOperand(CsvDbColumn column, string tableName)
 			{
@@ -175,10 +166,12 @@ namespace CsvDb
 
 		public class CsvDbQueryStringOperand : CsvDbQueryConstantOperand
 		{
-			public override CsvDbQueryOperandType Type => CsvDbQueryOperandType.String;
+			public override CsvDbColumnTypeEnum Type => CsvDbColumnTypeEnum.String;
 
 			string name;
 			public override string Name => name;
+
+			public override object Value(ref object[] values) { return name; }
 
 			public CsvDbQueryStringOperand(string name)
 			{
@@ -188,16 +181,49 @@ namespace CsvDb
 
 		public class CsvDbQueryNumberOperand : CsvDbQueryConstantOperand
 		{
-			public override CsvDbQueryOperandType Type => CsvDbQueryOperandType.Number;
+			CsvDbColumnTypeEnum type;
+			public override CsvDbColumnTypeEnum Type => type;
 
-			double value;
-			public override string Name => value.ToString(CsvDbQueryConstantOperand.Format);
+			public override string Name => _value.ToString();
 
-			public CsvDbQueryNumberOperand(double value)
+			object _value;
+			public override object Value(ref object[] values) { return _value; }
+
+			public T GetValueAs<T>()
 			{
-				this.value = value;
+				T val = default(T);
+				var typeName = val.GetType().Name;
+				if (Enum.TryParse<TypeCode>(typeName, out TypeCode typeCode))
+				{
+					return (T)Convert.ChangeType(_value, typeCode);
+				}
+				throw new ArgumentException($"Unable to cast operand to T [{typeName}]");
 			}
-		}
+
+			//name can be a cast like (Byte)8
+			public CsvDbQueryNumberOperand(string name)
+			{
+				if (int.TryParse(name, out int intValue))
+				{
+					//Byte
+					//Int16
+					//Int32
+					_value = intValue;
+					type = CsvDbColumnTypeEnum.Int32;
+				}
+				else if (Double.TryParse(name, out double doubleValue))
+				{
+					//Double
+					_value = doubleValue;
+					type = CsvDbColumnTypeEnum.Double;
+				}
+				else
+				{
+					throw new ArgumentException($"Invalid number operand: {name}");
+				}
+			}
+
+		}//
 
 		#endregion
 
@@ -270,7 +296,40 @@ namespace CsvDb
 				{
 					throw new ArgumentException($"Database query expression invalid");
 				}
+				//test types
+				 
 				Operator = new CsvDbQueryOperator(oper);
+			}
+
+			public bool Evaluate(ref object[] values)
+			{
+				var l = Left.Value(ref values);
+				var r = Right.Value(ref values);
+
+
+				return false;
+			}
+
+			bool Comparer<T>(T left, CsvDbQueryConditionOper comp, T right)
+				where T : IComparable<T>
+			{
+				var result = left.CompareTo(right);
+				switch (Operator.Type)
+				{
+					case CsvDbQueryConditionOper.Equal:
+						return result == 0;
+					case CsvDbQueryConditionOper.NotEqual:
+						return result != 0;
+					case CsvDbQueryConditionOper.Greater:
+						return result > 0;
+					case CsvDbQueryConditionOper.GreaterOrEqual:
+						return result >= 0;
+					case CsvDbQueryConditionOper.Less:
+						return result < 0;
+					case CsvDbQueryConditionOper.LessOrEqual:
+						return result <= 0;
+				}
+				return false;
 			}
 
 			public override string ToString() => $"{Left} {Operator} {Right}";
@@ -314,15 +373,21 @@ namespace CsvDb
 
 		#endregion
 
-		static string pattern = @"SELECT\s+(?<columns>\*|(?:\w+\s*,\s*)*\w+)\s+FROM\s+(?<table>\w+)\s*"
-			+ "(?:WHERE\\s+(?<where>(?:(?:(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?:=|<>|[><]=?)\\s*(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?:and|or))\\s*)*))?"
-			+ @"(?:\s*SKIP\s+(?<skip>\d+))?"
-			+ @"(?:\s*LIMIT\s+(?<limit>\d+))?";
+		static string pattern =
+			@"\s*SELECT\s+(?<columns>\*|(?:\w+\s*,\s*)*\w+)" +
+			@"\s+FROM\s+(?<table>\w+)" +
+			//"(?<where>\\s*WHERE\\s*(?:(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?:=|<>|[><]=?)\\s*(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))))\\s*(?:AND|OR)?\\s*)*)?" +
+			"(?<where>\\s*WHERE\\s*(?:(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:=|<>|[><]=?)\\s*(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:AND|OR)?\\s*)*)" +
+			//with casting (Byte)5
+			//"(?<where>\\s*WHERE\\s*(?:(?:(?:\\(\\w+\\))?(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:=|<>|[><]=?)\\s*(?:(?:\\(\\w+\\))?(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:AND|OR)?\\s*)*)" +
+			"(?:\\s*SKIP\\s+(?<skip>\\d+))?" +
+			"(?:\\s*LIMIT\\s+(?<limit>\\d+))?";
 
 		static Regex patterRegEx = new Regex(pattern, RegexOptions.Multiline | RegexOptions.Compiled);
 
 		static string paramPattern =
-			"(?:(?<left>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?<oper>=|<>|[><]=?)\\s*(?<right>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?<cond>and|or)";
+			"(?:(?<left>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?<oper>=|<>|[><]=?)\\s*(?<right>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?<cond>AND|OR)";
+		//"(?:(?<left>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?<oper>=|<>|[><]=?)\\s*(?<right>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?<cond>AND|OR)";
 
 		static Regex regexWhere = new Regex(paramPattern, RegexOptions.Multiline | RegexOptions.Compiled);
 

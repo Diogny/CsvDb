@@ -17,7 +17,144 @@ namespace CsvDb
 			}
 		}
 
-		//has a bug
+		internal static List<string[]> ReadRecords(
+			string path,
+			CsvDbTable table,
+		IEnumerable<Int32> offsetCollection)
+		{
+			var list = new List<string[]>();
+
+			var sb = new StringBuilder();
+			//char buffer
+			var buffer = new char[1024];
+			var charIndex = 0;
+
+			using (var reader = new io.StreamReader(path))
+			{
+				void FillBuffer()
+				{
+					reader.Read(buffer, 0, buffer.Length);
+					charIndex = 0;
+				};
+				char ReadChar()
+				{
+					if (charIndex >= buffer.Length)
+					{
+						FillBuffer();
+					}
+					return buffer[charIndex++];
+				}
+
+				char PeekChar()
+				{
+					if (charIndex >= buffer.Length)
+					{
+						FillBuffer();
+					}
+					return buffer[charIndex];
+				}
+				foreach (var offs in offsetCollection)
+				{
+					var count = table.Columns.Count;
+					//record of columns
+					var record = new string[count];
+					var columnIndex = 0;
+					//point to record offset
+					reader.BaseStream.Position = offs;
+
+					//fill buffer initially
+					FillBuffer();
+
+					//read csv record columns
+					//read  , => add column
+					//		  " => start of string, read until next "
+					//					if " and next is "", then "" and continue until next "
+					//		  otherwise read until next ,
+
+					sb.Length = 0;
+					char ch = (char)0;
+
+					while (columnIndex < count)
+					{
+						ch = ReadChar();
+						//add when comma, (13) \r (10) \n
+						switch (ch)
+						{
+							case ',':
+								if (sb.Length > 0)
+								{
+									//store column
+									record[columnIndex] = sb.ToString();
+									sb.Length = 0;
+								}
+								//point to next column
+								columnIndex++;
+								break;
+							case '\r':
+							case '\n':
+								if (sb.Length > 0)
+								{
+									//store column
+									record[columnIndex] = sb.ToString();
+									sb.Length = 0;
+								}
+								//signal end of record
+								columnIndex = count;
+								break;
+							case '"':
+								bool endOfString = false;
+								while (!endOfString)
+								{
+									//read as many as possible
+									while ((ch = ReadChar()) != '"')
+									{
+										sb.Append(ch);
+									}
+									//we got a "
+									if (PeekChar() == '"')
+									{
+										//it's ""
+										charIndex++;
+										sb.Append("\"\"");
+									}
+									else
+									{
+										//consume last "
+										//ch = ReadChar();
+										//end of string reached
+										endOfString = true;
+									}
+								}
+								//leave string in sb until next comma or \r \n
+								//this way spaces after "string with spaces" will be discarded
+								break;
+							default:
+								if ((int)ch <= 32)
+								{
+									//do nothing, discard spaces before comma, "strings", ...
+								}
+								else
+								{
+									//read while > ' '
+									//single string word or symbol, number, etc
+									do
+									{
+										sb.Append(ch);
+									} while ((int)(ch = ReadChar()) > 32 && (ch != ','));
+									//read again the ch
+									charIndex--;
+									//leave string in sb
+								}
+								break;
+						}
+					}
+					//add new record
+					list.Add(record);
+				}
+			}
+			return list;
+		}
+
 		public List<string[]> Find(string tableName, string columnName, object key)
 		{
 			//go to page and find <key,[values]>
@@ -40,118 +177,12 @@ namespace CsvDb
 
 			var offset = column.TreeIndexReader.Find(key);
 
-			CsvDbKeyValue<object> item = column.PageItemReader.Find(offset, key);
+			CsvDbKeyValues<object> item = column.PageItemReader.Find(offset, key);
 
-			var list = new List<string[]>();
+			var path = io.Path.Combine(Database.BinaryPath, $"{table.Name}.csv");
 
 			//go to csv and find it records
-			var path = io.Path.Combine(Database.BinaryPath, $"{table.Name}.csv");
-			var sb = new StringBuilder();
-			//char buffer
-			var buffer = new char[1024];
-			var index = 0;
-
-			using (var reader = new io.StreamReader(path))
-			{
-				void FillBuffer()
-				{
-					reader.Read(buffer, 0, buffer.Length);
-					index = 0;
-				};
-				char ReadChar()
-				{
-					if (index >= buffer.Length)
-					{
-						FillBuffer();
-					}
-					return buffer[index++];
-				}
-
-				char PeekChar()
-				{
-					if (index >= buffer.Length)
-					{
-						FillBuffer();
-					}
-					return buffer[index];
-				}
-				
-				foreach (var offs in item.Values)
-				{
-					var count = table.Columns.Count;
-					//record of columns
-					var record = new string[count];
-					var i = 0;
-					//point to record offset
-					reader.BaseStream.Position = offs;
-
-					//fill buffer initially
-					FillBuffer();
-
-					//read csv record columns
-					//read  , => add column
-					//		  " => start of string, read until next "
-					//					if " and next is "", then "" and continue until next "
-					//		  otherwise read until next ,
-
-					sb.Length = 0;
-					while (i < count)
-					{
-						var ch = ReadChar();
-						if (ch == ',')
-						{
-							if (sb.Length > 0)
-							{
-								//not empty
-								record[i] = sb.ToString();
-							}
-							sb.Length = 0;
-							i++;
-						}
-						else if (ch == '"')
-						{
-							bool endOfString = false;
-							while (!endOfString)
-							{
-								//read as many as possible
-								while ((ch = ReadChar()) != '"')
-								{
-									sb.Append(ch);
-								}
-								if (PeekChar() == '"')
-								{
-									index++;
-									sb.Append("\"\"");
-								}
-								else
-								{
-									endOfString = true;
-								}
-							}
-							//leave sb with value so next comma will add
-						}
-						else if ((int)ch <= 32)
-						{
-							//do nothing, discard spaces before comma, "strings", ...
-						}
-						else
-						{
-							//read until ,
-							do
-							{
-								sb.Append(ch);
-							} while ((ch = ReadChar()) != ',');
-
-							record[i++] = sb.ToString();
-							sb.Length = 0;
-						}
-					}
-					//add new record
-					list.Add(record);
-				}
-			}
-
-			return list;
+			return ReadRecords(path, table, item.Values);
 		}
 
 	}
