@@ -1,41 +1,56 @@
 ﻿using CsvDb;
 using System;
+using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace ConsoleApp
 {
 	class Program
 	{
+		static string basePath = @"C:\Users\Diogny\Desktop\NJTransit\";
+
 		static void Main(string[] args)
 		{
+			var handleWait = false;
+
 			//Generators();
 			//TestHeaders();
 
-			//SqlQueryTests();
-			//TestSearch();
-			SqlQueryExecuteTests();
+			//SqlQueryExecuteTests();
+			//SqlQueryFinalParseTests();
+			handleWait = SqlQueryExecute();
 
-			Console.WriteLine("\r\nPress enter to finish!");
-			Console.ReadLine();
+			if (!handleWait)
+			{
+				Console.WriteLine("\r\nPress enter to finish!");
+				Console.ReadLine();
+			}
+		}
+
+		static CsvDb.CsvDb CreateDatabase()
+		{
+			string rootPath =
+				$@"{basePath}data\";
+			//$@"{basePath}data-light\";
+			//$@"{basePath}data-extra-light\";
+
+			var db = new CsvDb.CsvDb(rootPath);
+			return db;
 		}
 
 		static void Generators()
 		{
-			string rootPath =
-			//@"C:\Users\Diogny\Desktop\NJTransit\data\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
-			@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
-			//
-			//@"C:\Users\Diogny\Desktop\NJTransit\test\";
+			//update CreateDatabase() rootPath to match with [name].zip file  data\ with bus_data.zip
 
-			var db = new CsvDb.CsvDb(rootPath);
+			var db = CreateDatabase();
 
 			var gen = new CsvDbGenerator(
 				db,
-				//@"C:\Users\Diogny\Desktop\NJTransit\bus_data.zip",
-				//@"C:\Users\Diogny\Desktop\NJTransit\bus_data-light.zip",
-				@"C:\Users\Diogny\Desktop\NJTransit\bus_data-extra-light.zip",
+				//@"{basePath}bus_data.zip",
+				//@"{basePath}bus_data-light.zip",
+				@"{basePath}bus_data-extra-light.zip",
 
 				//comment this when uncommented: gen.GenerateTxtData(); for a clean output
 				removeAll: false
@@ -49,16 +64,151 @@ namespace ConsoleApp
 			gen.GenerateTreeStructure();
 		}
 
-		static void SqlQueryExecuteTests()
+		static bool SqlQueryExecute()
 		{
-			string rootPath =
-		@"C:\Users\Diogny\Desktop\NJTransit\data\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
+			//SELECT * FROM agency
 
-			var db = new CsvDb.CsvDb(rootPath);
+			var dif = new TimeDifference();
+			dif.Start = DateTime.Now;
+
+			var db = CreateDatabase();
+
+			dif.End = DateTime.Now;
 
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
+			Console.WriteLine($">created on: {dif}");
+
+			//Action displayHelp = () =>
+			void displayHelp()
+			{
+				Console.WriteLine("");
+				Console.WriteLine("Menu");
+				Console.WriteLine(" Shows (h)elp");
+				Console.WriteLine(" (S)earch Database");
+				Console.WriteLine(" Display (t)ables");
+				Console.WriteLine(" Display (c)olumn");
+				Console.WriteLine(" Clea(r)");
+				Console.WriteLine(" (Q)uit");
+			}
+
+			//Console.TreatControlCAsInput = true;
+			bool end = false;
+			//displayHelp();
+			while (!end)
+			{
+				Console.Write(">");
+
+				while (Console.KeyAvailable == false)
+					Thread.Sleep(250); // Loop until input is entered.
+
+				ConsoleKeyInfo key = Console.ReadKey();
+				Console.WriteLine();
+				switch (key.Key)
+				{
+					case ConsoleKey.H:
+						displayHelp();
+						break;
+					case ConsoleKey.T:
+						//display tables
+						foreach (var t in db.Tables)
+						{
+							Console.WriteLine($" ({t.Columns.Count}) {t.Name}:{t.Type}, multikey: {t.Multikey} rows: {t.Rows}");
+						}
+						break;
+					case ConsoleKey.C:
+						//if ((key.Modifiers & ConsoleModifiers.Control) != 0)
+						//{
+						//	// Console.Write("CTL+");
+						//	end = true;
+						//}
+						//else
+						{
+							//show column structure
+							Console.Write("table name >");
+							var tableName = Console.ReadLine(); // readLine().Trim(); // 
+							var table = db.Table(tableName);
+							if (table == null)
+							{
+								Console.WriteLine($" invalid table [{tableName}]");
+							}
+							else
+							{
+								foreach (var col in table.Columns)
+								{
+									Console.WriteLine($" [{table.Name}].{col.Name}:{col.Type}");
+									Console.WriteLine($"  key: {col.Key}, indexed: {col.Indexed}, unique: {col.Unique}, pages: {col.PageCount}");
+								}
+							}
+						}
+						break;
+					case ConsoleKey.S:
+						try
+						{
+							Console.Write("query >");
+							var query = Console.In.ReadLine();  // readLine(); // 
+							Console.WriteLine();
+							Console.WriteLine($"> processing: {query}");
+
+							var parser = new CsvDbQueryParser();
+							dif.Start = DateTime.Now;
+							var dbQuery = parser.Parse(db, query);
+							dif.End = DateTime.Now;
+							Console.WriteLine($">parsed on: {dif}");
+
+							//to calculate times
+							dif.Start = DateTime.Now;
+
+							var visualizer = new CsvDbVisualizer(dbQuery);
+							var rows = visualizer.Execute().ToList();
+
+							dif.End = DateTime.Now;
+							Console.WriteLine($">{rows.Count} row(s) retrieved on: {dif}");
+
+							//header
+							dif.Start = DateTime.Now;
+
+							var header = String.Join("|", dbQuery.Columns.Header);
+							Console.WriteLine($"\r\n{header}");
+							Console.WriteLine($"{new string('-', header.Length)}");
+
+							foreach (var record in visualizer.Execute())
+							{
+								Console.WriteLine($"{String.Join(",", record)}");
+							}
+
+							dif.End = DateTime.Now;
+							Console.WriteLine($"\r\n>row(s) displayed on: {dif}");
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"error: {ex.Message}");
+						}
+						break;
+					case ConsoleKey.Q:
+						end = true;
+						break;
+					case ConsoleKey.R:
+						Console.Clear();
+						break;
+					default:
+						Console.WriteLine(" -invalid option, press [h] for help");
+						break;
+				}
+			}
+			return true;
+		}
+
+		static void SqlQueryExecuteTests()
+		{
+			var dif = new TimeDifference();
+			dif.Start = DateTime.Now;
+
+			var db = CreateDatabase();
+
+			dif.End = DateTime.Now;
+
+			Console.WriteLine($"\r\nDatabase: {db.Name}");
+			Console.WriteLine($">created on: {dif}");
 
 			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
 									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
@@ -70,110 +220,111 @@ namespace ConsoleApp
 
 			Console.WriteLine($"\r\nIn query: {query}");
 
-			var dbQuery = CsvDb.CsvDbQuery.Parse(db, query);
+			dif.Start = DateTime.Now;
+
+			var parser = new CsvDbQueryParser();
+			var dbQuery = parser.Parse(db, query); // old one: CsvDb.CsvDbQuery.Parse(db, query);
+
+			dif.End = DateTime.Now;
+			Console.WriteLine($">parsed on: {dif}");
 
 			var outQuery = dbQuery.ToString();
 
-			Console.WriteLine($"\r\nOut query: {outQuery}");
+			Console.WriteLine($"\r\nOut query: {outQuery}\r\n");
+
+			//to calculate times
+			dif.Start = DateTime.Now;
 
 			var visualizer = new CsvDbVisualizer(dbQuery);
+			var rows = visualizer.Execute().ToList();
+
+			dif.End = DateTime.Now;
+			Console.WriteLine($">{rows.Count} row(s) retrieved on: {dif}");
+
+			//header
+			dif.Start = DateTime.Now;
+
+			var header = String.Join("|", dbQuery.Columns.Header);
+			Console.WriteLine($"\r\n{header}");
+			Console.WriteLine($"{new string('-', header.Length)}");
+
 			foreach (var record in visualizer.Execute())
 			{
 				Console.WriteLine($"{String.Join(",", record)}");
 			}
 
+			dif.End = DateTime.Now;
+			Console.WriteLine($"\r\n>row(s) displayed on: {dif}");
+
 		}
 
-		static void SqlQueryTests()
+		static void SqlQueryFinalParseTests()
 		{
-			string rootPath =
-		//@"C:\Users\Diogny\Desktop\NJTransit\data\";
-		//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
-		@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
-
-			var db = new CsvDb.CsvDb(rootPath);
+			var db = CreateDatabase();
 
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
 
-			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
-				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
-				//"select * from routes where"
-				//"select * from routes"
-				//"select * from"
-				//"select *"
-				//"select"
-				//""
-				;
-			
-			Console.WriteLine($"\r\nIn query: {query}");
-
-			var dbQuery = CsvDb.CsvDbQuery.Parse(db, query);
-
-			var outQuery = dbQuery.ToString();
-			
-			Console.WriteLine($"\r\nOut query: {outQuery}");
-		}
-
-		static void TestSearch()
-		{
-			string rootPath =
-		@"C:\Users\Diogny\Desktop\NJTransit\data\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
-
-			var db = new CsvDb.CsvDb(rootPath);
-
-			var r = new CsvRecordReader(db);
-			var tests = new List<object[]>()
+			var queryCollection = new string[]
 			{
-				new object[] { "agency", "agency_id", (String)"NJB" },
-				//		NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
-				new object[] { "stops", "stop_id", (Int32)307 },
-				//		307,10863,"SHORE RD AT MEYRAN AVE",,39.324568,-74.587541,0
-				new object[] { "routes", "route_id", (Int32)180 },
-				//	offset: 1320,		180|3073
-				//		180,NJB,74,,3,,
-				new object[] { "calendar_dates", "date", (Int32)20180422 },
-				//		2,20180422,1
-				//		8,20180422,1
-				new object[]  { "trips", "trip_id", (Int32)61584 }
-				//	offset: 494480
-				//		253,2,61584,GO28 NEWARK AIRPORT NORTH AREA & TERMINALS-Exact Fare,0,258OG013,7334
+				//errors
+				"",
+				"SELECT",
+				"SELECT *",
+				"SELECT * FROM",
+				"SELECT * FROM none",
+				"SELECT * FROM routes WHERE ",
+				"SELECT * FROM routes WHERE SKIP 2 ",
+				"SELECT * FROM routes SKIP ",
+				"SELECT * FROM routes WHERE route_id ",
+				"SELECT * FROM routes WHERE route_id > ",
+				"SELECT * FROM routes WHERE > 5 SKIP 2",
+				"SELECT * FROM routes WHERE route_id > SKIP 2",
+				//this one is because cookoo_i is not a table and tries to convert to number
+				"SELECT * FROM routes WHERE cookoo_i > 4 SKIP 2",
+
+				//
+				"SELECT * FROM routes",
+				"SELECT * FROM routes SKIP 2",
+				"SELECT * FROM routes SKIP 2 LIMIT 5",
+				"SELECT * FROM routes WHERE route_id >= 5",
+				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\"",
+				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2",
+				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5",
+				//
+				"SELECT route_id, agency_id,route_type FROM routes",
+				"SELECT route_id, agency_id,route_type FROM routes SKIP 2",
+				"SELECT route_id, agency_id,route_type FROM routes SKIP 2 LIMIT 2",
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5",
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\"",
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2",
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 2"
 			};
-			foreach (var args in tests.Select(item => new
-			{
-				table = (String)item[0],
-				column = (String)item[1],
-				key = item[2]
-			}))
-			{
-				Console.WriteLine($"\r\nTest for: {String.Join(",", args)}");
 
+			foreach (var query in queryCollection)
+			{
 				try
 				{
-					var res = r.Find(args.table, args.column, "=", args.key);
+					Console.WriteLine($"\r\n{new string('-', Console.WindowHeight - 1)}");
 
-					Console.WriteLine("Output>");
-					foreach (var col in res)
-					{
-						Console.WriteLine($"{String.Join(",", col)}");
-					}
+					Console.WriteLine($"\r\n>{query}");
+
+					var parser = new CsvDbQueryParser();
+					var queryDb = parser.Parse(db, query);
+
+					var outQuery = queryDb.ToString();
+
+					Console.WriteLine($"\r\n>{outQuery}");
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine(ex.Message);
+					Console.WriteLine($"exception: {ex.Message}");
 				}
 			}
 		}
 
 		static void TestHeaders()
 		{
-			string rootPath =
-		@"C:\Users\Diogny\Desktop\NJTransit\data\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
-			//@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
-
-			var db = new CsvDb.CsvDb(rootPath);
+			var db = CreateDatabase();
 
 			//this is just for testing
 			var vis = new Visualizer(db);

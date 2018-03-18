@@ -69,7 +69,12 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"Invalid databse structure");
 			}
-			Structure = Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(structure);
+			//Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
+			//fastJSON is 2X+ faster than Newtonsoft.Json parser
+			//https://github.com/mgholam/fastJSON
+
+			Structure =
+				fastJSON.JSON.ToObject<CsvDbStructure>(structure);
 
 			//link
 			Tables.ForEach(t =>
@@ -94,8 +99,14 @@ namespace CsvDb
 			Save();
 		}
 
-		public CsvDb(string path)
+		/// <summary>
+		/// Creates a new CSV database
+		/// </summary>
+		/// <param name="path">path to the root of the databse</param>
+		/// <param name="dif">for testings only, will be removed</param>
+		public CsvDb(string path, TimeDifference dif = null)
 		{
+
 			// path\bin\
 			//		__tables.json
 			//		[table].csv
@@ -140,20 +151,28 @@ namespace CsvDb
 			}
 			//Name = io.Path.GetFileNameWithoutExtension(Path = path);
 			//
-			Load();
+
+			Load(dif);
 		}
 
 		/// <summary>
 		/// Re load the __tables.json structure of the Csv database
 		/// </summary>
+		/// <param name="dif">for testings only, will be removed</param>
 		/// <returns></returns>
-		public bool Load()
+		public bool Load(TimeDifference dif = null)
 		{
 			try
 			{
 				var text = io.File.ReadAllText(FileStructurePath);
-				//
-				Structure = Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
+
+				//Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
+				//fastJSON is 2X+ faster than Newtonsoft.Json parser
+				//https://github.com/mgholam/fastJSON
+
+				Structure =
+					fastJSON.JSON.ToObject<CsvDbStructure>(text);
+
 				//link
 				Tables.ForEach(table =>
 				{
@@ -163,6 +182,7 @@ namespace CsvDb
 						column.Table = table;
 					});
 				});
+
 				return true;
 			}
 			catch (Exception ex)
@@ -177,7 +197,8 @@ namespace CsvDb
 			try
 			{
 				var json =
- Newtonsoft.Json.JsonConvert.SerializeObject(Structure, Newtonsoft.Json.Formatting.Indented);
+				//Newtonsoft.Json.JsonConvert.SerializeObject(Structure, Newtonsoft.Json.Formatting.Indented);
+				fastJSON.JSON.ToNiceJSON(Structure);
 				//
 				io.File.WriteAllText(FileStructurePath, json);
 				return true;
@@ -205,6 +226,7 @@ namespace CsvDb
 		}
 	}
 
+	[Serializable]
 	public class CsvDbTable
 	{
 		public string Name { get; set; }
@@ -246,6 +268,7 @@ namespace CsvDb
 		}
 	}
 
+	[Serializable]
 	public class CsvDbColumn
 	{
 		public string Indexer { get; set; }
@@ -336,6 +359,7 @@ namespace CsvDb
 		}
 	}
 
+	[Serializable]
 	public class CsvDbTablePager
 	{
 		public int PagerSize { get; set; }

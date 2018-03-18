@@ -13,9 +13,40 @@ using static CsvDb.CsvDbQuery;
 
 namespace CsvDb
 {
+	public class TimeDifference
+	{
+		public DateTime Start { get; set; }
+
+		public DateTime End { get; set; }
+
+		public TimeSpan Difference { get { return End - Start; } }
+
+		public override string ToString() => Difference.Difference();
+	}
+
 	public static class Utils
 	{
 		//https://msdn.microsoft.com/en-us/magazine/mt808499.aspx
+
+		public static string Difference(this TimeSpan span)
+		{
+			if (span.Seconds == 0)
+			{
+				return $"{span.Milliseconds} ms";
+			}
+			else if (span.Minutes == 0)
+			{
+				return $"{span.Seconds}.{span.Milliseconds} sec";
+			}
+			else if (span.Hours == 0)
+			{
+				return $"{span.Minutes}:{span.Seconds}.{span.Milliseconds} min";
+			}
+			else
+			{
+				return span.ToString("hh\\:mm\\:ss");
+			}
+		}
 
 		public static IEnumerable<CsvDbQueryWhereItem> Flatten(
 			this List<CsvDbQueryExpressionBase> list)

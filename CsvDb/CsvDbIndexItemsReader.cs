@@ -24,7 +24,7 @@ namespace CsvDb
 
 		io.BinaryReader reader = null;
 
-		List<MetaItemsPage<T>> Pages = new List<MetaItemsPage<T>>();
+		internal List<MetaItemsPage<T>> Pages = new List<MetaItemsPage<T>>();
 
 		public bool ValidPage(int offset)
 		{

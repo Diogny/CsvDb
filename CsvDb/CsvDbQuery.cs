@@ -91,48 +91,71 @@ namespace CsvDb
 			//execute all indexers and stack with logicals
 			CsvDbQueryLogic oper = CsvDbQueryLogic.Undefined;
 			IEnumerable<int> result = null;
+			var executerClassType = typeof(CsvDbQueryIndexExecuter<>);
 
-			foreach (var item in Where)
+			if (Where.Count == 0)
 			{
-				if (item.IsExpression)
+				//find key column
+				var keyColumn = Table.Columns.FirstOrDefault(c => c.Key);
+				if (keyColumn == null)
 				{
-					var expr = item as CsvDbQueryExpression;
-					var table = expr.Table as CsvDbQueryTableColumnOperand;
-					var typeIndex = Type.GetType($"System.{table.Column.Type}");
+					throw new ArgumentException($"Cannot find key fro table [{Table.Name}]");
+				}
+				var typeIndex = Type.GetType($"System.{keyColumn.Type}");
 
-					var classType = typeof(CsvDbQueryIndexExecuter<>);
-					Type genericClass = classType.MakeGenericType(typeIndex);
+				Type genericClass = executerClassType.MakeGenericType(typeIndex);
 
-					var objClass = Activator.CreateInstance(genericClass, new object[] {
-						expr
-					});
-					MethodInfo execute_Method = genericClass.GetMethod("Execute");
+				var objClass = Activator.CreateInstance(genericClass, new object[] {
+							keyColumn
+						});
+				MethodInfo execute_Method = genericClass.GetMethod("Execute");
 
-					var collection = (IEnumerable<int>)execute_Method.Invoke(objClass, new object[] { });
-
-					if (result == null)
+				result = (IEnumerable<int>)execute_Method.Invoke(objClass, new object[] { });
+			}
+			else
+			{
+				foreach (var item in Where)
+				{
+					if (item.IsExpression)
 					{
-						result = collection;
+						var expr = item as CsvDbQueryExpression;
+						var table = expr.Table as CsvDbQueryTableColumnOperand;
+						var typeIndex = Type.GetType($"System.{table.Column.Type}");
+
+						Type genericClass = executerClassType.MakeGenericType(typeIndex);
+
+						var objClass = Activator.CreateInstance(genericClass, new object[] {
+							expr
+						});
+						MethodInfo execute_Method = genericClass.GetMethod("Execute");
+
+						var collection = (IEnumerable<int>)execute_Method.Invoke(objClass, new object[] { });
+
+						if (result == null)
+						{
+							result = collection;
+						}
+						else
+						{
+							//perform logicals
+							switch (oper)
+							{
+								case CsvDbQueryLogic.AND:
+									result = result.Intersect(collection);
+									break;
+								case CsvDbQueryLogic.OR:
+									result = result.Union(collection);
+									break;
+							}
+						}
 					}
 					else
 					{
-						//perform logicals
-						switch (oper)
-						{
-							case CsvDbQueryLogic.AND:
-								result = result.Intersect(collection);
-								break;
-							case CsvDbQueryLogic.OR:
-								result = result.Union(collection);
-								break;
-						}
+						var logical = item as CsvDbQueryLogical;
+						oper = logical.LogicalType;
 					}
 				}
-				else
-				{
-					var logical = item as CsvDbQueryLogical;
-					oper = logical.LogicalType;
-				}
+
 			}
 
 			foreach (var offset in result)
@@ -140,7 +163,7 @@ namespace CsvDb
 				yield return offset;
 			}
 		}
-		
+
 		#endregion
 
 		// *\t[table]\t[[column],==,[value]>]
@@ -160,6 +183,8 @@ namespace CsvDb
 				Columns = columns;
 				IsFull = isFull;
 			}
+
+			public string[] Header => Columns.Select(c => c.Name).ToArray();
 
 			public override string ToString() => IsFull ? "*" : String.Join(",", Columns.Select(c => c.Name));
 		}
@@ -227,6 +252,11 @@ namespace CsvDb
 				if (column != null)
 				{
 					return new CsvDbQueryTableColumnOperand(column, name);
+				}
+				//if it doesn't start with [0-9] or [+-] then bad column
+				if (!(char.IsDigit(name[0]) || name[0] == '+' || name[0] == '-'))
+				{
+					throw new ArgumentException($"[{table.Name}].{name} column not found in database!");
 				}
 				//	number
 				return new CsvDbQueryNumberOperand(name);
@@ -513,123 +543,6 @@ namespace CsvDb
 			}
 
 			public override string ToString() => $"{Name}";
-		}
-
-		#endregion
-
-		#region Parse
-
-		//make a real parser later to include parenthesis, real type cast,...
-
-		static string pattern =
-			@"\s*SELECT\s+(?<columns>\*|(?:\w+\s*,\s*)*\w+)" +
-			@"\s+FROM\s+(?<table>\w+)" +
-			//"(?<where>\\s*WHERE\\s*(?:(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?:=|<>|[><]=?)\\s*(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))))\\s*(?:AND|OR)?\\s*)*)?" +
-			"(?<where>\\s*WHERE\\s*(?:(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:=|<>|[><]=?)\\s*(?:(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:AND|OR)?\\s*)*)" +
-			//with casting (Byte)5
-			//"(?<where>\\s*WHERE\\s*(?:(?:(?:\\(\\w+\\))?(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:=|<>|[><]=?)\\s*(?:(?:\\(\\w+\\))?(?:(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))\\s*(?:AND|OR)?\\s*)*)" +
-			"(?:\\s*SKIP\\s+(?<skip>\\d+))?" +
-			"(?:\\s*LIMIT\\s+(?<limit>\\d+))?";
-
-		static Regex patterRegEx = new Regex(pattern, RegexOptions.Multiline | RegexOptions.Compiled);
-
-		static string paramPattern =
-			"(?:(?<left>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?<oper>=|<>|[><]=?)\\s*(?<right>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?<cond>AND|OR)";
-		//"(?:(?<left>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\"))\\s*(?<oper>=|<>|[><]=?)\\s*(?<right>(?:[-+]?\\d+\\.?\\d+)|\\w+|(?:\"[^\"]+\")))|(?<cond>AND|OR)";
-
-		static Regex regexWhere = new Regex(paramPattern, RegexOptions.Multiline | RegexOptions.Compiled);
-
-		//https://regex101.com/
-
-		public static CsvDbQuery Parse(CsvDb db, string query)
-		{
-			var match = patterRegEx.Match(query);
-			if (!match.Success)
-			{
-				throw new ArgumentException($"Invalid query against database.");
-			}
-
-			//Table
-			var table = db.Table(match.Groups["table"].Value.Trim());
-			if (table == null)
-			{
-				throw new ArgumentException($"Cannot find table name of database.");
-			}
-
-			//Columns
-			var group = match.Groups["columns"];
-			var columns = new List<CsvDbColumn>();
-			var isFull = false;
-			if (group.Value == "*")
-			{
-				isFull = true;
-				columns = table.Columns;
-			}
-			else
-			{
-				foreach (var colName in group.Value.Split(","))
-				{
-					var c = table.Column(colName.Trim());
-					if (c == null)
-					{
-						throw new ArgumentException($"Cannot find {colName} in [{table.Name}] name of database.");
-					}
-					columns.Add(c);
-				}
-			}
-			var colSelector = new CsvDbQueryColumnSelector(columns, isFull);
-
-			//Skip
-			int skip = -1;
-			if ((group = match.Groups["skip"]).Success &&
-				(!Int32.TryParse(group.Value, out skip) ||
-				skip <= 0))
-			{
-				throw new ArgumentException($"SKIP must be a positive integer greater than zero.");
-			}
-
-			//Limit
-			int limit = -1;
-			if ((group = match.Groups["limit"]).Success &&
-				(!Int32.TryParse(group.Value, out limit) ||
-				limit <= 0))
-			{
-				throw new ArgumentException($"LIMIT must be a positive integer greater than zero.");
-			}
-
-			//Where
-			var where = new List<CsvDbQueryExpressionBase>();
-			if ((group = match.Groups["where"]).Success)
-			{
-				var matchesWhere = regexWhere.Matches(group.Value);
-				if (matchesWhere == null)
-				{
-					throw new ArgumentException($"Invalid WHERE query against database.");
-				}
-				foreach (Match m in matchesWhere)
-				{
-					CsvDbQueryExpressionBase expr = null;
-					if (m.Groups["cond"].Success)
-					{
-						expr = new CsvDbQueryLogical(m.Groups["cond"].Value);
-					}
-					else
-					{
-						expr = new CsvDbQueryExpression(
-							table,
-							m.Groups["left"].Value,
-							m.Groups["oper"].Value,
-							m.Groups["right"].Value
-						);
-					}
-					if (expr == null)
-					{
-						throw new ArgumentException($"Invalid WHERE query against database.");
-					}
-					where.Add(expr);
-				}
-			}
-			return new CsvDbQuery(db, query, table, colSelector, where, skip, limit);
 		}
 
 		#endregion
