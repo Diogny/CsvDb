@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
+using System.Reflection;
 
 namespace CsvDb
 {
@@ -78,17 +79,75 @@ namespace CsvDb
 			return String.Join(" ", array);
 		}
 
-		public void Execute()
+		#region Execute
+
+		protected internal IEnumerable<int> Execute()
 		{
-			Console.WriteLine("comming soon...");
+			//execute where expresion containing the indexed column
+			//	 returns a collection of offset:int
+			//with that result
+			//  according to AND/OR filter by offset values
+
+			//execute all indexers and stack with logicals
+			CsvDbQueryLogic oper = CsvDbQueryLogic.Undefined;
+			IEnumerable<int> result = null;
+
+			foreach (var item in Where)
+			{
+				if (item.IsExpression)
+				{
+					var expr = item as CsvDbQueryExpression;
+					var table = expr.Table as CsvDbQueryTableColumnOperand;
+					var typeIndex = Type.GetType($"System.{table.Column.Type}");
+
+					var classType = typeof(CsvDbQueryIndexExecuter<>);
+					Type genericClass = classType.MakeGenericType(typeIndex);
+
+					var objClass = Activator.CreateInstance(genericClass, new object[] {
+						expr
+					});
+					MethodInfo execute_Method = genericClass.GetMethod("Execute");
+
+					var collection = (IEnumerable<int>)execute_Method.Invoke(objClass, new object[] { });
+
+					if (result == null)
+					{
+						result = collection;
+					}
+					else
+					{
+						//perform logicals
+						switch (oper)
+						{
+							case CsvDbQueryLogic.AND:
+								result = result.Intersect(collection);
+								break;
+							case CsvDbQueryLogic.OR:
+								result = result.Union(collection);
+								break;
+						}
+					}
+				}
+				else
+				{
+					var logical = item as CsvDbQueryLogical;
+					oper = logical.LogicalType;
+				}
+			}
+
+			foreach (var offset in result)
+			{
+				yield return offset;
+			}
 		}
+		
+		#endregion
 
 		// *\t[table]\t[[column],==,[value]>]
 		//SELECT route_id, rout_short_name FROM routes r
 		//		WHERE r.agency_id == "NJT" AND
 		//					r.route_type == 2
 		// route_id,route_short_name\t[routes]\t[agency_id],==,"NJT"\tAND\t[route_type],==,2
-
 
 		public class CsvDbQueryColumnSelector
 		{
@@ -105,18 +164,53 @@ namespace CsvDb
 			public override string ToString() => IsFull ? "*" : String.Join(",", Columns.Select(c => c.Name));
 		}
 
+		public enum CsvDbQueryWhereItemType
+		{
+			/// <summary>
+			/// Expression divided into Operand Operator Operand + Logical
+			/// </summary>
+			Expression,
+			/// <summary>
+			/// table column, number, string
+			/// </summary>
+			Operand,
+			/// <summary>
+			/// equal, greater, greater and equal, less, less and equal, non equal
+			/// </summary>
+			Operator,
+			/// <summary>
+			/// AND, OR
+			/// </summary>
+			Logical
+		}
+
+		public abstract class CsvDbQueryWhereItem
+		{
+			public CsvDbQueryWhereItemType Type { get; protected internal set; }
+
+			protected internal CsvDbQueryWhereItem(CsvDbQueryWhereItemType type)
+			{
+				Type = type;
+			}
+		}
+
 		#region Operands
 
-		public abstract class CsvDbQueryOperand
+		public abstract class CsvDbQueryOperand : CsvDbQueryWhereItem
 		{
+
+			public abstract bool IsTableColumn { get; }
 
 			public abstract string Name { get; }
 
-			public abstract CsvDbColumnTypeEnum Type { get; }
+			public abstract CsvDbColumnTypeEnum OperandType { get; }
 
 			public abstract object Value(ref object[] values);
 
+			public abstract object Value();
+
 			protected internal CsvDbQueryOperand()
+				: base(CsvDbQueryWhereItemType.Operand)
 			{ }
 
 			public override string ToString() => $"{Name}";
@@ -141,13 +235,20 @@ namespace CsvDb
 
 		public class CsvDbQueryTableColumnOperand : CsvDbQueryOperand
 		{
+			public override bool IsTableColumn => true;
+
 			public CsvDbColumn Column { get; protected internal set; }
 
-			public override CsvDbColumnTypeEnum Type => Column.TypeEnum;
+			public override CsvDbColumnTypeEnum OperandType => Column.TypeEnum;
 
 			public override string Name { get => Column.Name; }
 
 			public override object Value(ref object[] values) { return values[Column.Index]; }
+
+			public override object Value()
+			{
+				throw new ArgumentException("Table columns need record values referenced");
+			}
 
 			protected internal CsvDbQueryTableColumnOperand(CsvDbColumn column, string tableName)
 			{
@@ -166,12 +267,19 @@ namespace CsvDb
 
 		public class CsvDbQueryStringOperand : CsvDbQueryConstantOperand
 		{
-			public override CsvDbColumnTypeEnum Type => CsvDbColumnTypeEnum.String;
+			public override bool IsTableColumn => false;
+
+			public override CsvDbColumnTypeEnum OperandType => CsvDbColumnTypeEnum.String;
 
 			string name;
 			public override string Name => name;
 
 			public override object Value(ref object[] values) { return name; }
+
+			public override object Value()
+			{
+				return name;
+			}
 
 			public CsvDbQueryStringOperand(string name)
 			{
@@ -181,13 +289,17 @@ namespace CsvDb
 
 		public class CsvDbQueryNumberOperand : CsvDbQueryConstantOperand
 		{
+			public override bool IsTableColumn => false;
+
 			CsvDbColumnTypeEnum type;
-			public override CsvDbColumnTypeEnum Type => type;
+			public override CsvDbColumnTypeEnum OperandType => type;
 
 			public override string Name => _value.ToString();
 
 			object _value;
 			public override object Value(ref object[] values) { return _value; }
+
+			public override object Value() { return _value; }
 
 			public T GetValueAs<T>()
 			{
@@ -239,33 +351,34 @@ namespace CsvDb
 			LessOrEqual
 		}
 
-		public class CsvDbQueryOperator
+		public class CsvDbQueryOperator : CsvDbQueryWhereItem
 		{
-			public CsvDbQueryConditionOper Type { get; protected internal set; }
+			public CsvDbQueryConditionOper OperatorType { get; protected internal set; }
 
 			public string Name { get; protected internal set; }
 
 			protected internal CsvDbQueryOperator(string oper)
+				: base(CsvDbQueryWhereItemType.Operator)
 			{
 				switch (Name = oper)
 				{
 					case "=":
-						Type = CsvDbQueryConditionOper.Equal;
+						OperatorType = CsvDbQueryConditionOper.Equal;
 						break;
 					case "<>":
-						Type = CsvDbQueryConditionOper.NotEqual;
+						OperatorType = CsvDbQueryConditionOper.NotEqual;
 						break;
 					case ">":
-						Type = CsvDbQueryConditionOper.Greater;
+						OperatorType = CsvDbQueryConditionOper.Greater;
 						break;
 					case ">=":
-						Type = CsvDbQueryConditionOper.GreaterOrEqual;
+						OperatorType = CsvDbQueryConditionOper.GreaterOrEqual;
 						break;
 					case "<":
-						Type = CsvDbQueryConditionOper.Less;
+						OperatorType = CsvDbQueryConditionOper.Less;
 						break;
 					case "<=":
-						Type = CsvDbQueryConditionOper.LessOrEqual;
+						OperatorType = CsvDbQueryConditionOper.LessOrEqual;
 						break;
 					default:
 						throw new ArgumentException($"Invalid condition operator [{oper}]");
@@ -277,17 +390,43 @@ namespace CsvDb
 
 		#endregion
 
-		public abstract class CsvDbQueryExpressionBase
-		{ }
+		#region Expression
+
+		public abstract class CsvDbQueryExpressionBase : CsvDbQueryWhereItem
+		{
+			public abstract bool IsExpression { get; }
+
+			public CsvDbQueryExpressionBase()
+				: base(CsvDbQueryWhereItemType.Expression)
+			{ }
+		}
 
 		public class CsvDbQueryExpression : CsvDbQueryExpressionBase
 		{
+
+			public override bool IsExpression => true;
 
 			public CsvDbQueryOperand Left { get; protected internal set; }
 
 			public CsvDbQueryOperator Operator { get; protected internal set; }
 
 			public CsvDbQueryOperand Right { get; protected internal set; }
+
+			public CsvDbQueryOperand Table
+			{
+				get
+				{
+					if (Left.IsTableColumn)
+					{
+						return Left;
+					}
+					else if (Right.IsTableColumn)
+					{
+						return Right;
+					}
+					return null;
+				}
+			}
 
 			protected internal CsvDbQueryExpression(CsvDbTable table, string left, string oper, string right)
 			{
@@ -297,7 +436,7 @@ namespace CsvDb
 					throw new ArgumentException($"Database query expression invalid");
 				}
 				//test types
-				 
+
 				Operator = new CsvDbQueryOperator(oper);
 			}
 
@@ -314,7 +453,7 @@ namespace CsvDb
 				where T : IComparable<T>
 			{
 				var result = left.CompareTo(right);
-				switch (Operator.Type)
+				switch (Operator.OperatorType)
 				{
 					case CsvDbQueryConditionOper.Equal:
 						return result == 0;
@@ -335,17 +474,22 @@ namespace CsvDb
 			public override string ToString() => $"{Left} {Operator} {Right}";
 		}
 
+		#endregion
+
 		#region Logical Operands supported AND, OR
 
 		public enum CsvDbQueryLogic
 		{
+			Undefined,
 			AND,
 			OR
 		}
 
 		public class CsvDbQueryLogical : CsvDbQueryExpressionBase
 		{
-			public CsvDbQueryLogic Type { get; protected internal set; }
+			public override bool IsExpression => false;
+
+			public CsvDbQueryLogic LogicalType { get; protected internal set; }
 
 			public string Name { get; protected internal set; }
 
@@ -358,10 +502,10 @@ namespace CsvDb
 				switch (Name = condition.ToUpper())
 				{
 					case "AND":
-						Type = CsvDbQueryLogic.AND;
+						LogicalType = CsvDbQueryLogic.AND;
 						break;
 					case "OR":
-						Type = CsvDbQueryLogic.OR;
+						LogicalType = CsvDbQueryLogic.OR;
 						break;
 					default:
 						throw new ArgumentException($"Invalid condition [{Name}]");
@@ -372,6 +516,10 @@ namespace CsvDb
 		}
 
 		#endregion
+
+		#region Parse
+
+		//make a real parser later to include parenthesis, real type cast,...
 
 		static string pattern =
 			@"\s*SELECT\s+(?<columns>\*|(?:\w+\s*,\s*)*\w+)" +
@@ -483,6 +631,8 @@ namespace CsvDb
 			}
 			return new CsvDbQuery(db, query, table, colSelector, where, skip, limit);
 		}
+
+		#endregion
 
 	}
 }

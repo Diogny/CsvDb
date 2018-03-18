@@ -7,7 +7,8 @@ using System.Reflection;
 
 namespace CsvDb
 {
-	public class CsvDbIndexTreeReader
+	public class CsvDbIndexTreeReader<T>
+		where T : IComparable<T>
 	{
 		public CsvDb Database { get; protected internal set; }
 
@@ -25,7 +26,7 @@ namespace CsvDb
 
 		io.BinaryReader reader = null;
 
-		internal MetaIndexBase Root { get; set; }
+		internal MetaIndexBase<T> Root { get; set; }
 
 		public CsvDbIndexTreeReader(CsvDb db, string tableName, string columnName)
 		{
@@ -61,7 +62,7 @@ namespace CsvDb
 				if (!IsLeaf)
 				{
 					pageId = 0;
-					Root = ReadTreePage(0);
+					Root = ReadTreePageStructure(0);
 				}
 			}
 
@@ -69,9 +70,9 @@ namespace CsvDb
 
 		int pageId = 0;
 
-		MetaIndexBase ReadTreePage(int parent)
+		MetaIndexBase<T> ReadTreePageStructure(int parent)
 		{
-			MetaIndexBase page = null;
+			MetaIndexBase<T> page = null;
 
 			var flags = reader.ReadInt32();
 			//
@@ -104,9 +105,9 @@ namespace CsvDb
 
 					//read key
 					//is an object
-					var key = KeyType.LoadKey(reader);
+					var key = (T)KeyType.LoadKey(reader);
 
-					page = new MetaIndexNode()
+					page = new MetaIndexNode<T>()
 					{
 						Number = thisPageNo,
 						UniqueValue = uniqueKeyValue,
@@ -114,20 +115,20 @@ namespace CsvDb
 						Values = keyValueCollection
 					};
 
-					var pageNode = page as MetaIndexNode;
+					var pageNode = page as MetaIndexNode<T>;
 
 					//left tree page node
-					pageNode.Left = ReadTreePage(thisPageNo);
+					pageNode.Left = ReadTreePageStructure(thisPageNo);
 
 					//right tree page node
-					pageNode.Right = ReadTreePage(thisPageNo);
+					pageNode.Right = ReadTreePageStructure(thisPageNo);
 
 					return page;
 				case Consts.BTreePageNodeItemsFlag:
 					//
 					var offset = reader.ReadInt32();
 
-					page = new MetaIndexItems()
+					page = new MetaIndexItems<T>()
 					{
 						Number = thisPageNo,
 						Offset = offset
@@ -138,52 +139,53 @@ namespace CsvDb
 			}
 		}
 
-		/// <summary>
-		/// returns the offset page
-		/// </summary>
-		/// <param name="key"></param>
-		/// <returns></returns>
-		public int Find(object key)
+		///// <summary>
+		///// returns the offset page
+		///// </summary>
+		///// <param name="key"></param>
+		///// <returns></returns>
+		//public int Find(object key)
+		//{
+		//	var keyTypeName = key.GetType().Name;
+		//	CsvDbColumnTypeEnum keyType;
+		//	if (!Enum.TryParse<CsvDbColumnTypeEnum>(keyTypeName, out keyType) ||
+		//		keyType != KeyType)
+		//	{
+		//		return -2;
+		//	}
+
+		//	if (Root == null)
+		//	{
+		//		//go to .bin file directly, it's ONE page of items
+		//		return CsvDbGenerator.ItemsPageStart;
+		//	}
+		//	else
+		//	{
+		//		//can be compared here
+		//		MetaIndexItems<T> page;
+		//		var thisType = this.GetType();
+		//		MethodInfo method = thisType
+		//				.GetMethod(nameof(FindKey), BindingFlags.Instance | BindingFlags.NonPublic);
+
+		//		Type indexType = Type.GetType($"System.{keyTypeName}");
+
+		//		MethodInfo generic = method.MakeGenericMethod(indexType);
+
+		//		page = generic.Invoke(this,
+		//					new object[]
+		//					{
+		//						Root,
+		//						key
+		//					}) as MetaIndexItems<T>;
+
+		//		return (page == null) ? -4 : page.Offset;
+		//	}
+		//}
+
+		internal MetaIndexBase<T> FindKey(T key)
 		{
-			var keyTypeName = key.GetType().Name;
-			CsvDbColumnTypeEnum keyType;
-			if (!Enum.TryParse<CsvDbColumnTypeEnum>(keyTypeName, out keyType) ||
-				keyType != KeyType)
-			{
-				return -2;
-			}
+			MetaIndexBase<T> root = Root;
 
-			if (Root == null)
-			{
-				//go to .bin file directly, it's ONE page of items
-				return CsvDbGenerator.ItemsPageStart;
-			}
-			else
-			{
-				//can be compared here
-				MetaIndexItems page;
-				var thisType = this.GetType();
-				MethodInfo method = thisType
-						.GetMethod(nameof(FindKey), BindingFlags.Instance | BindingFlags.NonPublic);
-
-				Type indexType = Type.GetType($"System.{keyTypeName}");
-
-				MethodInfo generic = method.MakeGenericMethod(indexType);
-
-				page = generic.Invoke(this,
-							new object[]
-							{
-								Root,
-								key
-							}) as MetaIndexItems;
-
-				return (page == null) ? -4 : page.Offset;
-			}
-		}
-
-		MetaIndexBase FindKey<T>(MetaIndexBase root, T key)
-			where T : IComparable<T>
-		{
 			while (root != null)
 			{
 				switch (root.Type)
@@ -193,7 +195,7 @@ namespace CsvDb
 						return root;
 					case MetaIndexType.Node:
 						//
-						var nodePage = root as MetaIndexNode;
+						var nodePage = root as MetaIndexNode<T>;
 						var comp = key.CompareTo((T)nodePage.Key);
 						if (comp < 0)
 						{
@@ -214,22 +216,6 @@ namespace CsvDb
 				}
 			}
 
-			//var stack = new Stack<MetaIndexBase>();
-			//stack.Push(root);
-			//while (stack.Count > 0)
-			//{
-			//	var page = stack.Pop();
-			//	//compare keys
-			//	if (page.Type == MetaIndexType.Items)
-			//	{
-
-			//		return page;
-			//	}
-			//	else
-			//	{
-
-			//	}
-			//}
 			return null;
 		}
 
@@ -241,7 +227,8 @@ namespace CsvDb
 		Items
 	}
 
-	internal abstract class MetaIndexBase
+	internal abstract class MetaIndexBase<T>
+		where T : IComparable<T>
 	{
 		public int Number { get; set; }
 
@@ -249,26 +236,30 @@ namespace CsvDb
 
 	}
 
-	internal class MetaIndexNode : MetaIndexBase
+	internal class MetaIndexNode<T> : MetaIndexBase<T>
+		where T : IComparable<T>
 	{
 		public bool UniqueValue { get; set; }
 
 		//later make it generic (internally)
-		public object Key { get; set; }
+		public T Key { get; set; }
 
 		public List<int> Values { get; set; }
 
-		public MetaIndexBase Left { get; set; }
+		public MetaIndexBase<T> Left { get; set; }
 
-		public MetaIndexBase Right { get; set; }
+		public MetaIndexBase<T> Right { get; set; }
 
 		public override MetaIndexType Type => MetaIndexType.Node;
 
 	}
 
-	internal class MetaIndexItems : MetaIndexBase
+	internal class MetaIndexItems<T> : MetaIndexBase<T>
+		where T : IComparable<T>
 	{
 		public int Offset { get; set; }
+
+		//should store the amount of items inside this page item
 
 		public override MetaIndexType Type => MetaIndexType.Items;
 

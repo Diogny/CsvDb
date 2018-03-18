@@ -9,12 +9,33 @@ using Microsoft.CodeAnalysis.Emit;
 using System.IO;
 using System.Linq;
 using io = System.IO;
+using static CsvDb.CsvDbQuery;
 
 namespace CsvDb
 {
 	public static class Utils
 	{
 		//https://msdn.microsoft.com/en-us/magazine/mt808499.aspx
+
+		public static IEnumerable<CsvDbQueryWhereItem> Flatten(
+			this List<CsvDbQueryExpressionBase> list)
+		{
+			foreach (var item in list)
+			{
+				switch (item.Type)
+				{
+					case CsvDbQueryWhereItemType.Logical:
+						yield return item;
+						break;
+					case CsvDbQueryWhereItemType.Expression:
+						var expr = item as CsvDbQueryExpression;
+						yield return expr.Left;
+						yield return expr.Operator;
+						yield return expr.Right;
+						break;
+				}
+			}
+		}
 
 		//any of these chars should be wrapped by ""
 		//	"	,	line-break

@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using io = System.IO;
 
 namespace CsvDb
 {
+	[Obsolete("This is for testings only, will be removed shortly")]
 	public class CsvRecordReader
 	{
 		public CsvDb Database { get; protected internal set; }
@@ -17,10 +19,12 @@ namespace CsvDb
 			}
 		}
 
-		internal static List<string[]> ReadRecords(
+		internal static List<string[]> ReadRecords<T>(
 			string path,
 			CsvDbTable table,
-		IEnumerable<Int32> offsetCollection)
+			T key,
+			IEnumerable<Int32> offsetCollection)
+			where T : IComparable<T>
 		{
 			var list = new List<string[]>();
 
@@ -155,35 +159,129 @@ namespace CsvDb
 			return list;
 		}
 
-		public List<string[]> Find(string tableName, string columnName, object key)
+		protected internal List<string[]> FindGeneric<T>(CsvDbTable table, CsvDbColumn column, T key)
+			where T : IComparable<T>
 		{
 			//go to page and find <key,[values]>
 			//[values] are the offsets inside csv text file
 
-			var table = Database.Table(tableName);
-			if (table == null)
+			var treeReader = column.TreeIndexReader<T>();
+			int offset = -1;
+			if (treeReader.Root == null)
 			{
-				return null;
+				//go to .bin file directly, it's ONE page of items
+				offset = CsvDbGenerator.ItemsPageStart;
 			}
-			var column = table.Column(columnName);
-			if (column == null)
+			else
 			{
-				return null;
+				var meta = treeReader.FindKey(key) as MetaIndexItems<T>;
+				if (meta == null)
+				{
+					throw new ArgumentException($"Index corrupted");
+				}
+				offset = meta.Offset;
 			}
-
-			var treeIndex = new CsvDbIndexTreeReader(Database, tableName, columnName);
-
-			var itemsPages = new CsvDbIndexItemsReader(Database, tableName, columnName);
-
-			var offset = column.TreeIndexReader.Find(key);
-
-			CsvDbKeyValues<object> item = column.PageItemReader.Find(offset, key);
+			if (offset < 0)
+			{
+				throw new ArgumentException($"Index corrupted");
+			}
+			//Console.WriteLine($"Offset: {offset}");
+			CsvDbKeyValues<T> item = column.PageItemReader<T>().Find(offset, key);
 
 			var path = io.Path.Combine(Database.BinaryPath, $"{table.Name}.csv");
 
 			//go to csv and find it records
-			return ReadRecords(path, table, item.Values);
+			return ReadRecords<T>(path, table, key, item.Values);
 		}
 
+		//going to be erased after testings, CsvDbQuery parse table and column already
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="tableColumn">table.column</param>
+		/// <param name="oper">operator</param>
+		/// <param name="key">key to search for</param>
+		/// <returns></returns>
+		public List<string[]> Find(string tableColumn, string oper, object key)
+		{
+			string[] splitted = null;
+			if (String.IsNullOrWhiteSpace(tableColumn) ||
+				(splitted = tableColumn.Split(".", StringSplitOptions.RemoveEmptyEntries)).Length != 2)
+			{
+				throw new ArgumentException($"Invalid [table].[column] definition in database");
+			}
+			return Find(splitted[0], splitted[1], oper, key);
+		}
+
+		//going to be erased after testings, CsvDbQuery parse table and column already
+		public List<string[]> Find(string tableName, string columnName, string oper, object key)
+		{
+			var table = Database.Table(tableName ?? "");
+			if (table == null)
+			{
+				throw new ArgumentException($"table [{tableName}] doesnot exist in database");
+			}
+			var column = table.Column(columnName ?? "");
+			if (column == null)
+			{
+				throw new ArgumentException($"column [{tableName}].{columnName} doesnot exist in database");
+			}
+			return Find(column, oper, key);
+		}
+
+		public List<string[]> Find(CsvDbColumn column, string oper, object key)
+		{
+			var keyTypeName = key.GetType().Name;
+			if (keyTypeName != column.Type)
+			{
+				throw new ArgumentException($"Unable to retrieve key of type: {keyTypeName}");
+			}
+			switch (oper = ((oper ?? "").Trim()))
+			{
+				case "=":
+					return FindEqual(column, key);
+				case ">":
+				case ">=":
+					return FindGreaterThan(column, oper, key);
+				case "<":
+				case "<=":
+					return FindLessThan(column, oper, key);
+			}
+			throw new ArgumentException($"Invalid Operator [{oper}]!");
+		}
+
+		protected internal List<string[]> FindEqual(CsvDbColumn column, object key)
+		{
+			//go to page and find <key,[values]>
+			//[values] are the offsets inside csv text file
+
+			var keyType = Type.GetType($"System.{column.Type}");
+			//generic method
+			MethodInfo findgen_mthd =
+				this.GetType()
+					.GetMethod(nameof(CsvRecordReader.FindGeneric),
+					BindingFlags.Instance | BindingFlags.NonPublic);
+
+			//call generic table processing method
+			MethodInfo findGen = findgen_mthd.MakeGenericMethod(keyType);
+			//invoke
+			var list = findGen.Invoke(this, new object[] { column.Table, column, key });
+
+			return (List<string[]>)list;
+		}
+
+		protected internal List<string[]> FindGreaterThan(CsvDbColumn column, string oper, object key)
+		{
+			CsvDbTable table = column.Table;
+			bool includeKey = oper == ">=";
+			throw new ArgumentException("Operator > not implemented yet!");
+		}
+
+		protected internal List<string[]> FindLessThan(CsvDbColumn column, string oper, object key)
+		{
+			CsvDbTable table = column.Table;
+			bool includeKey = oper == "<=";
+			throw new ArgumentException("Operator < not implemented yet!");
+		}
 	}
 }

@@ -1,22 +1,22 @@
 ﻿using CsvDb;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ConsoleApp
 {
 	class Program
 	{
-		//var dbStructPath = @"C:\Users\Diogny\Me\OneDrive\Projects\VS2017\CsvDb\CsvDbLib\";
-
 		static void Main(string[] args)
 		{
-
 			//Generators();
 			//TestHeaders();
 
 			//SqlQueryTests();
-			TestSearch();
+			//TestSearch();
+			SqlQueryExecuteTests();
 
-			Console.WriteLine("Press enter to finish!");
+			Console.WriteLine("\r\nPress enter to finish!");
 			Console.ReadLine();
 		}
 
@@ -29,13 +29,7 @@ namespace ConsoleApp
 			//
 			//@"C:\Users\Diogny\Desktop\NJTransit\test\";
 
-			var db = new CsvDb.CsvDb(
-				////use this when start from zero
-				//dbStructPath
-				////use this just to compile pagers and indexes
-				//   comment line: gen.GenerateTxtData();
-				rootPath
-			);
+			var db = new CsvDb.CsvDb(rootPath);
 
 			var gen = new CsvDbGenerator(
 				db,
@@ -53,6 +47,41 @@ namespace ConsoleApp
 			gen.CompileIndexes();
 
 			gen.GenerateTreeStructure();
+		}
+
+		static void SqlQueryExecuteTests()
+		{
+			string rootPath =
+		@"C:\Users\Diogny\Desktop\NJTransit\data\";
+			//@"C:\Users\Diogny\Desktop\NJTransit\data-light\";
+			//@"C:\Users\Diogny\Desktop\NJTransit\data-extra-light\";
+
+			var db = new CsvDb.CsvDb(rootPath);
+
+			Console.WriteLine($"\r\nDatabase: {db.Name}");
+
+			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
+									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
+									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id = 180"
+									//		180,NJB,74,,3,,
+				"SELECT * FROM trips WHERE route_id = 204 AND service_id = 5 AND trip_id = 52325"
+				//		204,5,52325,"810 WOODBRIDGE CENTER-Exact Fare",1,810MX003,6369
+				;
+
+			Console.WriteLine($"\r\nIn query: {query}");
+
+			var dbQuery = CsvDb.CsvDbQuery.Parse(db, query);
+
+			var outQuery = dbQuery.ToString();
+
+			Console.WriteLine($"\r\nOut query: {outQuery}");
+
+			var visualizer = new CsvDbVisualizer(dbQuery);
+			foreach (var record in visualizer.Execute())
+			{
+				Console.WriteLine($"{String.Join(",", record)}");
+			}
+
 		}
 
 		static void SqlQueryTests()
@@ -75,14 +104,13 @@ namespace ConsoleApp
 				//"select"
 				//""
 				;
-			//select trip_headsign,block_id, trip_id,  route_id,service_id from trips where a> 7 and "p" = 8 skip 3 limit  10
-
+			
 			Console.WriteLine($"\r\nIn query: {query}");
 
 			var dbQuery = CsvDb.CsvDbQuery.Parse(db, query);
 
 			var outQuery = dbQuery.ToString();
-			//"SELECT * FROM routes WHERE route_id = 5 and agency_id = \"NJB\""
+			
 			Console.WriteLine($"\r\nOut query: {outQuery}");
 		}
 
@@ -96,23 +124,45 @@ namespace ConsoleApp
 			var db = new CsvDb.CsvDb(rootPath);
 
 			var r = new CsvRecordReader(db);
-			var res = r.Find("calendar_dates", "date", (Int32)20180422);
-			//"agency", "agency_id", (String)"NJB"
-			//		NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
-			//"stops", "stop_id", (Int32)307
-			//		307,10863,"SHORE RD AT MEYRAN AVE",,39.324568,-74.587541,0
-			//"routes", "route_id", (Int32)180
-			//		180,NJB,74,,3,,
-			//"calendar_dates", "date", (Int32)20180422
-			//		2,20180422,1
-			//		8,20180422,1
-			/*
-			 record = {string[7]}
-			 */
-			Console.WriteLine("Output>");
-			foreach (var col in res)
+			var tests = new List<object[]>()
 			{
-				Console.WriteLine($"{String.Join(",", col)}");
+				new object[] { "agency", "agency_id", (String)"NJB" },
+				//		NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
+				new object[] { "stops", "stop_id", (Int32)307 },
+				//		307,10863,"SHORE RD AT MEYRAN AVE",,39.324568,-74.587541,0
+				new object[] { "routes", "route_id", (Int32)180 },
+				//	offset: 1320,		180|3073
+				//		180,NJB,74,,3,,
+				new object[] { "calendar_dates", "date", (Int32)20180422 },
+				//		2,20180422,1
+				//		8,20180422,1
+				new object[]  { "trips", "trip_id", (Int32)61584 }
+				//	offset: 494480
+				//		253,2,61584,GO28 NEWARK AIRPORT NORTH AREA & TERMINALS-Exact Fare,0,258OG013,7334
+			};
+			foreach (var args in tests.Select(item => new
+			{
+				table = (String)item[0],
+				column = (String)item[1],
+				key = item[2]
+			}))
+			{
+				Console.WriteLine($"\r\nTest for: {String.Join(",", args)}");
+
+				try
+				{
+					var res = r.Find(args.table, args.column, "=", args.key);
+
+					Console.WriteLine("Output>");
+					foreach (var col in res)
+					{
+						Console.WriteLine($"{String.Join(",", col)}");
+					}
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine(ex.Message);
+				}
 			}
 		}
 
@@ -134,13 +184,6 @@ namespace ConsoleApp
 			//	vis.TestOverwrite();
 
 			//vis.TestIndexItems();
-			vis.TestIndexReader("routes", "route_id", (Int32)180);
-			//		"routes", "route_id", (Int32)180				//offset: 1320,		180|3073
-			// only for \data\
-			//		"trips", "trip_id", (Int32)61584				//offset: 494480		61584|3796690
-
-			//with this value(s), we go the .csv to get the record(s)
-
 		}
 
 	}

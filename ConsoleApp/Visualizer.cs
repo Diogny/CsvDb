@@ -394,29 +394,6 @@ namespace ConsoleApp
 			}
 		}
 
-		public void TestIndexReader(string tableName, string columnName, object key)
-		{
-			Console.WriteLine($"Looking for <{key}> on [{tableName}].{columnName}\r\n");
-
-			var treeIndex = new db.CsvDbIndexTreeReader(Database, tableName, columnName);
-
-			var itemsPages = new db.CsvDbIndexItemsReader(Database, tableName, columnName);
-
-			var offset = treeIndex.Find(key);
-
-			var item = itemsPages.Find(offset, key);
-			if (item == null)
-			{
-				Console.WriteLine($"could not find <{key}> of [{tableName}].{columnName}");
-			}
-			else
-			{
-				Console.WriteLine($"Page Offset: {offset}\r\n");
-				Console.WriteLine($"<{item.Key}>");
-				Console.WriteLine($"Value(s): {String.Join(", ", item.Values)}");
-			}
-		}
-
 		public void TestOverwrite()
 		{
 			var stream = new io.MemoryStream();

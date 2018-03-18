@@ -155,12 +155,12 @@ namespace CsvDb
 				//
 				Structure = Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
 				//link
-				Tables.ForEach(t =>
+				Tables.ForEach(table =>
 				{
-					t.Database = this;
-					t.Columns.ForEach(c =>
+					table.Database = this;
+					table.Columns.ForEach(column =>
 					{
-						c.Table = t;
+						column.Table = table;
 					});
 				});
 				return true;
@@ -223,7 +223,6 @@ namespace CsvDb
 
 		public List<CsvDbColumn> Columns { get; set; }
 
-		[Newtonsoft.Json.JsonIgnore]
 		protected internal CsvDb Database { get; set; }
 
 		[Newtonsoft.Json.JsonIgnore]
@@ -278,33 +277,58 @@ namespace CsvDb
 			}
 		}
 
-		[Newtonsoft.Json.JsonIgnore]
 		protected internal CsvDbTable Table { get; set; }
 
-		[Newtonsoft.Json.JsonIgnore]
-		private Lazy<CsvDbIndexItemsReader> _indexItemReader;
+		private object _indexItemReader;
 
-		[Newtonsoft.Json.JsonIgnore]
-		public CsvDbIndexItemsReader PageItemReader { get { return _indexItemReader.Value; } }
+		protected internal CsvDbIndexItemsReader<T> PageItemReader<T>()
+			where T : IComparable<T>
+		{
+			//made [protected internal] to remove type checking later
+			//check type
+			var typeName = typeof(T).Name; // default(T).GetType().Name;
+			if (typeName != Type)
+			{
+				throw new ArgumentException($"Invalid index type [{typeName}] for column [{Name}]");
+			}
+			if (_indexItemReader == null)
+			{
+				_indexItemReader = Activator.CreateInstance(typeof(CsvDbIndexItemsReader<T>), new object[]
+				 {
+					 Table.Database,
+					 Table.Name,
+					 Name
+				 });
+			}
+			return (CsvDbIndexItemsReader<T>)_indexItemReader;
+		}
 
-		[Newtonsoft.Json.JsonIgnore]
-		private Lazy<CsvDbIndexTreeReader> _treeIndexReader;
+		private object _treeIndexReader;
 
-		[Newtonsoft.Json.JsonIgnore]
-		public CsvDbIndexTreeReader TreeIndexReader { get { return _treeIndexReader.Value; } }
+		protected internal CsvDbIndexTreeReader<T> TreeIndexReader<T>()
+			where T : IComparable<T>
+		{
+			//made [protected internal] to remove type checking later
+			//check type
+			var typeName = typeof(T).Name; // default(T).GetType().Name;
+			if (typeName != Type)
+			{
+				throw new ArgumentException($"Invalid index type [{typeName}] for column [{Name}]");
+			}
+			if (_treeIndexReader == null)
+			{
+				_treeIndexReader = Activator.CreateInstance(typeof(CsvDbIndexTreeReader<T>), new object[]
+				 {
+					 Table.Database,
+					 Table.Name,
+					 Name
+				 });
+			}
+			return (CsvDbIndexTreeReader<T>)_treeIndexReader;
+		}
 
 		public CsvDbColumn()
-		{
-			//load only if needed
-			_indexItemReader = new Lazy<CsvDbIndexItemsReader>(() =>
-				{
-					return new CsvDbIndexItemsReader(Table.Database, Table.Name, Name);
-				});
-			_treeIndexReader = new Lazy<CsvDbIndexTreeReader>(() =>
-				{
-					return new CsvDbIndexTreeReader(Table.Database, Table.Name, Name);
-				});
-		}
+		{ }
 
 		public override string ToString()
 		{

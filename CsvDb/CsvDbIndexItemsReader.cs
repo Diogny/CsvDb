@@ -6,7 +6,8 @@ using io = System.IO;
 
 namespace CsvDb
 {
-	public class CsvDbIndexItemsReader
+	public class CsvDbIndexItemsReader<T>
+		where T : IComparable<T>
 	{
 
 		public CsvDb Database { get; protected internal set; }
@@ -23,7 +24,7 @@ namespace CsvDb
 
 		io.BinaryReader reader = null;
 
-		List<MetaItemsPage> Pages = new List<MetaItemsPage>();
+		List<MetaItemsPage<T>> Pages = new List<MetaItemsPage<T>>();
 
 		public bool ValidPage(int offset)
 		{
@@ -84,7 +85,7 @@ namespace CsvDb
 
 					reader.BaseStream.Seek(skip, io.SeekOrigin.Current);
 
-					var page = new MetaItemsPage()
+					var page = new MetaItemsPage<T>()
 					{
 						Flags = flags,
 						UniqueKeyValue = uniqueKeyValue,
@@ -102,7 +103,7 @@ namespace CsvDb
 			}
 		}
 
-		public CsvDbKeyValues<object> Find(int offset, object key)
+		public CsvDbKeyValues<T> Find(int offset, T key)
 		{
 			var page = Pages.FirstOrDefault(p => p.Offset == offset);
 
@@ -113,7 +114,7 @@ namespace CsvDb
 			var pair = page.Items.FirstOrDefault(i => i.Key.Equals(key));
 			return (pair.Key == null) ?
 				null :
-				new CsvDbKeyValues<object>()
+				new CsvDbKeyValues<T>()
 				{
 					Key = pair.Key,
 					Values = pair.Value
@@ -121,7 +122,8 @@ namespace CsvDb
 		}
 	}
 
-	internal class MetaItemsPage
+	internal class MetaItemsPage<T>
+		where T : IComparable<T>
 	{
 		//readl file field
 		public Int32 Flags { get; set; }
@@ -141,19 +143,19 @@ namespace CsvDb
 		internal int DataStart { get; set; }
 
 		//class properties
-		public CsvDbIndexItemsReader Parent { get; protected internal set; }
+		public CsvDbIndexItemsReader<T> Parent { get; protected internal set; }
 
 		public Double Frequency { get; set; }
 
-		List<KeyValuePair<object, List<int>>> _items = null;
+		List<KeyValuePair<T, List<int>>> _items = null;
 
-		public IEnumerable<KeyValuePair<object, List<int>>> Items
+		public IEnumerable<KeyValuePair<T, List<int>>> Items
 		{
 			get
 			{
 				if (_items == null)
 				{
-					var list = new List<KeyValuePair<object, List<int>>>();
+					var list = new List<KeyValuePair<T, List<int>>>();
 					using (var reader = new io.BinaryReader(io.File.OpenRead(Parent.PathToItems)))
 					{
 						//point to page
@@ -163,7 +165,7 @@ namespace CsvDb
 
 						//keys
 						var ii = 0;
-						KeyValuePair<object, List<int>> pair;
+						KeyValuePair<T, List<int>> pair;
 
 						if (Parent.KeyType == CsvDbColumnTypeEnum.String)
 						{
@@ -175,9 +177,11 @@ namespace CsvDb
 								var charArray = new char[keyLengths[ii]];
 								reader.Read(charArray, 0, keyLengths[ii]);
 								//
-								pair = new KeyValuePair<object, List<int>>(
-									new String(charArray),
+								var stringKey = (T)Convert.ChangeType(new String(charArray), typeof(T));
+								pair = new KeyValuePair<T, List<int>>(
+									stringKey,
 									new List<int>());
+
 								list.Add(pair);
 							}
 						}
@@ -185,8 +189,8 @@ namespace CsvDb
 						{
 							for (ii = 0; ii < ItemsCount; ii++)
 							{
-								var key = Parent.KeyType.LoadKey(reader);
-								pair = new KeyValuePair<object, List<int>>(
+								var key = (T)Parent.KeyType.LoadKey(reader);
+								pair = new KeyValuePair<T, List<int>>(
 									key,
 									new List<int>());
 								list.Add(pair);
@@ -222,6 +226,11 @@ namespace CsvDb
 				//
 				return _items;
 			}
+		}
+
+		public void ReleaseMemory()
+		{
+			_items = null;
 		}
 
 	}
