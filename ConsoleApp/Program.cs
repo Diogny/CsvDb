@@ -4,12 +4,17 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Microsoft.Extensions.Configuration;
 
 namespace ConsoleApp
 {
-	class Program
+	public class Program
 	{
-		static string basePath = @"C:\Users\Diogny\Desktop\NJTransit\";
+
+		public static IConfiguration Configuration => new ConfigurationBuilder()
+				.SetBasePath(System.IO.Directory.GetCurrentDirectory())
+				.AddJsonFile("config.json")
+				.Build();
 
 		static void Main(string[] args)
 		{
@@ -29,14 +34,47 @@ namespace ConsoleApp
 			}
 		}
 
-		static CsvDb.CsvDb CreateDatabase()
+		static CsvDb.CsvDb OpenDatabase(string dbName = null, bool logTimes = true)
 		{
-			string rootPath =
-				$@"{basePath}data\";
-			//$@"{basePath}data-light\";
-			//$@"{basePath}data-extra-light\";
+			var section = Program.Configuration.GetSection("Data");
+			var basePath = section["BasePath"];
 
-			var db = new CsvDb.CsvDb(rootPath);
+			if (string.IsNullOrWhiteSpace(dbName))
+			{
+				dbName = "data\\";
+			}
+			string rootPath = $"{basePath}{dbName}"
+			//$@"{basePath}data\"
+			//$@"{basePath}data-light\"
+			//$@"{basePath}data-extra-light\"
+			;
+			if (!rootPath.EndsWith('\\'))
+			{
+				rootPath += "\\";
+			}
+
+			var dif = new TimeDifference();
+			if (logTimes)
+			{
+				dif.Start = DateTime.Now;
+			}
+
+			CsvDb.CsvDb db = null;
+			try
+			{
+				db = new CsvDb.CsvDb(rootPath);
+
+				if (logTimes)
+				{
+					dif.End = DateTime.Now;
+					Console.WriteLine($" opened on: {dif}");
+				}
+			}
+			catch (Exception ex)
+			{
+				db = null;
+				Console.WriteLine($"error: {ex.Message}");
+			}
 			return db;
 		}
 
@@ -44,7 +82,7 @@ namespace ConsoleApp
 		{
 			//update CreateDatabase() rootPath to match with [name].zip file  data\ with bus_data.zip
 
-			var db = CreateDatabase();
+			var db = OpenDatabase();
 
 			var gen = new CsvDbGenerator(
 				db,
@@ -66,17 +104,19 @@ namespace ConsoleApp
 
 		static bool SqlQueryExecute()
 		{
+			var availableDatabases = new string[]
+			{
+				"data",
+				"data-light",
+				"data-extra-light"
+			};
+
 			//SELECT * FROM agency
 
 			var dif = new TimeDifference();
-			dif.Start = DateTime.Now;
 
-			var db = CreateDatabase();
-
-			dif.End = DateTime.Now;
-
-			Console.WriteLine($"\r\nDatabase: {db.Name}");
-			Console.WriteLine($">created on: {dif}");
+			//var db = CreateDatabase();
+			CsvDb.CsvDb db = null;
 
 			//Action displayHelp = () =>
 			void displayHelp()
@@ -84,6 +124,9 @@ namespace ConsoleApp
 				Console.WriteLine("");
 				Console.WriteLine("Menu");
 				Console.WriteLine(" Shows (h)elp");
+				Console.WriteLine(" (D)isplay database(s)");
+				Console.WriteLine(" (M)ount database");
+				Console.WriteLine(" (U)nmount database");
 				Console.WriteLine(" (S)earch Database");
 				Console.WriteLine(" Display (t)ables");
 				Console.WriteLine(" Display (c)olumn");
@@ -105,11 +148,48 @@ namespace ConsoleApp
 				Console.WriteLine();
 				switch (key.Key)
 				{
+					case ConsoleKey.M:
+						Console.Write("database name >");
+						var dbName = Console.ReadLine();
+						if ((db = OpenDatabase(dbName: dbName, logTimes: true)) != null)
+						{
+							Console.WriteLine($"\r\nUsing database: {db.Name}");
+						}
+						break;
+					case ConsoleKey.U:
+						if (db == null)
+						{
+							Console.WriteLine($" no database to unmount");
+						}
+						else
+						{
+							Console.WriteLine($" unmounting database [{db.Name}]");
+							db = null;
+						}
+						break;
+					case ConsoleKey.D:
+						var prefix = "\r\n   -";
+						var txt = String.Join(prefix, availableDatabases);
+						if (String.IsNullOrWhiteSpace(txt))
+						{
+							txt = $"{prefix}there is no available database";
+						}
+						else
+						{
+							txt = $"{prefix}{txt}";
+						}
+						Console.WriteLine($" database(s){txt}");
+						break;
 					case ConsoleKey.H:
 						displayHelp();
 						break;
 					case ConsoleKey.T:
 						//display tables
+						if (db == null)
+						{
+							Console.WriteLine(" there's no database in use");
+							break;
+						}
 						foreach (var t in db.Tables)
 						{
 							Console.WriteLine($" ({t.Columns.Count}) {t.Name}:{t.Type}, multikey: {t.Multikey} rows: {t.Rows}");
@@ -123,9 +203,14 @@ namespace ConsoleApp
 						//}
 						//else
 						{
+							if (db == null)
+							{
+								Console.WriteLine(" there's no database in use");
+								break;
+							}
 							//show column structure
 							Console.Write("table name >");
-							var tableName = Console.ReadLine(); // readLine().Trim(); // 
+							var tableName = Console.ReadLine();
 							var table = db.Table(tableName);
 							if (table == null)
 							{
@@ -144,16 +229,22 @@ namespace ConsoleApp
 					case ConsoleKey.S:
 						try
 						{
-							Console.Write("query >");
-							var query = Console.In.ReadLine();  // readLine(); // 
+							if (db == null)
+							{
+								Console.WriteLine(" there's no database in use");
+								break;
+							}
+
+							Console.Write(" query >");
+							var query = Console.In.ReadLine();
 							Console.WriteLine();
-							Console.WriteLine($"> processing: {query}");
+							//Console.WriteLine($" processing: {query}");
 
 							var parser = new CsvDbQueryParser();
 							dif.Start = DateTime.Now;
 							var dbQuery = parser.Parse(db, query);
 							dif.End = DateTime.Now;
-							Console.WriteLine($">parsed on: {dif}");
+							Console.WriteLine($" query parsed on: {dif}");
 
 							//to calculate times
 							dif.Start = DateTime.Now;
@@ -162,7 +253,7 @@ namespace ConsoleApp
 							var rows = visualizer.Execute().ToList();
 
 							dif.End = DateTime.Now;
-							Console.WriteLine($">{rows.Count} row(s) retrieved on: {dif}");
+							Console.WriteLine($" {rows.Count} row(s) retrieved on: {dif}");
 
 							//header
 							dif.Start = DateTime.Now;
@@ -177,7 +268,7 @@ namespace ConsoleApp
 							}
 
 							dif.End = DateTime.Now;
-							Console.WriteLine($"\r\n>row(s) displayed on: {dif}");
+							Console.WriteLine($"\r\n displayed on: {dif}");
 						}
 						catch (Exception ex)
 						{
@@ -203,7 +294,7 @@ namespace ConsoleApp
 			var dif = new TimeDifference();
 			dif.Start = DateTime.Now;
 
-			var db = CreateDatabase();
+			var db = OpenDatabase();
 
 			dif.End = DateTime.Now;
 
@@ -260,7 +351,7 @@ namespace ConsoleApp
 
 		static void SqlQueryFinalParseTests()
 		{
-			var db = CreateDatabase();
+			var db = OpenDatabase();
 
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
 
@@ -324,7 +415,7 @@ namespace ConsoleApp
 
 		static void TestHeaders()
 		{
-			var db = CreateDatabase();
+			var db = OpenDatabase();
 
 			//this is just for testing
 			var vis = new Visualizer(db);

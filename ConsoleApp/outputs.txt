@@ -1,0 +1,64 @@
+﻿>h
+
+Menu
+ Shows (h)elp
+ (D)isplay database(s)
+ (M)ount database
+ (U)nmount database
+ (S)earch Database
+ Display (t)ables
+ Display (c)olumn
+ Clea(r)
+ (Q)uit
+>d
+ database(s)
+   -data
+   -data-light
+   -data-extra-light
+>u
+ no database to unmount
+>m
+database name >data
+ opened on: 437 ms
+
+Using database: NJTranst
+>t
+ (6) agency:System.String, multikey: False rows: 1
+ (7) routes:System.Int32, multikey: False rows: 253
+ (7) stops:System.Int32, multikey: False rows: 16552
+ (3) calendar_dates:System.Int32, multikey: False rows: 1293
+ (7) trips:System.Int32, multikey: True rows: 61794
+ (8) stop_times:System.Int32, multikey: False rows: 3229261
+ (5) shapes:System.Int32, multikey: False rows: 3934053
+>c
+table name >agency
+ [agency].agency_id:String
+  key: True, indexed: True, unique: True, pages: 1
+ [agency].agency_name:String
+  key: False, indexed: False, unique: False, pages: 0
+ [agency].agency_url:String
+  key: False, indexed: False, unique: False, pages: 0
+ [agency].agency_timezone:String
+  key: False, indexed: False, unique: False, pages: 0
+ [agency].agency_lang:String
+  key: False, indexed: False, unique: False, pages: 0
+ [agency].agency_phone:String
+  key: False, indexed: False, unique: False, pages: 0
+>s
+ query >SELECT * FROM agency
+
+ query parsed on: 40 ms
+ 1 row(s) retrieved on: 104 ms
+
+agency_id|agency_name|agency_url|agency_timezone|agency_lang|agency_phone
+-------------------------------------------------------------------------
+NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
+
+ displayed on: 15 ms
+>u
+ unmounting database [NJTranst]
+>t
+ there's no database in use
+>c
+ there's no database in use
+>

@@ -99,7 +99,7 @@ namespace CsvDb
 					case "<":
 					case "<=":
 						//return FindLessThan(column, oper, key);
-						throw new ArgumentException("Operator: {Expression.Operator.Name} not implemented yet!");
+						throw new ArgumentException($"Operator: {Expression.Operator.Name} not implemented yet!");
 				}
 			}
 			else

@@ -104,7 +104,7 @@ namespace CsvDb
 		/// </summary>
 		/// <param name="path">path to the root of the databse</param>
 		/// <param name="dif">for testings only, will be removed</param>
-		public CsvDb(string path, TimeDifference dif = null)
+		public CsvDb(string path)
 		{
 
 			// path\bin\
@@ -128,31 +128,32 @@ namespace CsvDb
 			FileStructurePath = io.Path.Combine(BinaryPath, SystemStructureFile);
 			if (!io.File.Exists(FileStructurePath))
 			{
-				//create an empty __tables.json file
-				if (!io.Directory.Exists(BinaryPath))
-				{
-					io.Directory.CreateDirectory(BinaryPath);
+				throw new ArgumentException($"cannot load database structure on: {FileStructurePath}");
+				////create an empty __tables.json file
+				//if (!io.Directory.Exists(BinaryPath))
+				//{
+				//	io.Directory.CreateDirectory(BinaryPath);
 
-					//later add option to clean directory with flag if dessired
+				//	//later add option to clean directory with flag if dessired
 
-				}
+				//}
 
-				var obj = new
-				{
-					Version = "1.01",
-					Description = "Implementing a system hidden variables",
-					PageSize = 255,
-					Tables = new String[0]
-				};
-				var json =
-							 Newtonsoft.Json.JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.Indented);
-				//
-				io.File.WriteAllText(FileStructurePath, json);
+				//var obj = new
+				//{
+				//	Version = "1.01",
+				//	Description = "Implementing a system hidden variables",
+				//	PageSize = 255,
+				//	Tables = new String[0]
+				//};
+				//var json =
+				//			 Newtonsoft.Json.JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.Indented);
+				////
+				//io.File.WriteAllText(FileStructurePath, json);
 			}
 			//Name = io.Path.GetFileNameWithoutExtension(Path = path);
 			//
 
-			Load(dif);
+			Load();
 		}
 
 		/// <summary>
@@ -160,7 +161,7 @@ namespace CsvDb
 		/// </summary>
 		/// <param name="dif">for testings only, will be removed</param>
 		/// <returns></returns>
-		public bool Load(TimeDifference dif = null)
+		public bool Load()
 		{
 			try
 			{
