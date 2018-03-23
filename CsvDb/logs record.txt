@@ -1,5 +1,7 @@
-﻿2018/03/19	
+﻿2018/03/19 - 2018/03/23	
 .- added this logs record
 .- updated frequency in pages
 .- created new project Csv.CMS
 .- restructure index classes, put all in one class
+2018/03/23 - 
+.- fix calling twice query execute

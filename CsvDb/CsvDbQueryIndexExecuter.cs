@@ -132,6 +132,7 @@ namespace CsvDb
 				}
 				else
 				{
+					//In-Order return all values
 					foreach (var offs in DumpTable(treeReader.Root))
 					{
 						yield return offs;
@@ -144,27 +145,35 @@ namespace CsvDb
 
 		IEnumerable<int> DumpTable(PageIndexNodeBase<T> root)
 		{
-			if (root != null)
+			switch (root.Type)
 			{
-				switch (root.Type)
-				{
-					case MetaIndexType.Items:
-						var itemPage = root as PageIndexItems<T>;
-						yield return itemPage.Offset;
-						break;
-					case MetaIndexType.Node:
-						var nodePage = root as PageIndexNode<T>;
-						//return first all left nodes
+				case MetaIndexType.Items:
+					var itemPage = root as PageIndexItems<T>;
+
+					yield return itemPage.Offset;
+					break;
+				case MetaIndexType.Node:
+					var nodePage = root as PageIndexNode<T>;
+
+					//return first all left nodes if any
+					if (nodePage.Left != null)
+					{
 						foreach (var ofs in DumpTable(nodePage.Left))
 							yield return ofs;
-						//return root node
-						foreach (var ofs in nodePage.Values)
-							yield return ofs;
-						//return last all right nodes
+					}
+
+					//return root node
+					foreach (var ofs in nodePage.Values)
+						yield return ofs;
+
+					//return last all right nodes
+					if (nodePage.Right != null)
+					{
 						foreach (var ofs in DumpTable(nodePage.Right))
 							yield return ofs;
-						break;
-				}
+					}
+
+					break;
 			}
 		}
 

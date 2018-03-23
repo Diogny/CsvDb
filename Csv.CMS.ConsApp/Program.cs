@@ -217,10 +217,11 @@ namespace Csv.CMS.ConsApp
 								sw.Restart();
 
 								var visualizer = new CsvDbVisualizer(dbQuery);
-								var rows = visualizer.Execute().ToList();
+								var rows = visualizer.Execute();
 
 								sw.Stop();
-								Console.Write($" {rows.Count} row(s) ");
+								var rowCount = rows.Count();
+								Console.Write($" {rowCount} row(s) ");
 								Console.WriteLine("retrieved on {0} ms", sw.ElapsedMilliseconds);
 
 								//header
@@ -230,7 +231,7 @@ namespace Csv.CMS.ConsApp
 								Console.WriteLine($"\r\n{header}");
 								Console.WriteLine($"{new string('-', header.Length)}");
 
-								foreach (var record in visualizer.Execute())
+								foreach (var record in rows)
 								{
 									Console.WriteLine($"{String.Join(",", record)}");
 								}

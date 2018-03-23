@@ -99,7 +99,7 @@ namespace CsvDb
 				var keyColumn = Table.Columns.FirstOrDefault(c => c.Key);
 				if (keyColumn == null)
 				{
-					throw new ArgumentException($"Cannot find key fro table [{Table.Name}]");
+					throw new ArgumentException($"Cannot find key from table [{Table.Name}]");
 				}
 				var typeIndex = Type.GetType($"System.{keyColumn.Type}");
 
