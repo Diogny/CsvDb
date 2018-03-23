@@ -64,7 +64,11 @@ namespace CsvDb
 				switch (Expression.Operator.Name)
 				{
 					case "=":
-						var treeReader = Table.Column.TreeIndexReader<T>();
+						//check if IEnumerable is called twice when reading tree node pages
+
+
+
+						var treeReader = Table.Column.IndexTree<T>();
 						int offset = -1;
 
 						var value = Constant.Value();
@@ -79,18 +83,29 @@ namespace CsvDb
 						}
 						else
 						{
-							var meta = treeReader.FindKey(key) as MetaIndexItems<T>;
-							if (meta == null)
+							var baseNode = treeReader.FindKey(key) as PageIndexNodeBase<T>;
+							if (baseNode == null)
 							{
 								throw new ArgumentException($"Index corrupted");
 							}
-							//
-							offset = meta.Offset;
-						}
-						CsvDbKeyValues<T> item = Table.Column.PageItemReader<T>().Find(offset, key);
-						foreach (var cvsOfs in item.Values)
-						{
-							yield return cvsOfs;
+							switch (baseNode.Type)
+							{
+								case MetaIndexType.Node:
+									var nodePage = baseNode as PageIndexNode<T>;
+									foreach (var csvOfs in nodePage.Values)
+									{
+										yield return csvOfs;
+									}
+									break;
+								case MetaIndexType.Items:
+									offset = ((PageIndexItems<T>)baseNode).Offset;
+									CsvDbKeyValues<T> item = Table.Column.IndexItems<T>().Find(offset, key);
+									foreach (var cvsOfs in item.Values)
+									{
+										yield return cvsOfs;
+									}
+									break;
+							}
 						}
 						break;
 					case ">":
@@ -105,11 +120,11 @@ namespace CsvDb
 			else
 			{
 				//return the full table rows
-				var treeReader = Column.TreeIndexReader<T>();
+				var treeReader = Column.IndexTree<T>();
 				if (treeReader.Root == null)
 				{
 					//itemspage has only one page, no tree root
-					foreach (var cvsOfs in Column.PageItemReader<T>()
+					foreach (var cvsOfs in Column.IndexItems<T>()
 						.Pages[0].Items.SelectMany(i => i.Value))
 					{
 						yield return cvsOfs;
@@ -127,18 +142,18 @@ namespace CsvDb
 			yield break;
 		}
 
-		IEnumerable<int> DumpTable(MetaIndexBase<T> root)
+		IEnumerable<int> DumpTable(PageIndexNodeBase<T> root)
 		{
 			if (root != null)
 			{
 				switch (root.Type)
 				{
 					case MetaIndexType.Items:
-						var itemPage = root as MetaIndexItems<T>;
+						var itemPage = root as PageIndexItems<T>;
 						yield return itemPage.Offset;
 						break;
 					case MetaIndexType.Node:
-						var nodePage = root as MetaIndexNode<T>;
+						var nodePage = root as PageIndexNode<T>;
 						//return first all left nodes
 						foreach (var ofs in DumpTable(nodePage.Left))
 							yield return ofs;

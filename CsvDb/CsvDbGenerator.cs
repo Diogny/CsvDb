@@ -35,7 +35,7 @@ namespace CsvDb
 			//generic method
 			MethodInfo processTable_Method =
 				this.GetType()
-					.GetMethod(nameof(CsvDbGenerator.generateCsvTableText),
+					.GetMethod(nameof(CsvDbGenerator.GenerateCsvTableText),
 					BindingFlags.Instance | BindingFlags.NonPublic);
 
 			foreach (var table in Database.Tables)
@@ -90,7 +90,7 @@ namespace CsvDb
 			}
 		}
 
-		void generateCsvTableText<TClass>(
+		void GenerateCsvTableText<TClass>(
 			CsvHelper.CsvReader csv,
 			io.Compression.ZipArchiveEntry entry,
 			CsvDbTable table,
@@ -161,7 +161,8 @@ namespace CsvDb
 				//
 				int rowLine = 0;
 				var sb = new StringBuilder();
-				var startTime = DateTime.Now;
+				var sw = new System.Diagnostics.Stopwatch();
+				sw.Start();
 				var csvParser = new CsvRecordParser(csv, table);
 
 				//read each record of csv entry
@@ -244,9 +245,11 @@ namespace CsvDb
 				}
 
 				//ellapsed time
-				var timespan = DateTime.Now - startTime;
-				var ellapsed = $"  ellapsed: {timespan}";
-				Console.WriteLine(ellapsed);
+				sw.Stop();
+				Console.WriteLine("ellapsed {0} ms", sw.ElapsedMilliseconds);
+				//var timespan = DateTime.Now - startTime;
+				//var ellapsed = $"  ellapsed: {timespan}";
+				//Console.WriteLine(ellapsed);
 
 				//store/update line count
 				table.Rows = rowLine;
@@ -351,10 +354,10 @@ namespace CsvDb
 			var thisType = this.GetType();
 			//
 			MethodInfo generateIndexCollection_Method = thisType
-				.GetMethod(nameof(generateIndexCollectionKeysMultipleValues), BindingFlags.Instance | BindingFlags.NonPublic);
+				.GetMethod(nameof(GenerateIndexCollectionKeysMultipleValues), BindingFlags.Instance | BindingFlags.NonPublic);
 			//
 			MethodInfo compileIndex_Method = thisType
-					.GetMethod(nameof(compileIndex), BindingFlags.Instance | BindingFlags.NonPublic);
+					.GetMethod(nameof(CompileIndex), BindingFlags.Instance | BindingFlags.NonPublic);
 
 			foreach (var table in Database.Tables)
 			{
@@ -392,7 +395,7 @@ namespace CsvDb
 
 						//save index collection to disk
 						MethodInfo saveBinaryIndexIndex_Method = thisType
-							.GetMethod(nameof(saveBinaryIndex), BindingFlags.Instance | BindingFlags.NonPublic);
+							.GetMethod(nameof(SaveBinaryIndex), BindingFlags.Instance | BindingFlags.NonPublic);
 
 						MethodInfo genericSaveBinaryIndex = saveBinaryIndexIndex_Method.MakeGenericMethod(indexType);
 						genericSaveBinaryIndex.Invoke(this,
@@ -417,7 +420,7 @@ namespace CsvDb
 			}
 		}
 
-		List<KeyValuePair<T, List<int>>> generateIndexCollectionKeysMultipleValues<T>(
+		List<KeyValuePair<T, List<int>>> GenerateIndexCollectionKeysMultipleValues<T>(
 			CsvDbColumn index,
 			Type indexType
 		)
@@ -499,7 +502,7 @@ namespace CsvDb
 			return groupedList;
 		}
 
-		BTreePageBase<T> compileIndex<T>(
+		BTreePageBase<T> CompileIndex<T>(
 			List<KeyValuePair<T, List<int>>> collection,
 			int pageSize,
 			CsvDbColumn index
@@ -589,7 +592,7 @@ namespace CsvDb
 			}
 		}
 
-		void saveBinaryIndex<T>(BTreePageBase<T> rootPage, CsvDbColumn index)
+		void SaveBinaryIndex<T>(BTreePageBase<T> rootPage, CsvDbColumn index)
 			where T : IComparable<T>
 		{
 			if (rootPage == null)
@@ -610,7 +613,7 @@ namespace CsvDb
 			var indexBinFilePath = indexfilepath + ".bin";
 			using (var writer = new io.BinaryWriter(io.File.Create(indexBinFilePath)))
 			{
-				var collectionPage = getNodeItemPages<T>(rootPage).ToList();
+				var collectionPage = GetNodeItemPages<T>(rootPage).ToList();
 
 				//MAIN HEADER
 
@@ -643,7 +646,7 @@ namespace CsvDb
 			{
 				Int32 valueInt32 = 0;
 				//write Index main Header
-				CsvDbColumnHeader header = new CsvDbColumnHeader();
+				PageIndexTreeHeader header = new PageIndexTreeHeader();
 				//
 				header.Value0 = 0;
 				//page count
@@ -678,7 +681,7 @@ namespace CsvDb
 			}
 		}
 
-		IEnumerable<BTreePageItems<T>> getNodeItemPages<T>(BTreePageBase<T> rootPage)
+		IEnumerable<BTreePageItems<T>> GetNodeItemPages<T>(BTreePageBase<T> rootPage)
 				where T : IComparable<T>
 		{
 			var stack = new Stack<BTreePageBase<T>>();
@@ -750,135 +753,6 @@ namespace CsvDb
 				{
 					StoreTreePage<T>(node.Right, writer);
 				}
-			}
-		}
-
-		#endregion
-
-		#region SHOW TREE STRUCTURE OF PAGES  -------DONT UPLOAD TO GITHUB, it's for testings
-
-		public void GenerateTreeStructure()
-		{
-			Console.WriteLine($"\r\nTree Node Page Structures:");
-			foreach (var table in Database.Tables)
-			{
-				Console.WriteLine($"\r\n[{table.Name}]");
-				foreach (var index in table.Columns.Where(c => c.Indexed))
-				{
-					Console.WriteLine($"\nIndex [{index.Name}]");
-
-					var pathNodeTree = io.Path.Combine(Database.BinaryPath, $"{index.Indexer}");
-					var pathItemPages = $"{pathNodeTree}.bin";
-					var pathTreeStruct = $"{io.Path.Combine(Database.LogPath, $"{index.Indexer}")}.tree.txt";
-
-					if (!io.File.Exists(pathNodeTree))
-					{
-						Console.WriteLine("Tree index not found, skip!");
-					}
-					else
-					{
-						using (var reader = new io.BinaryReader(io.File.OpenRead(pathNodeTree)))
-						using (var writer = new io.StreamWriter(pathTreeStruct))
-						{
-							writer.WriteLine($"[{table.Name}].{index.Name} Tree Structure");
-							writer.WriteLine("");
-							writer.WriteLine("Header");
-							writer.WriteLine("----------------------");
-
-							//header CsvDbColumnHeader
-							var headerBuffer = new byte[CsvDbColumnHeader.Size];
-							//
-							var read = reader.Read(headerBuffer, 0, headerBuffer.Length);
-							var header = CsvDbColumnHeader.FromArray(headerBuffer);
-
-							writer.WriteLine($" Value0: {header.Value0}");
-							writer.WriteLine($" Column Index: {header.ColumnIndex}");
-							writer.WriteLine($" Page Count: {header.PageCount}");
-							writer.WriteLine($" Flags: {header.Flags}");
-
-							var isUnique = (header.Flags & Consts.IndexHeaderIsUnique) != 0;
-							var isKey = (header.Flags & Consts.IndexHeaderIsKey) != 0;
-							var isLeaf = (header.Flags & Consts.IndexHeaderIsLeaf) != 0;
-
-							byte keyTypeValue = (byte)header.Flags;
-							CsvDbColumnTypeEnum keyType = (CsvDbColumnTypeEnum)keyTypeValue;
-
-							writer.WriteLine($"  Unique: {isUnique}");
-							writer.WriteLine($"  Key: {isKey}");
-							writer.WriteLine($"  Leaf: {isLeaf}");
-							writer.WriteLine($"  Key Type: {keyType}");
-
-							if (!isLeaf)
-							{
-								writer.WriteLine("");
-								ReadTreePageShape("", "", reader, keyType, writer);
-							}
-						}
-						Console.WriteLine("Done!");
-					}
-				}
-			}
-		}
-
-		void ReadTreePageShape(string keyprefix, string childrenprefix, io.BinaryReader reader,
-			CsvDbColumnTypeEnum keyType,
-			io.StreamWriter writer)
-		{
-			var flags = reader.ReadInt32();
-
-			//remove last 3 chars if any
-			var newCldPref = childrenprefix.Length == 0 ?
-						 "" :
-						 childrenprefix.Substring(0, childrenprefix.Length - 3);
-
-			var prefix = $"{newCldPref}{keyprefix}";
-
-
-			var pageType = flags & 0b011;
-			switch (pageType)
-			{
-				case Consts.BTreePageNodeFlag:
-					var pageSize = reader.ReadInt32();
-
-					var uniqueKeyValue = (flags & Consts.BTreeUniqueKeyValueFlag) != 0;
-
-					Int32 keyValue = 0;
-					Int32 keyValueCount = 0;
-					var keyValueCollection = new List<int>();
-
-					//read value(s)
-					if (uniqueKeyValue)
-					{
-						keyValue = reader.ReadInt32();
-					}
-					else
-					{
-						keyValueCount = reader.ReadInt32();
-						for (var i = 0; i < keyValueCount; i++)
-						{
-							keyValueCollection.Add(reader.ReadInt32());
-						}
-					}
-
-					//read key
-					var key = keyType.LoadKey(reader);
-
-					writer.WriteLine($"{prefix}Key: <{key}> PageSize: {pageSize}, Unique Key Value: {uniqueKeyValue}");
-
-					//left tree page node
-					ReadTreePageShape("├──", childrenprefix + "│  ", reader, keyType, writer);
-
-					//right tree page node
-					ReadTreePageShape("└──", childrenprefix + "   ", reader, keyType, writer);
-
-					break;
-				case Consts.BTreePageNodeItemsFlag:
-					//read offset to [table][column].index.bin for page items
-					var offset = reader.ReadInt32();
-					writer.WriteLine($"{prefix}PageItem, Offset to item page: {offset}");
-					break;
-				default:
-					throw new ArgumentException("Invalid database structure!");
 			}
 		}
 

@@ -3,14 +3,12 @@ using System;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Microsoft.Extensions.Configuration;
 
 namespace ConsoleApp
 {
-	public class Program
+	class Program
 	{
-
 		public static IConfiguration Configuration => new ConfigurationBuilder()
 				.SetBasePath(System.IO.Directory.GetCurrentDirectory())
 				.AddJsonFile("config.json")
@@ -18,16 +16,17 @@ namespace ConsoleApp
 
 		static void Main(string[] args)
 		{
-			var handleWait = false;
+			var handledWait = false;
 
 			//Generators();
-			//TestHeaders();
 
 			//SqlQueryExecuteTests();
-			//SqlQueryFinalParseTests();
-			handleWait = SqlQueryExecute();
 
-			if (!handleWait)
+			handledWait = SqlQueryFinalParseTests();
+
+			//TreeTests();
+
+			if (!handledWait)
 			{
 				Console.WriteLine("\r\nPress enter to finish!");
 				Console.ReadLine();
@@ -43,20 +42,18 @@ namespace ConsoleApp
 			{
 				dbName = "data\\";
 			}
-			string rootPath = $"{basePath}{dbName}"
-			//$@"{basePath}data\"
-			//$@"{basePath}data-light\"
-			//$@"{basePath}data-extra-light\"
-			;
+			string rootPath = $"{basePath}{dbName}";
+
 			if (!rootPath.EndsWith('\\'))
 			{
 				rootPath += "\\";
 			}
 
-			var dif = new TimeDifference();
+			System.Diagnostics.Stopwatch sw = null;
 			if (logTimes)
 			{
-				dif.Start = DateTime.Now;
+				sw = new System.Diagnostics.Stopwatch();
+				sw.Start();
 			}
 
 			CsvDb.CsvDb db = null;
@@ -66,8 +63,8 @@ namespace ConsoleApp
 
 				if (logTimes)
 				{
-					dif.End = DateTime.Now;
-					Console.WriteLine($" opened on: {dif}");
+					sw.Stop();
+					Console.WriteLine("  opened on {0} ms", sw.ElapsedMilliseconds);
 				}
 			}
 			catch (Exception ex)
@@ -98,208 +95,18 @@ namespace ConsoleApp
 			//gen.CompilePagers();
 
 			gen.CompileIndexes();
-
-			gen.GenerateTreeStructure();
-		}
-
-		static bool SqlQueryExecute()
-		{
-			var availableDatabases = new string[]
-			{
-				"data",
-				"data-light",
-				"data-extra-light"
-			};
-
-			//SELECT * FROM agency
-
-			var dif = new TimeDifference();
-
-			//var db = CreateDatabase();
-			CsvDb.CsvDb db = null;
-
-			//Action displayHelp = () =>
-			void displayHelp()
-			{
-				Console.WriteLine("");
-				Console.WriteLine("Menu");
-				Console.WriteLine(" Shows (h)elp");
-				Console.WriteLine(" (D)isplay database(s)");
-				Console.WriteLine(" (M)ount database");
-				Console.WriteLine(" (U)nmount database");
-				Console.WriteLine(" (S)earch Database");
-				Console.WriteLine(" Display (t)ables");
-				Console.WriteLine(" Display (c)olumn");
-				Console.WriteLine(" Clea(r)");
-				Console.WriteLine(" (Q)uit");
-			}
-
-			//Console.TreatControlCAsInput = true;
-			bool end = false;
-			//displayHelp();
-			while (!end)
-			{
-				Console.Write(">");
-
-				while (Console.KeyAvailable == false)
-					Thread.Sleep(250); // Loop until input is entered.
-
-				ConsoleKeyInfo key = Console.ReadKey();
-				Console.WriteLine();
-				switch (key.Key)
-				{
-					case ConsoleKey.M:
-						Console.Write("database name >");
-						var dbName = Console.ReadLine();
-						if ((db = OpenDatabase(dbName: dbName, logTimes: true)) != null)
-						{
-							Console.WriteLine($"\r\nUsing database: {db.Name}");
-						}
-						break;
-					case ConsoleKey.U:
-						if (db == null)
-						{
-							Console.WriteLine($" no database to unmount");
-						}
-						else
-						{
-							Console.WriteLine($" unmounting database [{db.Name}]");
-							db = null;
-						}
-						break;
-					case ConsoleKey.D:
-						var prefix = "\r\n   -";
-						var txt = String.Join(prefix, availableDatabases);
-						if (String.IsNullOrWhiteSpace(txt))
-						{
-							txt = $"{prefix}there is no available database";
-						}
-						else
-						{
-							txt = $"{prefix}{txt}";
-						}
-						Console.WriteLine($" database(s){txt}");
-						break;
-					case ConsoleKey.H:
-						displayHelp();
-						break;
-					case ConsoleKey.T:
-						//display tables
-						if (db == null)
-						{
-							Console.WriteLine(" there's no database in use");
-							break;
-						}
-						foreach (var t in db.Tables)
-						{
-							Console.WriteLine($" ({t.Columns.Count}) {t.Name}:{t.Type}, multikey: {t.Multikey} rows: {t.Rows}");
-						}
-						break;
-					case ConsoleKey.C:
-						//if ((key.Modifiers & ConsoleModifiers.Control) != 0)
-						//{
-						//	// Console.Write("CTL+");
-						//	end = true;
-						//}
-						//else
-						{
-							if (db == null)
-							{
-								Console.WriteLine(" there's no database in use");
-								break;
-							}
-							//show column structure
-							Console.Write("table name >");
-							var tableName = Console.ReadLine();
-							var table = db.Table(tableName);
-							if (table == null)
-							{
-								Console.WriteLine($" invalid table [{tableName}]");
-							}
-							else
-							{
-								foreach (var col in table.Columns)
-								{
-									Console.WriteLine($" [{table.Name}].{col.Name}:{col.Type}");
-									Console.WriteLine($"  key: {col.Key}, indexed: {col.Indexed}, unique: {col.Unique}, pages: {col.PageCount}");
-								}
-							}
-						}
-						break;
-					case ConsoleKey.S:
-						try
-						{
-							if (db == null)
-							{
-								Console.WriteLine(" there's no database in use");
-								break;
-							}
-
-							Console.Write(" query >");
-							var query = Console.In.ReadLine();
-							Console.WriteLine();
-							//Console.WriteLine($" processing: {query}");
-
-							var parser = new CsvDbQueryParser();
-							dif.Start = DateTime.Now;
-							var dbQuery = parser.Parse(db, query);
-							dif.End = DateTime.Now;
-							Console.WriteLine($" query parsed on: {dif}");
-
-							//to calculate times
-							dif.Start = DateTime.Now;
-
-							var visualizer = new CsvDbVisualizer(dbQuery);
-							var rows = visualizer.Execute().ToList();
-
-							dif.End = DateTime.Now;
-							Console.WriteLine($" {rows.Count} row(s) retrieved on: {dif}");
-
-							//header
-							dif.Start = DateTime.Now;
-
-							var header = String.Join("|", dbQuery.Columns.Header);
-							Console.WriteLine($"\r\n{header}");
-							Console.WriteLine($"{new string('-', header.Length)}");
-
-							foreach (var record in visualizer.Execute())
-							{
-								Console.WriteLine($"{String.Join(",", record)}");
-							}
-
-							dif.End = DateTime.Now;
-							Console.WriteLine($"\r\n displayed on: {dif}");
-						}
-						catch (Exception ex)
-						{
-							Console.WriteLine($"error: {ex.Message}");
-						}
-						break;
-					case ConsoleKey.Q:
-						end = true;
-						break;
-					case ConsoleKey.R:
-						Console.Clear();
-						break;
-					default:
-						Console.WriteLine(" -invalid option, press [h] for help");
-						break;
-				}
-			}
-			return true;
 		}
 
 		static void SqlQueryExecuteTests()
 		{
-			var dif = new TimeDifference();
-			dif.Start = DateTime.Now;
+			var sw = new System.Diagnostics.Stopwatch();
+			sw.Start();
 
 			var db = OpenDatabase();
 
-			dif.End = DateTime.Now;
-
+			sw.Stop();
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
-			Console.WriteLine($">created on: {dif}");
+			Console.WriteLine(">created on {0} ms", sw.ElapsedMilliseconds);
 
 			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
 									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
@@ -311,29 +118,28 @@ namespace ConsoleApp
 
 			Console.WriteLine($"\r\nIn query: {query}");
 
-			dif.Start = DateTime.Now;
-
+			sw.Restart();
 			var parser = new CsvDbQueryParser();
 			var dbQuery = parser.Parse(db, query); // old one: CsvDb.CsvDbQuery.Parse(db, query);
 
-			dif.End = DateTime.Now;
-			Console.WriteLine($">parsed on: {dif}");
+			sw.Stop();
+			Console.WriteLine(">parsed on {0} ms", sw.ElapsedMilliseconds);
 
 			var outQuery = dbQuery.ToString();
 
 			Console.WriteLine($"\r\nOut query: {outQuery}\r\n");
 
 			//to calculate times
-			dif.Start = DateTime.Now;
+			sw.Restart();
 
 			var visualizer = new CsvDbVisualizer(dbQuery);
 			var rows = visualizer.Execute().ToList();
 
-			dif.End = DateTime.Now;
-			Console.WriteLine($">{rows.Count} row(s) retrieved on: {dif}");
+			sw.Stop();
+			Console.WriteLine(">{rows.Count} row(s) retrieved on {0} ms", sw.ElapsedMilliseconds);
 
 			//header
-			dif.Start = DateTime.Now;
+			sw.Restart();
 
 			var header = String.Join("|", dbQuery.Columns.Header);
 			Console.WriteLine($"\r\n{header}");
@@ -344,12 +150,11 @@ namespace ConsoleApp
 				Console.WriteLine($"{String.Join(",", record)}");
 			}
 
-			dif.End = DateTime.Now;
-			Console.WriteLine($"\r\n>row(s) displayed on: {dif}");
-
+			sw.Stop();
+			Console.WriteLine("\r\n>row(s) displayed on {0} ms", sw.ElapsedMilliseconds);
 		}
 
-		static void SqlQueryFinalParseTests()
+		static bool SqlQueryFinalParseTests()
 		{
 			var db = OpenDatabase();
 
@@ -411,23 +216,145 @@ namespace ConsoleApp
 					Console.WriteLine($"exception: {ex.Message}");
 				}
 			}
+			return false;
 		}
 
-		static void TestHeaders()
+		static void TreeTests()
 		{
-			var db = OpenDatabase();
+			var root = new MyTree<char>('A',
+				new MyTree<char>('B',
+					new MyTree<char>('D',
+						new MyTree<char>('F')),
+					new MyTree<char>('E')),
+				new MyTree<char>('C',
+					new MyTree<char>('G'),
+					new MyTree<char>('H')));
 
-			//this is just for testing
-			var vis = new Visualizer(db);
+			Console.WriteLine("Pre Order");
+			root.PreOrder((n) =>
+			{
+				Console.WriteLine(n.Value);
+			});
 
-			//vis.TestIndexTrees();
-			vis.TestIndexTreeShape();
+			Console.WriteLine("In Order");
+			root.InOrder((n) =>
+			{
+				Console.WriteLine(n.Value);
+			});
 
-			//	vis.TestOverwrite();
-
-			//vis.TestIndexItems();
+			Console.WriteLine("Post Order");
+			root.PostOrder((n) =>
+			{
+				Console.WriteLine(n.Value);
+			});
 		}
 
+		class MyTree<T>
+		{
+			public T Value { get; set; }
+
+			public MyTree<T> Left { get; set; }
+
+			public MyTree<T> Right { get; set; }
+
+			public MyTree(T value, MyTree<T> left = null, MyTree<T> right = null)
+			{
+				Value = value;
+				Left = left;
+				Right = right;
+			}
+
+			public override string ToString() => $"{Value}";
+
+			public void PreOrder(Action<MyTree<T>> action)
+			{
+				//https://en.wikipedia.org/wiki/Tree_traversal#Pre-order
+				var stack = new Stack<MyTree<T>>();
+				//push root
+				stack.Push(this);
+
+				while (stack.Count > 0)
+				{
+					//
+					var node = stack.Pop();
+					action(node);
+					//
+					if (node.Right != null)
+					{
+						stack.Push(node.Right);
+					}
+					if (node.Left != null)
+					{
+						stack.Push(node.Left);
+					}
+
+				}
+			}
+
+			public void InOrder(Action<MyTree<T>> action)
+			{
+				//https://articles.leetcode.com/binary-search-tree-in-order-traversal/
+				var stack = new Stack<MyTree<T>>();
+
+				//set current to root
+				MyTree<T> current = this;
+
+				while (stack.Count > 0 || current != null)
+				{
+					if (current != null)
+					{
+						stack.Push(current);
+						//try to go Left
+						current = current.Left;
+					}
+					else
+					{
+						current = stack.Pop();
+						//call action
+						action(current);
+						//try to go Right
+						current = current.Right;
+					}
+				}
+			}
+
+			public void PostOrder(Action<MyTree<T>> action)
+			{
+				//postfix
+				//https://articles.leetcode.com/binary-tree-post-order-traversal/
+				var stack = new Stack<MyTree<T>>();
+				//push root
+				stack.Push(this);
+
+				MyTree<T> prev = null;
+
+				while (stack.Count > 0)
+				{
+					var curr = stack.Peek();
+
+					if (prev == null || prev.Left == curr || prev.Right == curr)
+					{
+						if (curr.Left != null)
+							stack.Push(curr.Left);
+						else if (curr.Right != null)
+							stack.Push(curr.Right);
+					}
+					else if (curr.Left == prev)
+					{
+						if (curr.Right != null)
+							stack.Push(curr.Right);
+					}
+					else
+					{
+						action(curr);
+						stack.Pop();
+					}
+					prev = curr;
+
+				}
+			}
+
+		}
 	}
 
 }

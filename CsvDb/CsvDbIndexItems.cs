@@ -6,8 +6,8 @@ using io = System.IO;
 
 namespace CsvDb
 {
-	public class CsvDbIndexItemsReader<T>
-		where T : IComparable<T>
+	public class CsvDbIndexItems<T>
+			where T : IComparable<T>
 	{
 
 		public CsvDb Database { get; protected internal set; }
@@ -24,14 +24,14 @@ namespace CsvDb
 
 		io.BinaryReader reader = null;
 
-		internal List<MetaItemsPage<T>> Pages = new List<MetaItemsPage<T>>();
+		public List<MetaItemsPage<T>> Pages { get; protected internal set; }
 
 		public bool ValidPage(int offset)
 		{
 			return Pages.Any(p => p.Offset == offset);
 		}
 
-		public CsvDbIndexItemsReader(CsvDb db, string tableName, string columnName)
+		public CsvDbIndexItems(CsvDb db, string tableName, string columnName)
 		{
 			if ((Database = db) == null)
 			{
@@ -48,6 +48,8 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"Could not find indexer in database");
 			}
+
+			Pages = new List<MetaItemsPage<T>>();
 
 			//read main structure of item pages
 			using (reader = new io.BinaryReader(io.File.OpenRead(PathToItems)))
@@ -94,13 +96,14 @@ namespace CsvDb
 						ItemsCount = itemsCount,
 						DataStart = dataStart,
 						Parent = this,
-						Frequency = 0.0
+						Frequency = 0.0,
+						Number = pi
 					};
 					Pages.Add(page);
-
 				}
-
 			}
+			//update item page count
+			Index.ItemPages = Pages.Count;
 		}
 
 		public CsvDbKeyValues<T> Find(int offset, T key)
@@ -122,30 +125,33 @@ namespace CsvDb
 		}
 	}
 
-	internal class MetaItemsPage<T>
+	public class MetaItemsPage<T>
 		where T : IComparable<T>
 	{
-		//readl file field
-		public Int32 Flags { get; set; }
+		//read file field
+		public Int32 Flags { get; internal set; }
 
 		/// <summary>
 		/// ItemsPage's ID
 		/// </summary>
-		public Int32 Offset { get; set; }
+		public Int32 Offset { get; internal set; }
 
-		public Int32 PageSize { get; set; }
+		public Int32 PageSize { get; internal set; }
 
-		public Int32 ItemsCount { get; set; }
+		public Int32 ItemsCount { get; internal set; }
 
 		//generated fields
-		public bool UniqueKeyValue { get; set; }
+		public bool UniqueKeyValue { get; internal set; }
 
 		internal int DataStart { get; set; }
 
 		//class properties
-		public CsvDbIndexItemsReader<T> Parent { get; protected internal set; }
 
-		public Double Frequency { get; set; }
+		public int Number { get; internal set; }
+
+		public CsvDbIndexItems<T> Parent { get; protected internal set; }
+
+		public Double Frequency { get; internal set; }
 
 		List<KeyValuePair<T, List<int>>> _items = null;
 
@@ -153,6 +159,8 @@ namespace CsvDb
 		{
 			get
 			{
+				//later comply with Database.ReadPolicy
+
 				if (_items == null)
 				{
 					var list = new List<KeyValuePair<T, List<int>>>();
@@ -221,8 +229,9 @@ namespace CsvDb
 
 					}
 					_items = list;
-					Frequency++;
 				}
+				//increase frequency
+				Frequency += 0.01;
 				//
 				return _items;
 			}

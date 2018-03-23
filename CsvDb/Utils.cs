@@ -13,16 +13,6 @@ using static CsvDb.CsvDbQuery;
 
 namespace CsvDb
 {
-	public class TimeDifference
-	{
-		public DateTime Start { get; set; }
-
-		public DateTime End { get; set; }
-
-		public TimeSpan Difference { get { return End - Start; } }
-
-		public override string ToString() => Difference.Difference();
-	}
 
 	public static class Utils
 	{
@@ -75,6 +65,11 @@ namespace CsvDb
 		public static string ToYesNo(this bool value)
 		{
 			return value ? "Yes" : "No";
+		}
+
+		public static string IfYes(this bool value, string text)
+		{
+			return value ? text : String.Empty;
 		}
 
 		public static IEnumerable<K> GetAllKeysAs<T, K>(

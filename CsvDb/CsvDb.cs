@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using io = System.IO;
 
 namespace CsvDb
@@ -22,6 +23,13 @@ namespace CsvDb
 		OpenEdit
 	}
 
+	public enum CsvDbIndexItemsPolicy
+	{
+		ReadAlways,
+		ReadAndStoreAlways,
+		ReadKeepMostFrequentAlways
+	}
+
 	internal class CsvDbStructure
 	{
 		public String Version { get; set; }
@@ -36,7 +44,7 @@ namespace CsvDb
 
 	}
 
-	public class CsvDb
+	public class CsvDb : IDisposable
 	{
 		public string LogPath { get; protected internal set; }
 
@@ -47,6 +55,8 @@ namespace CsvDb
 		public string Name { get { return Structure.Name; } }
 
 		public int PageSize { get { return Structure.PageSize; } }
+
+		public CsvDbIndexItemsPolicy ReadPolicy { get; set; }
 
 		internal CsvDbStructure Structure;
 
@@ -75,6 +85,8 @@ namespace CsvDb
 
 			Structure =
 				fastJSON.JSON.ToObject<CsvDbStructure>(structure);
+
+			ReadPolicy = CsvDbIndexItemsPolicy.ReadAlways;
 
 			//link
 			Tables.ForEach(t =>
@@ -153,6 +165,8 @@ namespace CsvDb
 			//Name = io.Path.GetFileNameWithoutExtension(Path = path);
 			//
 
+			ReadPolicy = CsvDbIndexItemsPolicy.ReadAlways;
+
 			Load();
 		}
 
@@ -180,6 +194,12 @@ namespace CsvDb
 					table.Database = this;
 					table.Columns.ForEach(column =>
 					{
+						//update
+						if (!column.Indexed)
+						{
+							column.NodePages = 0;
+							column.ItemPages = 0;
+						}
 						column.Table = table;
 					});
 				});
@@ -197,6 +217,7 @@ namespace CsvDb
 		{
 			try
 			{
+				fastJSON.JSON.Parameters.UseExtensions = false;
 				var json =
 				//Newtonsoft.Json.JsonConvert.SerializeObject(Structure, Newtonsoft.Json.Formatting.Indented);
 				fastJSON.JSON.ToNiceJSON(Structure);
@@ -216,14 +237,45 @@ namespace CsvDb
 			return Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
 		}
 
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="tableName">table name</param>
+		/// <param name="columnName">column name</param>
+		/// <returns></returns>
 		public CsvDbColumn Index(string tableName, string columnName)
 		{
 			return Table(tableName)?.Columns.FirstOrDefault(c => String.Compare(c.Name, columnName) == 0);
 		}
 
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="tableColumnName">table.index</param>
+		/// <returns></returns>
+		public CsvDbColumn Index(string tableColumnName)
+		{
+			var cols = tableColumnName?.Split('.', StringSplitOptions.RemoveEmptyEntries);
+			CsvDbColumn index = null;
+			if (cols != null && cols.Length == 2)
+			{
+				index = Index(cols[0], cols[1]);
+			}
+			return index;
+		}
+
 		public override string ToString()
 		{
 			return $"{Name} ({Tables?.Count}) table(s)";
+		}
+
+		public void Dispose()
+		{
+			//save main info
+			Save();
+			//update page frequency info and save
+			//var path = io.Path.Combine(BinaryPath, "");
+
 		}
 	}
 
@@ -288,6 +340,10 @@ namespace CsvDb
 
 		public int PageCount { get; set; }
 
+		public int ItemPages { get; set; }
+
+		public int NodePages { get; set; }
+
 		[Newtonsoft.Json.JsonIgnore]
 		public CsvDbColumnTypeEnum TypeEnum
 		{
@@ -301,11 +357,13 @@ namespace CsvDb
 			}
 		}
 
-		protected internal CsvDbTable Table { get; set; }
+		[System.Xml.Serialization.XmlIgnore]
+		//[ScriptIgnore]
+		public CsvDbTable Table { get; internal set; }
 
-		private object _indexItemReader;
+		private object _itemsIndex;
 
-		protected internal CsvDbIndexItemsReader<T> PageItemReader<T>()
+		public CsvDbIndexItems<T> IndexItems<T>()
 			where T : IComparable<T>
 		{
 			//made [protected internal] to remove type checking later
@@ -315,40 +373,40 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"Invalid index type [{typeName}] for column [{Name}]");
 			}
-			if (_indexItemReader == null)
+			if (_itemsIndex == null)
 			{
-				_indexItemReader = Activator.CreateInstance(typeof(CsvDbIndexItemsReader<T>), new object[]
+				_itemsIndex = Activator.CreateInstance(typeof(CsvDbIndexItems<T>), new object[]
 				 {
 					 Table.Database,
 					 Table.Name,
 					 Name
 				 });
 			}
-			return (CsvDbIndexItemsReader<T>)_indexItemReader;
+			return (CsvDbIndexItems<T>)_itemsIndex;
 		}
 
-		private object _treeIndexReader;
+		private object _indexTree;
 
-		protected internal CsvDbIndexTreeReader<T> TreeIndexReader<T>()
+		public CsvDbIndexTree<T> IndexTree<T>()
 			where T : IComparable<T>
 		{
 			//made [protected internal] to remove type checking later
 			//check type
-			var typeName = typeof(T).Name; // default(T).GetType().Name;
+			var typeName = typeof(T).Name;
 			if (typeName != Type)
 			{
 				throw new ArgumentException($"Invalid index type [{typeName}] for column [{Name}]");
 			}
-			if (_treeIndexReader == null)
+			if (_indexTree == null)
 			{
-				_treeIndexReader = Activator.CreateInstance(typeof(CsvDbIndexTreeReader<T>), new object[]
+				_indexTree = Activator.CreateInstance(typeof(CsvDbIndexTree<T>), new object[]
 				 {
 					 Table.Database,
 					 Table.Name,
 					 Name
 				 });
 			}
-			return (CsvDbIndexTreeReader<T>)_treeIndexReader;
+			return (CsvDbIndexTree<T>)_indexTree;
 		}
 
 		public CsvDbColumn()

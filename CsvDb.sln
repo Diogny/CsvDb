@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CsvDb", "CsvDb\CsvDb.csproj
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp", "ConsoleApp\ConsoleApp.csproj", "{E85A631D-3BA9-4802-9826-65FC645A2887}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Csv.CMS.ConsApp", "Csv.CMS.ConsApp\Csv.CMS.ConsApp.csproj", "{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{E85A631D-3BA9-4802-9826-65FC645A2887}.Release|x64.Build.0 = Release|Any CPU
 		{E85A631D-3BA9-4802-9826-65FC645A2887}.Release|x86.ActiveCfg = Release|Any CPU
 		{E85A631D-3BA9-4802-9826-65FC645A2887}.Release|x86.Build.0 = Release|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Debug|x64.Build.0 = Debug|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Debug|x86.Build.0 = Debug|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Release|x64.ActiveCfg = Release|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Release|x64.Build.0 = Release|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Release|x86.ActiveCfg = Release|Any CPU
+		{83813891-C79D-47C0-A5F2-C1D9AFB4B58F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

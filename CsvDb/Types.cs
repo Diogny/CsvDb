@@ -49,54 +49,6 @@ namespace CsvDb
 		public io.StreamWriter writer;
 	}
 
-	public interface IBuffered
-	{
-		byte[] ToByteArray();
-
-	}
-
-	//[StructLayout(LayoutKind.Sequential)]
-	public struct CsvDbColumnHeader : IBuffered
-	{
-		public Int32 Value0;
-
-		public Int32 PageCount;
-
-		public Int32 ColumnIndex;
-
-		public Int32 Flags;
-
-		public static int Size => 16;
-
-		public byte[] ToByteArray()
-		{
-			var stream = new io.MemoryStream();
-			var writer = new io.BinaryWriter(stream);
-
-			writer.Write(this.Value0);
-			writer.Write(this.PageCount);
-			writer.Write(this.ColumnIndex);
-			writer.Write(this.Flags);
-
-			return stream.ToArray();
-		}
-
-		public static CsvDbColumnHeader FromArray(byte[] bytes)
-		{
-			var reader = new io.BinaryReader(new io.MemoryStream(bytes));
-
-			var s = default(CsvDbColumnHeader);
-
-			s.Value0 = reader.ReadInt32();
-			s.PageCount = reader.ReadInt32();
-			s.ColumnIndex = reader.ReadInt32();
-			s.Flags = reader.ReadInt32();
-
-			return s;
-		}
-
-	}
-
 	public class CsvDbKeyValues<T>
 	{
 		public T Key { get; set; }
