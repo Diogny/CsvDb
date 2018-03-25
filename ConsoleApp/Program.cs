@@ -9,20 +9,23 @@ namespace ConsoleApp
 {
 	class Program
 	{
-		public static IConfiguration Configuration => new ConfigurationBuilder()
-				.SetBasePath(System.IO.Directory.GetCurrentDirectory())
-				.AddJsonFile("config.json")
-				.Build();
+		public static IConfiguration Configuration { get; set; }
 
 		static void Main(string[] args)
 		{
+			Configuration = new ConfigurationBuilder()
+				.SetBasePath(System.IO.Directory.GetCurrentDirectory())
+				.AddJsonFile("config.json")
+				.AddCommandLine(args)
+				.Build();
+
 			var handledWait = false;
 
-			//Generators();
+			Generators();
 
 			//SqlQueryExecuteTests();
 
-			handledWait = SqlQueryFinalParseTests();
+			//handledWait = SqlQueryFinalParseTests();
 
 			//TreeTests();
 
@@ -35,8 +38,10 @@ namespace ConsoleApp
 
 		static CsvDb.CsvDb OpenDatabase(string dbName = null, bool logTimes = true)
 		{
-			var section = Program.Configuration.GetSection("Data");
-			var basePath = section["BasePath"];
+			//var section = Program.Configuration.GetSection("Data");
+			var appConfig = Configuration.GetSection("App").Get<Config.ConfigSettings>();
+			// section["BasePath"];
+			var basePath = appConfig.Database.BasePath;
 
 			if (string.IsNullOrWhiteSpace(dbName))
 			{
@@ -79,20 +84,29 @@ namespace ConsoleApp
 		{
 			//update CreateDatabase() rootPath to match with [name].zip file  data\ with bus_data.zip
 
-			var db = OpenDatabase();
+			//data
+			//data-full
+			//data-light
+			//data-extra-light
+			var db = OpenDatabase(dbName: "data-full");
+
+			var appConfig = Configuration.GetSection("App").Get<Config.ConfigSettings>();
+			// section["BasePath"];
+			var basePath = appConfig.Database.BasePath;
 
 			var gen = new CsvDbGenerator(
 				db,
-				//@"{basePath}bus_data.zip",
-				//@"{basePath}bus_data-light.zip",
-				@"{basePath}bus_data-extra-light.zip",
+				//$@"{basePath}bus_data.zip",
+				$@"{basePath}bus_data-full.zip",
+				//$@"{basePath}bus_data-light.zip",
+				//$@"{basePath}bus_data-extra-light.zip",
 
 				//comment this when uncommented: gen.GenerateTxtData(); for a clean output
 				removeAll: false
 			);
-			//gen.GenerateTxtData();
+			gen.GenerateTxtData();
 
-			//gen.CompilePagers();
+			gen.CompilePagers();
 
 			gen.CompileIndexes();
 		}

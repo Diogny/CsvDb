@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using static CsvDb.CsvDbQuery;
 
 namespace CsvDb
@@ -13,9 +14,9 @@ namespace CsvDb
 		int length;
 		char currentChar;
 
-		static string identifierChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
+		//static string identifierChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
 
-		static string numberChars = "0123456789";
+		//static string numberChars = "0123456789";
 
 		static string[] keyWords = new string[] { "SELECT", "FROM", "WHERE", "SKIP", "LIMIT",
 			"AND", "OR",
@@ -29,6 +30,7 @@ namespace CsvDb
 
 		public enum Token
 		{
+			None,
 			SELECT,
 			FROM,
 			WHERE,
@@ -36,8 +38,10 @@ namespace CsvDb
 			LIMIT,
 			AND,
 			OR,
-			//table column, variable
+			//table column, variable, descriptor
 			Identifier,
+			//[identifier as table name].[column name]
+			ColumnIdentifier,
 			//
 			Number,
 			//
@@ -317,138 +321,253 @@ namespace CsvDb
 
 		char PeekChar() { return ReadChar(peek: true, append: false); }
 
-		string ReadIdentifier()
-		{
-			var sb = new StringBuilder();
-			sb.Append(currentChar);
+		//string ReadIdentifier()
+		//{
+		//	var sb = new StringBuilder();
+		//	sb.Append(currentChar);
 
-			while (identifierChars.IndexOf(PeekChar()) >= 0)
-			{
-				sb.Append(ReadChar());
-			}
-			return sb.ToString();
-		}
+		//	while (identifierChars.IndexOf(PeekChar()) >= 0)
+		//	{
+		//		sb.Append(ReadChar());
+		//	}
+		//	return sb.ToString();
+		//}
 
-		string ReadNumber()
-		{
-			var sb = new StringBuilder();
-			sb.Append(currentChar);
-			//
-			while (numberChars.IndexOf(PeekChar()) >= 0)
-			{
-				sb.Append(ReadChar());
-			}
-			if (PeekChar() == '.')
-			{
-				sb.Append(ReadChar());
-				//
-				while (numberChars.IndexOf(PeekChar()) >= 0)
-				{
-					sb.Append(ReadChar());
-				}
-			}
-			return sb.ToString();
-		}
+		//string ReadNumber()
+		//{
+		//	var sb = new StringBuilder();
+		//	sb.Append(currentChar);
+		//	//
+		//	while (numberChars.IndexOf(PeekChar()) >= 0)
+		//	{
+		//		sb.Append(ReadChar());
+		//	}
+		//	if (PeekChar() == '.')
+		//	{
+		//		sb.Append(ReadChar());
+		//		//
+		//		while (numberChars.IndexOf(PeekChar()) >= 0)
+		//		{
+		//			sb.Append(ReadChar());
+		//		}
+		//	}
+		//	return sb.ToString();
+		//}
 
 		public CsvDbQuery Parse(CsvDb db, string query)
 		{
 			Reset();
-			TokenStruct token;
-			var enumerator = ParseTokens(query).GetEnumerator();
+			TokenStruct PreviousToken = default(TokenStruct);
+			TokenStruct CurrentToken = default(TokenStruct);
+			var peekedToken = default(TokenStruct);
+
+			var queue = new Queue<TokenStruct>(ParseTokens(query));
 
 			CsvDbTable table = null;
+			var tableCollection = new List<CsvDbQueryTableIdentifier>();
+			//
 			CsvDbQueryColumnSelector colSelector = null;
 			var where = new List<CsvDbQueryExpressionBase>();
 			int skipValue = -1;
 			int limitValue = -1;
+			CsvDbQueryTableIdentifier tableIdentifier = null;
+			bool EndOfStream = queue.Count == 0;
+			var columnSelectors = new List<TokenStruct>();
+			bool isFullColums = false;
+
+			// SELECT * | column0,column1,...
+			//					|	a.agency_id, b.serice_id,...
+			//
+			//	FROM table [descriptor]
+			//		
+			//	WHERE [descriptor].column = constant AND|OR ...
+			//	SKIP number
+			//	LIMIT number
+			//
+
+			bool GetToken()
+			{
+				if (EndOfStream || (EndOfStream = !queue.TryDequeue(out TokenStruct tk)))
+				{
+					return false;
+				}
+				//save previous
+				PreviousToken = CurrentToken;
+				//get current
+				CurrentToken = tk;
+
+				return true;
+			}
+
+			bool PeekToken()
+			{
+				if (!EndOfStream && queue.TryPeek(out peekedToken))
+				{
+					return true;
+				}
+				return false;
+			}
+
+			bool GetTokenIf(Token token)
+			{
+				if (!EndOfStream && queue.TryPeek(out peekedToken) && peekedToken.Token == token)
+				{
+					CurrentToken = queue.Dequeue();
+					return true;
+				}
+				return false;
+			};
+
+			//Func<string, TokenStruct> ReadIdentifier = (errmsg) =>
+			TokenStruct ReadOperand(string errmsg)
+			{
+				if (!GetToken() || !CurrentToken.IsIdentifier)
+				{
+					throw new ArgumentException(errmsg);
+				}
+				var identifier = CurrentToken.Value;
+				var position = CurrentToken.Position;
+				var tokenType = CurrentToken.Token;
+				var dot = String.Empty;
+				var columnName = String.Empty;
+
+				//try to peek a dot . after identifier
+				if (tokenType == Token.Identifier && GetTokenIf(Token.Dot))
+				{
+					dot = CurrentToken.Value;  //  .
+					tokenType = Token.ColumnIdentifier;
+
+					//read column identifier
+					if (!GetToken() || !CurrentToken.IsIdentifier)
+					{
+						throw new ArgumentException("missing column name after table name identifier");
+					}
+					columnName = CurrentToken.Value;
+				}
+				var newToken = new TokenStruct()
+				{
+					Token = tokenType,
+					Value = $"{identifier}{dot}{columnName}",
+					Position = position
+				};
+				return newToken;
+			}
 
 			//read SELECT
-			if (!enumerator.MoveNext() || (token = enumerator.Current).Token != Token.SELECT)
+			if (!GetTokenIf(Token.SELECT))
 			{
 				throw new ArgumentException("SELECT expected");
 			}
 
 			//read column selector: comma separated or *
-			if (!enumerator.MoveNext())
+			if (GetTokenIf(Token.Astherisk))
 			{
-				throw new ArgumentException("table column selector definition expected");
-			}
-			var selectors = new List<TokenStruct>();
-			bool endOfStream = false;
-			bool isFull = false;
-
-			if (enumerator.Current.Token == Token.Astherisk)
-			{
-				isFull = true;
-				selectors.Add(enumerator.Current);
-				//
-				endOfStream = !enumerator.MoveNext();
-			}
-			else if (enumerator.Current.Token == Token.Identifier)
-			{
-				selectors.Add(enumerator.Current);
-
-				//comma separated columns
-				while (!(endOfStream = !enumerator.MoveNext()) &&
-					enumerator.Current.Token == Token.Comma)
-				{
-					//don't add commas, just table column name identifiers
-					//test for next identifier
-					if (!enumerator.MoveNext() || enumerator.Current.Token != Token.Identifier)
-					{
-						throw new ArgumentException("table column selector definition expected");
-					}
-					//add identifier
-					selectors.Add(enumerator.Current);
-				}
+				isFullColums = true;
+				columnSelectors.Add(CurrentToken);
 			}
 			else
 			{
-				throw new ArgumentException("table column selector definition expected");
+				//mut have at least one column identifier
+				if (PeekToken() && peekedToken.Token != Token.Identifier)
+				{
+					throw new ArgumentException("table column name(s) expected");
+				}
+				//read first
+				columnSelectors.Add(ReadOperand("cannot read column name"));
+
+				while (GetTokenIf(Token.Comma))
+				{
+					//next
+					columnSelectors.Add(ReadOperand("cannot read column name"));
+				}
 			}
 
 			//read FROM
-			if (endOfStream || (token = enumerator.Current).Token != Token.FROM)
+			if (!GetTokenIf(Token.FROM))
 			{
 				throw new ArgumentException("FROM expected");
 			}
 
 			//read identifier: table name
-			if (!enumerator.MoveNext() || (token = enumerator.Current).Token != Token.Identifier)
+			if (!GetTokenIf(Token.Identifier))
 			{
 				throw new ArgumentException("table name identifier after FROM expected");
 			}
 
-			//first check -table name
-			table = db.Table(token.Value);
+			//check -table name
+			table = db.Table(CurrentToken.Value);
 			if (table == null)
 			{
-				throw new ArgumentException($"Cannot find table [{token.Value}] in database.");
+				throw new ArgumentException($"Cannot find table [{CurrentToken.Value}] in database.");
 			}
 
-			//second check -table columns
-			var columns = new List<CsvDbColumn>();
-			if (selectors[0].Token != Token.Astherisk)
+			//there can be a table identifier before the WHERE and after table name
+			if (GetTokenIf(Token.Identifier))
 			{
-				foreach (var tk in selectors)
+				//create it so WHERE can handle it
+				tableIdentifier = new CsvDbQueryTableIdentifier(table, CurrentToken.Value);
+			}
+			else
+			{
+				tableIdentifier = new CsvDbQueryTableIdentifier(table);
+			}
+			tableCollection.Add(tableIdentifier);
+
+			var columns = new List<CsvDbQueryColumnIdentifier>();
+
+			if (columnSelectors[0].Token != Token.Astherisk)
+			{
+				//unresolved column identifiers can exists for more complex queries
+				//	later add unresolved features
+				foreach (var tk in columnSelectors)
 				{
-					var c = table.Column(tk.Value);
-					if (c == null)
+					string columnName = tk.Value;
+					string identifier = String.Empty;
+
+					if (tk.Token == Token.ColumnIdentifier)
 					{
-						throw new ArgumentException($"Cannot find {tk.Value} in [{table.Name}] name of database.");
+						if (!tk.Parse(out identifier, out columnName))
+						{
+							throw new ArgumentException($"invalid column identifier: {tk.Value}");
+						}
+						//look only inside the table of the identifier
+						var tble = tableCollection
+							.Where(t => t.HasIdentifier)
+							.FirstOrDefault(t => t.Identifier == identifier);
+
+						var col = tble?.Table.Columns.FirstOrDefault(cl => cl.Name == columnName);
+						if (col == null)
+						{
+							throw new ArgumentException($"invalid column identifier: {tk.Value}");
+						}
+						//add column with identifier
+						columns.Add(new CsvDbQueryColumnIdentifier(col, identifier));
 					}
-					columns.Add(c);
+					else
+					{
+						//look in all tables
+						var col = db.Tables
+							.SelectMany(t => t.Columns)
+							.FirstOrDefault(c => c.Name == columnName);
+
+						if (col == null)
+						{
+							throw new ArgumentException($"Cannot find {tk.Value} in any table of database.");
+						}
+						columns.Add(new CsvDbQueryColumnIdentifier(col));
+					}
 				}
 			}
 			else
 			{
-				columns = table.Columns;
+				columns = table.Columns
+					.Select(c => new CsvDbQueryColumnIdentifier(c))
+					.ToList();
 			}
-			colSelector = new CsvDbQueryColumnSelector(columns, isFull);
+			colSelector = new CsvDbQueryColumnSelector(columns, isFullColums);
 
 			//read WHERE if any
-			if (!(endOfStream = !enumerator.MoveNext()) &&
-				(token = enumerator.Current).Token == Token.WHERE)
+			if (GetTokenIf(Token.WHERE))
 			{
 				//read expressions [column] > number  separated by AND|OR
 				// [number | string | identifier] [oper] [number | string | identifier] [AND | OR]
@@ -460,40 +579,35 @@ namespace CsvDb
 					if (identifierExpected)
 					{
 						//read left
-						if (!enumerator.MoveNext() || !(token = enumerator.Current).IsIdentifier)
-						{
-							throw new ArgumentException("left operand of WHERE expression expected");
-						}
-						var left = token;
+						var left = ReadOperand("left operand of WHERE expression expected");
 
 						//read operator
-						if (!enumerator.MoveNext() || !(token = enumerator.Current).IsOperator)
+						if (!GetToken() || !CurrentToken.IsOperator)
 						{
 							throw new ArgumentException("operator of WHERE expression expected");
 						}
-						var oper = token;
+						var oper = CurrentToken;
 
 						//read right
-						if (!enumerator.MoveNext() || !(token = enumerator.Current).IsIdentifier)
-						{
-							throw new ArgumentException("right operand of WHERE expression expected");
-						}
-						var right = token;
+						var right = ReadOperand("right operand of WHERE expression expected");
 
 						where.Add(new CsvDbQueryExpression(
-							table,
-							left.Value,
+							tableCollection,
+							left,
 							oper.Value,
-							right.Value
+							right
 						));
 						identifierExpected = false;
 					}
 					else
 					{
 						//end of where if not a logical
-						if (!(endOfStream = !enumerator.MoveNext()) && (token = enumerator.Current).IsLogical)
+						if (PeekToken() && peekedToken.IsLogical)
 						{
-							where.Add(new CsvDbQueryLogical(token.Value));
+							//consume it
+							GetToken();
+
+							where.Add(new CsvDbQueryLogical(CurrentToken.Value));
 
 							//next must be an identifier
 							identifierExpected = true;
@@ -505,7 +619,7 @@ namespace CsvDb
 
 					}
 				}
-				//
+				//a WHERE empty is invalid
 				if (where.Count == 0)
 				{
 					throw new ArgumentException("WHERE expression(s) expected");
@@ -513,36 +627,36 @@ namespace CsvDb
 			}
 
 			//read SKIP integer if any
-			if (!endOfStream && token.Token == Token.SKIP)
+			if (GetTokenIf(Token.SKIP))
 			{
 				//read integer
-				if (!enumerator.MoveNext() ||
-					(token = enumerator.Current).Token != Token.Number ||
-					!int.TryParse(enumerator.Current.Value, out skipValue))
+				if (!GetToken() ||
+					CurrentToken.Token != Token.Number ||
+					!int.TryParse(CurrentToken.Value, out skipValue))
 				{
 					throw new ArgumentException("Integer number after SKIP expected");
 				}
 			}
 
 			//read LIMIT integer if any
-			if (enumerator.MoveNext() && (token = enumerator.Current).Token == Token.LIMIT)
+			if (GetTokenIf(Token.LIMIT))
 			{
 				//read integer
-				if (!enumerator.MoveNext() ||
-					(token = enumerator.Current).Token != Token.Number ||
-					!int.TryParse(enumerator.Current.Value, out limitValue))
+				if (!GetToken() ||
+					CurrentToken.Token != Token.Number ||
+					!int.TryParse(CurrentToken.Value, out limitValue))
 				{
 					throw new ArgumentException("Integer number after LIMIT expected");
 				}
 			}
 
 			//should be end of stream
-			if (enumerator.MoveNext())
+			if (GetToken())
 			{
 				throw new ArgumentException("End of Db Query reached and extra tokens remaings");
 			}
 
-			return new CsvDbQuery(db, query, table, colSelector, where, skipValue, limitValue);
+			return new CsvDbQuery(db, query, tableIdentifier, colSelector, where, skipValue, limitValue);
 		}
 
 	}

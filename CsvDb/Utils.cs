@@ -18,6 +18,35 @@ namespace CsvDb
 	{
 		//https://msdn.microsoft.com/en-us/magazine/mt808499.aspx
 
+		public static bool Parse(this CsvDbQueryParser.TokenStruct token,
+			out string left, out string right)
+		{
+			if (token.Token != CsvDbQueryParser.Token.ColumnIdentifier)
+			{
+				left = right = null;
+				return false;
+			}
+			return Utils.Parse(token.Value, out left, out right);
+		}
+
+		public static bool Parse(this string identifier,
+			out string left, out string right)
+		{
+			left = right = null;
+			if (String.IsNullOrWhiteSpace(identifier))
+			{
+				return false;
+			}
+			var cols = identifier.Split('.', StringSplitOptions.RemoveEmptyEntries);
+			if (cols.Length != 2)
+			{
+				return false;
+			}
+			left = cols[0];
+			right = cols[1];
+			return true;
+		}
+
 		public static string Difference(this TimeSpan span)
 		{
 			if (span.Seconds == 0)

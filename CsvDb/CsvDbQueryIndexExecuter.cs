@@ -68,44 +68,56 @@ namespace CsvDb
 
 
 
-						var treeReader = Table.Column.IndexTree<T>();
+						var nodeTree = Table.Column.IndexTree<T>();
 						int offset = -1;
 
 						var value = Constant.Value();
 						Type valueType = Type.GetType($"System.{Constant.OperandType}");
 
 						var key = (T)Convert.ChangeType(value, valueType);
+						var collection = Enumerable.Empty<int>();
 
-						if (treeReader.Root == null)
+						if (nodeTree.Root == null)
 						{
 							//go to .bin file directly, it's ONE page of items
 							offset = CsvDbGenerator.ItemsPageStart;
+
+							CsvDbKeyValues<T> item = Table.Column.IndexItems<T>().Find(offset, key);
+							if (item != null && item.Values != null)
+							{
+								collection = item.Values;
+							}
 						}
 						else
 						{
-							var baseNode = treeReader.FindKey(key) as PageIndexNodeBase<T>;
+							var baseNode = nodeTree.FindKey(key) as PageIndexNodeBase<T>;
 							if (baseNode == null)
 							{
 								throw new ArgumentException($"Index corrupted");
 							}
+
 							switch (baseNode.Type)
 							{
 								case MetaIndexType.Node:
 									var nodePage = baseNode as PageIndexNode<T>;
-									foreach (var csvOfs in nodePage.Values)
+									if (nodePage != null && nodePage.Values != null)
 									{
-										yield return csvOfs;
+										collection = nodePage.Values;
 									}
 									break;
 								case MetaIndexType.Items:
 									offset = ((PageIndexItems<T>)baseNode).Offset;
 									CsvDbKeyValues<T> item = Table.Column.IndexItems<T>().Find(offset, key);
-									foreach (var cvsOfs in item.Values)
+									if (item != null && item.Values != null)
 									{
-										yield return cvsOfs;
+										collection = item.Values;
 									}
 									break;
 							}
+						}
+						foreach (var ofs in collection)
+						{
+							yield return ofs;
 						}
 						break;
 					case ">":

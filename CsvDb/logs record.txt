@@ -5,3 +5,7 @@
 .- restructure index classes, put all in one class
 2018/03/23 - 
 .- fix calling twice query execute
+2018/03/23 - 2018/03/24
+.- fix index search engine bugs
+.-prepare Query parser for more complex sql queries
+2018/03/24 - 

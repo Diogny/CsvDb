@@ -23,27 +23,56 @@ database name >data
 
 Using database: NJTranst
 >t
- (6) agency:System.String, multikey: False rows: 1
- (7) routes:System.Int32, multikey: False rows: 253
- (7) stops:System.Int32, multikey: False rows: 16552
- (3) calendar_dates:System.Int32, multikey: False rows: 1293
- (7) trips:System.Int32, multikey: True rows: 61794
- (8) stop_times:System.Int32, multikey: False rows: 3229261
- (5) shapes:System.Int32, multikey: False rows: 3934053
->c
-table name >agency
- [agency].agency_id:String
-  key: True, indexed: True, unique: True, pages: 1
- [agency].agency_name:String
-  key: False, indexed: False, unique: False, pages: 0
- [agency].agency_url:String
-  key: False, indexed: False, unique: False, pages: 0
- [agency].agency_timezone:String
-  key: False, indexed: False, unique: False, pages: 0
- [agency].agency_lang:String
-  key: False, indexed: False, unique: False, pages: 0
- [agency].agency_phone:String
-  key: False, indexed: False, unique: False, pages: 0
+ [agency] 1 row(s)
+   agency_id: string   [key] [indexed] [unique]  1 page(s)
+   agency_name: string
+   agency_url: string
+   agency_timezone: string
+   agency_lang: string
+   agency_phone: string
+ [routes] 254 row(s)
+   route_id: int32   [key] [indexed] [unique]  1 page(s)
+   agency_id: string
+   route_short_name: string   [indexed] [unique]  1 page(s)
+   route_long_name: string
+   route_type: int32
+   route_url: string
+   route_color: string
+ [stops] 16531 row(s)
+   stop_id: int32   [key] [indexed] [unique]  255 page(s)
+   stop_code: string   [indexed] [unique]  255 page(s)
+   stop_name: string
+   stop_desc: string
+   stop_lat: double
+   stop_lon: double
+   zone_id: int32
+ [calendar_dates] 691 row(s)
+   service_id: int32
+   date: int32   [key] [indexed] [unique]  1 page(s)
+   exception_type: int32
+ [trips] [multikey]  37024 row(s)
+   route_id: int32   [key] [indexed] [unique]  1 page(s)
+   service_id: int32   [key] [indexed] [unique]  1 page(s)
+   trip_id: int32   [key] [indexed] [unique]  511 page(s)
+   trip_headsign: string
+   direction_id: int32
+   block_id: string
+   shape_id: int32
+ [stop_times] [multikey]  1934026 row(s)
+   trip_id: int32   [key] [indexed] [unique]  511 page(s)
+   arrival_time: string
+   departure_time: string
+   stop_id: int32   [key] [indexed] [unique]  255 page(s)
+   stop_sequence: int32
+   pickup_type: int32
+   drop_off_type: int32
+   shape_dist_traveled: double
+ [shapes] 1935202 row(s)
+   shape_id: int32   [key] [indexed] [unique]  63 page(s)
+   shape_pt_lat: double
+   shape_pt_lon: double
+   shape_pt_sequence: int32
+   shape_dist_traveled: double
 >s
  query >SELECT * FROM agency
 

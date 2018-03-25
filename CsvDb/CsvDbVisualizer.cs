@@ -21,7 +21,7 @@ namespace CsvDb
 		{
 			var collection = Query.Execute();
 
-			var path = io.Path.Combine(Query.Database.BinaryPath, $"{Query.Table.Name}.csv");
+			var path = io.Path.Combine(Query.Database.BinaryPath, $"{Query.TableIdentifier.Table.Name}.csv");
 
 			//go to csv and find it records
 			return ReadRecords(path, collection);
@@ -64,7 +64,7 @@ namespace CsvDb
 				}
 				foreach (var offs in offsetCollection)
 				{
-					var count = Query.Table.Columns.Count;
+					var count = Query.TableIdentifier.Table.Columns.Count;
 					//record of columns
 					var record = new string[count];
 					var columnIndex = 0;

@@ -1,6 +1,9 @@
 ﻿{
-	"Data":
+	"App":
 	{
-		"BasePath": "PATH TO YOUR DATABASE PATH"
+		"Database":
+		{
+			"BasePath": "PATH TO DATABASE FOLDER"
+		}
 	}
 }

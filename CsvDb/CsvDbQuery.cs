@@ -13,7 +13,7 @@ namespace CsvDb
 
 		public string Query { get; protected internal set; }
 
-		public CsvDbTable Table { get; protected internal set; }
+		public CsvDbQueryTableIdentifier TableIdentifier { get; protected internal set; }
 
 		public CsvDbQueryColumnSelector Columns { get; protected internal set; }
 
@@ -32,7 +32,7 @@ namespace CsvDb
 		protected internal CsvDbQuery(
 			CsvDb db,
 			string query,
-			CsvDbTable table,
+			CsvDbQueryTableIdentifier table,
 			CsvDbQueryColumnSelector columns,
 			List<CsvDbQueryExpressionBase> where,
 			int skip = -1,
@@ -43,7 +43,7 @@ namespace CsvDb
 			{
 				throw new ArgumentException("Database is undefined");
 			}
-			if ((Table = table) == null || (Columns = columns) == null)
+			if ((TableIdentifier = table) == null || (Columns = columns) == null)
 			{
 				throw new ArgumentException("Csv Db Query must has a table and a column(s)");
 			}
@@ -62,7 +62,7 @@ namespace CsvDb
 				"SELECT",
 				Columns.ToString(),
 				"FROM",
-				Table.Name
+				TableIdentifier.ToString()
 			};
 			if (Where.Count > 0)
 			{
@@ -96,10 +96,10 @@ namespace CsvDb
 			if (Where.Count == 0)
 			{
 				//find key column
-				var keyColumn = Table.Columns.FirstOrDefault(c => c.Key);
+				var keyColumn = TableIdentifier.Table.Columns.FirstOrDefault(c => c.Key);
 				if (keyColumn == null)
 				{
-					throw new ArgumentException($"Cannot find key from table [{Table.Name}]");
+					throw new ArgumentException($"Cannot find key from table [{TableIdentifier.Table.Name}]");
 				}
 				var typeIndex = Type.GetType($"System.{keyColumn.Type}");
 
@@ -174,19 +174,78 @@ namespace CsvDb
 
 		public class CsvDbQueryColumnSelector
 		{
-			public List<CsvDbColumn> Columns { get; protected internal set; }
+			public List<CsvDbQueryColumnIdentifier> Columns { get; protected internal set; }
 
 			public bool IsFull { get; protected internal set; }
 
-			protected internal CsvDbQueryColumnSelector(List<CsvDbColumn> columns, bool isFull)
+			internal CsvDbQueryColumnSelector(List<CsvDbQueryColumnIdentifier> columns, bool isFull)
 			{
 				Columns = columns;
 				IsFull = isFull;
 			}
 
-			public string[] Header => Columns.Select(c => c.Name).ToArray();
+			public string[] Header => Columns.Select(c => c.Column.Name).ToArray();
 
-			public override string ToString() => IsFull ? "*" : String.Join(",", Columns.Select(c => c.Name));
+			public override string ToString() => IsFull ? "*" : String.Join(",", Columns.Select(c => c.ToString()));
+		}
+
+		public interface INameIdentifier
+		{
+			string Identifier { get; }
+
+			bool HasIdentifier { get; }
+
+		}
+
+		public abstract class NameIdentifier : INameIdentifier
+		{
+			public string Identifier { get; private set; }
+
+			public bool HasIdentifier => Identifier != null;
+
+			public NameIdentifier(string identifier)
+			{
+				//normalize lowercase
+				Identifier = String.IsNullOrWhiteSpace(identifier) ? null : identifier.Trim().ToLower();
+			}
+		}
+
+		public class CsvDbQueryTableIdentifier : NameIdentifier
+		{
+			public CsvDbTable Table { get; private set; }
+
+			internal CsvDbQueryTableIdentifier(CsvDbTable table, string identifier = null)
+				: base(identifier)
+			{
+				//identifier cannot match any column inside any table in database
+				if ((Table = table) == null ||
+					(Identifier != null &&
+						table.Database.Tables
+							.SelectMany(t => t.Columns)
+							.Any(c => String.Compare(c.Name, Identifier, true) == 0)))
+				{
+					throw new ArgumentException("table does not exists or identifier match one of its columns");
+				}
+			}
+
+			public override string ToString() => $"{Table.Name}" + (HasIdentifier ? $" {Identifier}" : "");
+
+		}
+
+		public class CsvDbQueryColumnIdentifier : NameIdentifier
+		{
+			public CsvDbColumn Column { get; private set; }
+
+			internal CsvDbQueryColumnIdentifier(CsvDbColumn column, string identifier = null)
+				: base(identifier)
+			{
+				if ((Column = column) == null)
+				{
+					throw new ArgumentException("column identifier cannot have an undefined column");
+				}
+			}
+
+			public override string ToString() => $"{(HasIdentifier ? $"{Identifier}." : "")}{Column.Name}";
 		}
 
 		public enum CsvDbQueryWhereItemType
@@ -213,7 +272,7 @@ namespace CsvDb
 		{
 			public CsvDbQueryWhereItemType Type { get; protected internal set; }
 
-			protected internal CsvDbQueryWhereItem(CsvDbQueryWhereItemType type)
+			internal CsvDbQueryWhereItem(CsvDbQueryWhereItemType type)
 			{
 				Type = type;
 			}
@@ -240,7 +299,47 @@ namespace CsvDb
 
 			public override string ToString() => $"{Name}";
 
-			protected internal static CsvDbQueryOperand Parse(CsvDbTable table, string name)
+			//later table will be a collection of table with more complex queries
+			//  because [identifier].[column] could point to more than one table
+			internal static CsvDbQueryOperand Parse(IEnumerable<CsvDbQueryTableIdentifier> tables,
+				CsvDbQueryParser.TokenStruct token)
+			{
+				switch (token.Token)
+				{
+					case CsvDbQueryParser.Token.String:
+						return new CsvDbQueryStringOperand(token.Value);
+					case CsvDbQueryParser.Token.Number:
+						return new CsvDbQueryNumberOperand(token.Value);
+					case CsvDbQueryParser.Token.Identifier:
+						//now test for table column's name
+						var column = tables
+							.SelectMany(t => t.Table.Columns)
+							.FirstOrDefault(c => c.Name == token.Value);
+						if (column != null)
+						{
+							return new CsvDbQueryTableColumnOperand(column);
+						}
+						break;
+					case CsvDbQueryParser.Token.ColumnIdentifier:
+						var pars = token.Value.Split('.');
+						//find the table by its identifier if any
+						var tble = tables
+							.Where(t => t.HasIdentifier)
+							.FirstOrDefault(t => t.Identifier == pars[0]);
+						//find the column inside the table
+						column = tble?.Table.Columns.FirstOrDefault(c => c.Name == pars[1]);
+						if (column != null)
+						{
+							return new CsvDbQueryTableColumnOperand(column, pars[0]);
+						}
+						break;
+				}
+				throw new ArgumentException($"{token.Value} doesnot exist in any table");
+			}
+
+			//later table will be a collection of table with more complex queries
+			//  because [identifier].[column] could point to more than one table
+			internal static CsvDbQueryOperand Parse(CsvDbTable table, string name)
 			{
 				//string
 				if (name.StartsWith('"') && name.EndsWith('"'))
@@ -251,7 +350,7 @@ namespace CsvDb
 				var column = table.Columns.FirstOrDefault(c => c.Name == name);
 				if (column != null)
 				{
-					return new CsvDbQueryTableColumnOperand(column, name);
+					return new CsvDbQueryTableColumnOperand(column);
 				}
 				//if it doesn't start with [0-9] or [+-] then bad column
 				if (!(char.IsDigit(name[0]) || name[0] == '+' || name[0] == '-'))
@@ -267,7 +366,7 @@ namespace CsvDb
 		{
 			public override bool IsTableColumn => true;
 
-			public CsvDbColumn Column { get; protected internal set; }
+			public CsvDbColumn Column { get; private set; }
 
 			public override CsvDbColumnTypeEnum OperandType => Column.TypeEnum;
 
@@ -275,15 +374,31 @@ namespace CsvDb
 
 			public override object Value(ref object[] values) { return values[Column.Index]; }
 
+			/// <summary>
+			/// Table identitifier
+			/// </summary>
+			public string Identifier { get; private set; }
+
+			/// <summary>
+			/// Has table identifier
+			/// </summary>
+			public bool HasIdentifier { get; private set; }
+
 			public override object Value()
 			{
 				throw new ArgumentException("Table columns need record values referenced");
 			}
 
-			protected internal CsvDbQueryTableColumnOperand(CsvDbColumn column, string tableName)
+			internal CsvDbQueryTableColumnOperand(CsvDbColumn column, string tableIdentifier = null)
 			{
 				Column = column;
+				HasIdentifier = (Identifier = String.IsNullOrWhiteSpace(tableIdentifier) ?
+					null :
+					tableIdentifier.Trim()
+				) != null;
 			}
+
+			public override string ToString() => $"{(HasIdentifier ? $"{Identifier}." : "")}{Name}";
 		}
 
 		public abstract class CsvDbQueryConstantOperand : CsvDbQueryOperand
@@ -311,9 +426,13 @@ namespace CsvDb
 				return name;
 			}
 
-			public CsvDbQueryStringOperand(string name)
+			public override string ToString() => $"\"{Name}\"";
+
+			internal CsvDbQueryStringOperand(string name)
 			{
-				this.name = name;
+				//remove the enclosing "" from string
+
+				this.name = name.Substring(1, name.Length - 2); // name;
 			}
 		}
 
@@ -343,7 +462,7 @@ namespace CsvDb
 			}
 
 			//name can be a cast like (Byte)8
-			public CsvDbQueryNumberOperand(string name)
+			internal CsvDbQueryNumberOperand(string name)
 			{
 				if (int.TryParse(name, out int intValue))
 				{
@@ -365,7 +484,7 @@ namespace CsvDb
 				}
 			}
 
-		}//
+		}
 
 		#endregion
 
@@ -456,6 +575,21 @@ namespace CsvDb
 					}
 					return null;
 				}
+			}
+
+			protected internal CsvDbQueryExpression(IEnumerable<CsvDbQueryTableIdentifier> tables,
+				CsvDbQueryParser.TokenStruct left,
+				string oper,
+				CsvDbQueryParser.TokenStruct right)
+			{
+				if ((Left = CsvDbQueryOperand.Parse(tables, left)) == null ||
+					(Right = CsvDbQueryOperand.Parse(tables, right)) == null)
+				{
+					throw new ArgumentException($"Database query expression invalid");
+				}
+				//test types
+
+				Operator = new CsvDbQueryOperator(oper);
 			}
 
 			protected internal CsvDbQueryExpression(CsvDbTable table, string left, string oper, string right)

@@ -223,7 +223,9 @@ namespace CsvDb
 							}
 							else
 							{
-								indexLine = $"{indexColValue}|{tableUniqueKeyValue}";
+								//do it too here, so no need to read key tree
+								//indexLine = $"{indexColValue}|{tableUniqueKeyValue}";
+								indexLine = $"{indexColValue}|{position}";
 							}
 							//write line
 							index.writer.WriteLine(indexLine);
@@ -569,7 +571,7 @@ namespace CsvDb
 			int count = end - start + 1;
 			if (count <= pageSize)
 			{
-				Console.WriteLine($"{start}...{end} ({count}) -leaf");
+				//Console.WriteLine($"{start}...{end} ({count}) -leaf");
 
 				var list = collection.Skip(start).Take(count).ToList();
 				return new BTreePageItems<T>(list);
@@ -577,7 +579,7 @@ namespace CsvDb
 			else
 			{
 				var center = count / 2;
-				Console.WriteLine($"{start}...{center}...{end} ({count}) -node");
+				//Console.WriteLine($"{start}...{center}...{end} ({count}) -node");
 
 				var page = new BTreePageNode<T>(collection[start + center]);
 

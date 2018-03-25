@@ -34,6 +34,7 @@ namespace Csv.CMS.ConsApp
 		{
 			var availableDatabases = new string[]
 			{
+				"data-full",
 				"data",
 				"data-light",
 				"data-extra-light"
@@ -80,11 +81,10 @@ namespace Csv.CMS.ConsApp
 				Console.WriteLine(" (K)ill/close database");
 				Console.WriteLine(" (S)earch Database");
 				Console.WriteLine(" Display (I)nformation of Database");
-				Console.WriteLine(" Display (T)ables");
-				Console.WriteLine(" Display (C)olumn");
-
+				Console.WriteLine(" Display (T)ables Info");
 				Console.WriteLine(" Display Index Tree (N)ode Structure");
 				Console.WriteLine(" Display (I)ndex Tree Structure");
+				Console.WriteLine(" (E)execute Queries");
 			}
 
 			//Console.TreatControlCAsInput = true;
@@ -101,6 +101,35 @@ namespace Csv.CMS.ConsApp
 				Console.WriteLine();
 				switch (key.Key)
 				{
+					case ConsoleKey.E:
+						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+						{
+							Console.WriteLine("Execute database queries:\r\n  -empty query ends");
+							string query = null;
+							bool finish = false;
+							do
+							{
+								Console.Write("\r\n  query: ");
+								query = Console.ReadLine();
+								if (!(finish = String.IsNullOrWhiteSpace(query)))
+								{
+									try
+									{
+										var parser = new CsvDbQueryParser();
+										sw.Restart();
+										var dbQuery = parser.Parse(db, query);
+										sw.Stop();
+										Console.WriteLine("    query parsed on {0} ms", sw.ElapsedMilliseconds);
+										Console.WriteLine($"     {dbQuery}");
+									}
+									catch (Exception ex)
+									{
+										Console.WriteLine($"    error: {ex.Message}");
+									}
+								}
+							} while (!finish);
+						}
+						break;
 					case ConsoleKey.I:
 						//display index structure
 						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
@@ -160,39 +189,16 @@ namespace Csv.CMS.ConsApp
 						//display tables
 						if (!IsObjectNull(db, " there's no database in use"))
 						{
-							foreach (var t in db.Tables)
+							foreach (var table in db.Tables)
 							{
-								var text = $" ({t.Columns.Count}) {t.Name}{(t.Multikey ? " Multikey " : "")}{(t.Rows > 0 ? $" {t.Rows} row(s)" : "")}";
+								var text = $" [{table.Name}]{(table.Multikey.IfYes(" [Multikey] "))}{(table.Rows > 0 ? $" {table.Rows} row(s)" : "")}";
 								Console.WriteLine(text.ToLower());
-							}
-						}
-						break;
-					case ConsoleKey.C:
-						//if ((key.Modifiers & ConsoleModifiers.Control) != 0)
-						//{
-						//	// Console.Write("CTL+");
-						//	end = true;
-						//}
-						//else
-						{
-							if (!IsObjectNull(db, " there's no database in use"))
-							{
-								//show column structure
-								Console.Write("table name >");
-								var tableName = Console.ReadLine();
-								var table = db.Table(tableName);
-								if (table == null)
+								//show columns
+								foreach (var col in table.Columns)
 								{
-									Console.WriteLine($" invalid table [{tableName}]");
-								}
-								else
-								{
-									foreach (var col in table.Columns)
-									{
-										var text = $" [{table.Name}].{col.Name}: {col.Type}" +
-										 $"  {(col.Key ? " Key" : "")}{(col.Indexed ? " Indexed" : "")}{(col.Unique ? " Unique" : "")} {(col.PageCount > 0 ? $" {col.PageCount} page(s)" : "")}";
-										Console.WriteLine(text.ToLower());
-									}
+									text = $"   {col.Name}: {col.Type}" +
+									 $"  {(col.Key.IfYes(" [Key]"))}{(col.Indexed.IfYes(" [Indexed]"))}{(col.Unique.IfYes(" [Unique]"))} {(col.PageCount > 0 ? $" {col.PageCount} page(s)" : "")}";
+									Console.WriteLine(text.ToLower());
 								}
 							}
 						}
@@ -212,6 +218,7 @@ namespace Csv.CMS.ConsApp
 								var dbQuery = parser.Parse(db, query);
 								sw.Stop();
 								Console.WriteLine(" query parsed on {0} ms", sw.ElapsedMilliseconds);
+								Console.WriteLine($"  {dbQuery}");
 
 								//to calculate times
 								sw.Restart();
