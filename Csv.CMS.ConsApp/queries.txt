@@ -154,7 +154,7 @@ shape_id|shape_pt_lat|shape_pt_lon|shape_pt_sequence|shape_dist_traveled
 1,40.737712,-74.245460,3,0.0142
 1,40.737720,-74.245402,4,0.0172
 ...
-263 row(s)
+363 row(s)
 
 SELECT * FROM stop_times WHERE trip_id = 1 AND stop_id = 27677
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

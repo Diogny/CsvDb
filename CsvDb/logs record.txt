@@ -9,3 +9,6 @@
 .- fix index search engine bugs
 .-prepare Query parser for more complex sql queries
 2018/03/24 - 
+.-rename classes
+.-change json to binary schema structure
+.-fix table dump

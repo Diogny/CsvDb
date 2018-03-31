@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Text;
 using io = System.IO;
 
 namespace CsvDb
 {
-	public enum CsvDbColumnTypeEnum : byte
+	public enum DbColumnTypeEnum : byte
 	{
 		None = 0b000000000,
 		Byte = 0b000000010,  // 2
@@ -29,6 +30,7 @@ namespace CsvDb
 
 		public const Int32 BTreePageNodeItemsFlag = 0b00000011;
 
+		//
 
 		public const Int32 BTreeUniqueKeyValueFlag = 0b00000100;
 
@@ -42,19 +44,63 @@ namespace CsvDb
 
 	struct IndexStruct
 	{
-		public CsvDbColumn column;
+		public DbColumn column;
 
 		public string file;
 
 		public io.StreamWriter writer;
 	}
 
-	public class CsvDbKeyValues<T>
+	public class DbKeyValues<T>
 	{
 		public T Key { get; set; }
 
 		public List<int> Values { get; set; }
 	}
 
+	public class DynamicEntity : DynamicObject
+	{
+		private IDictionary<string, object> _values;
 
+		public object this[string prop]
+		{
+			get
+			{
+				return _values.TryGetValue(prop, out object value) ? value : null;
+			}
+		}
+
+		public T Get<T>(string prop)
+			where T : IComparable<T>
+		{
+			return (T)this[prop];
+		}
+
+		public DynamicEntity(IDictionary<string, object> values)
+		{
+			_values = values;
+		}
+
+		public override bool TryGetMember(GetMemberBinder binder, out object result)
+		{
+			if (_values.ContainsKey(binder.Name))
+			{
+				result = _values[binder.Name];
+				return true;
+			}
+			result = null;
+			return false;
+		}
+	}
+	/*
+var values = new Dictionary<string, object>();
+values.Add("Title", "Hello World!");
+values.Add("Text", "My first post");
+values.Add("Tags", new[] { "hello", "world" });
+
+var post = new DynamicEntity(values);
+
+dynamic dynPost = post;
+var text = dynPost.Text;
+	 */
 }

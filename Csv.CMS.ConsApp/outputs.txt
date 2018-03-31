@@ -91,3 +91,202 @@ NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
 >c
  there's no database in use
 >
+
+System.Runtime, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a'
+
+using System;
+using System.Collections.Generic;
+using CsvDb;
+
+namespace CsvDb.Dynamic
+{
+        public interface IDbColumnClass {
+                bool Unique { get; }
+                IEnumerable<KeyValuePair<string,int>> Keys { get; }
+                DbTable Table { get; }
+        }
+
+        public class agency: IDbColumnClass
+        {
+                public String agency_id {get; set; }
+                public String agency_name {get; set; }
+                public String agency_url {get; set; }
+                public String agency_timezone {get; set; }
+                public String agency_lang {get; set; }
+                public String agency_phone {get; set; }
+                public bool Unique => true;
+                public IEnumerable<KeyValuePair<string,int>> Keys
+                {
+                        get
+                        {
+                                return new KeyValuePair<string,int>[] { new KeyValuePair<string,int>("agency_id", 0 ) };
+                        }
+                }
+                public DbTable Table { get; private set; }
+                public agency(DbTable table )
+                {
+                        if((Table = table) == null)
+                        {
+                                throw new ArgumentException("Cannot create database class with undefined table reference");
+                        };
+                }
+        }
+
+        public class routes: IDbColumnClass
+        {
+                public Int32 route_id {get; set; }
+                public String agency_id {get; set; }
+                public String route_short_name {get; set; }
+                public String route_long_name {get; set; }
+                public Int32 route_type {get; set; }
+                public String route_url {get; set; }
+                public String route_color {get; set; }
+                public bool Unique => true;
+                public IEnumerable<KeyValuePair<string,int>> Keys
+                {
+                        get
+                        {
+                                return new KeyValuePair<string,int>[] { new KeyValuePair<string,int>("route_id", 0 ) };
+                        }
+                }
+                public DbTable Table { get; private set; }
+                public routes(DbTable table )
+                {
+                        if((Table = table) == null)
+                        {
+                                throw new ArgumentException("Cannot create database class with undefined table reference");
+                        };
+                }
+        }
+
+        public class stops: IDbColumnClass
+        {
+                public Int32 stop_id {get; set; }
+                public String stop_code {get; set; }
+                public String stop_name {get; set; }
+                public String stop_desc {get; set; }
+                public Double stop_lat {get; set; }
+                public Double stop_lon {get; set; }
+                public Int32 zone_id {get; set; }
+                public bool Unique => true;
+                public IEnumerable<KeyValuePair<string,int>> Keys
+                {
+                        get
+                        {
+                                return new KeyValuePair<string,int>[] { new KeyValuePair<string,int>("stop_id", 0 ) };
+                        }
+                }
+                public DbTable Table { get; private set; }
+                public stops(DbTable table )
+                {
+                        if((Table = table) == null)
+                        {
+                                throw new ArgumentException("Cannot create database class with undefined table reference");
+                        };
+                }
+        }
+
+        public class calendar_dates: IDbColumnClass
+        {
+                public Int32 service_id {get; set; }
+                public Int32 date {get; set; }
+                public Int32 exception_type {get; set; }
+                public bool Unique => true;
+                public IEnumerable<KeyValuePair<string,int>> Keys
+                {
+                        get
+                        {
+                                return new KeyValuePair<string,int>[] { new KeyValuePair<string,int>("date", 1 ) };
+                        }
+                }
+                public DbTable Table { get; private set; }
+                public calendar_dates(DbTable table )
+                {
+                        if((Table = table) == null)
+                        {
+                                throw new ArgumentException("Cannot create database class with undefined table reference");
+                        };
+                }
+        }
+
+        public class trips: IDbColumnClass
+        {
+                public Int32 route_id {get; set; }
+                public Int32 service_id {get; set; }
+                public Int32 trip_id {get; set; }
+                public String trip_headsign {get; set; }
+                public Int32 direction_id {get; set; }
+                public String block_id {get; set; }
+                public Int32 shape_id {get; set; }
+                public bool Unique => false;
+                public IEnumerable<KeyValuePair<string,int>> Keys
+                {
+                        get
+                        {
+                                return new KeyValuePair<string,int>[] { new KeyValuePair<string,int>("route_id", 0 ), new KeyValuePair<string,int>("service_id", 1 ), new KeyValuePair<string,int>("trip_id", 2 ) };
+                        }
+                }
+                public DbTable Table { get; private set; }
+                public trips(DbTable table )
+                {
+                        if((Table = table) == null)
+                        {
+                                throw new ArgumentException("Cannot create database class with undefined table reference");
+                        };
+                }
+        }
+
+        public class stop_times: IDbColumnClass
+        {
+                public Int32 trip_id {get; set; }
+                public String arrival_time {get; set; }
+                public String departure_time {get; set; }
+                public Int32 stop_id {get; set; }
+                public Int32 stop_sequence {get; set; }
+                public Int32 pickup_type {get; set; }
+                public Int32 drop_off_type {get; set; }
+                public Double shape_dist_traveled {get; set; }
+                public bool Unique => false;
+                public IEnumerable<KeyValuePair<string,int>> Keys
+                {
+                        get
+                        {
+                                return new KeyValuePair<string,int>[] { new KeyValuePair<string,int>("trip_id", 0 ), new KeyValuePair<string,int>("stop_id", 3 ) };
+                        }
+                }
+                public DbTable Table { get; private set; }
+                public stop_times(DbTable table )
+                {
+                        if((Table = table) == null)
+                        {
+                                throw new ArgumentException("Cannot create database class with undefined table reference");
+                        };
+                }
+        }
+
+        public class shapes: IDbColumnClass
+        {
+                public Int32 shape_id {get; set; }
+                public Double shape_pt_lat {get; set; }
+                public Double shape_pt_lon {get; set; }
+                public Int32 shape_pt_sequence {get; set; }
+                public Double shape_dist_traveled {get; set; }
+                public bool Unique => true;
+                public IEnumerable<KeyValuePair<string,int>> Keys
+                {
+                        get
+                        {
+                                return new KeyValuePair<string,int>[] { new KeyValuePair<string,int>("shape_id", 0 ) };
+                        }
+                }
+                public DbTable Table { get; private set; }
+                public shapes(DbTable table )
+                {
+                        if((Table = table) == null)
+                        {
+                                throw new ArgumentException("Cannot create database class with undefined table reference");
+                        };
+                }
+        }
+
+}

@@ -6,7 +6,81 @@ list [table]
 
 select * FROM [table] WHERE ...
 
+There is no noticeable difference in calling a C# instance method directly or dynamically by "string" name, when you use a cached compiled LINQ expression.
+ 
+In my test case I call a method 1.000.000 times directly and dynamically and both take 1,6s:
+namespace Research.UnitTests
+{
+	using System;
+	using Microsoft.VisualStudio.TestTools.UnitTesting;
+	using System.Linq;
+	using System.Linq.Expressions;
+	using System.Collections.Generic;
+	using System.Reflection;
 
+	[TestClass]
+	public class Research
+	{
+		[TestMethod]
+		public void TestWithTiming()
+		{
+			var watch = new System.Diagnostics.Stopwatch();
+			watch.Start();
+			var calculator = new Calculator(); 
+			
+			// Get "Calculate" method.
+			MethodInfo methodInfo = typeof(Calculator).GetMethod("Calculate", new Type[] { typeof(int) });
+
+			// Create parameter "i" for Calculate method.
+			ParameterExpression param = Expression.Parameter(typeof(int), "i");     
+			
+			// Create "thisParameter" needed to call instance methods.
+			var thisParameter = Expression.Constant(calculator);
+
+			// Create an expression for the method call "Calculate" and specify its parameter(s).
+			// If the method was a static method, the "thisParameter" must be removed.
+			MethodCallExpression methodCall = Expression.Call(thisParameter, methodInfo, param);
+
+			// Create lambda expression from MethodCallExpression.
+			Expression<Func<int, string>> lambda = Expression.Lambda<Func<int, string>>(
+				methodCall,
+				new ParameterExpression[] { param }
+			);
+
+			// Compile lambda expression to a Func<>.
+			Func<int, string> func = lambda.Compile();
+
+			// Dynamically call instance method by "name".
+			// Duration: 1620 ms (1,6s).
+			for (int i = 0; i < 1000000; i++)
+			{
+				string result = func(i);
+			}
+
+			// Direct call
+			// Duration: 1605ms (1,6s)
+			for (int i = 0; i < 1000000; i++)
+			{
+				string result = calculator.Calculate(i);
+			}
+			watch.Stop();
+			System.Console.WriteLine(watch.Elapsed.TotalMilliseconds);
+		}
+	}
+
+	public class Calculator
+	{
+		public string Calculate(int i)
+		{
+			string result = string.Empty;
+			// Execute some code.
+			DateTime now = DateTime.Now;
+			DateTime nextDay = now.AddDays(i);
+			result = nextDay.ToString();
+			return result;
+		}
+	}
+}
 
 Key: <30898> PageSize: 16, Unique Key Value: True
 ├──Key: <15449> PageSize: 16, Unique Key Value: True

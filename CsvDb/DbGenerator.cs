@@ -7,7 +7,7 @@ using io = System.IO;
 
 namespace CsvDb
 {
-	public class CsvDbGenerator
+	public class DbGenerator
 	{
 		public string ZipFile { get; protected internal set; }
 
@@ -15,7 +15,7 @@ namespace CsvDb
 
 		public static Int32 ItemsPageStart => 8;
 
-		public CsvDbGenerator(CsvDb db, string zipfilepath, bool removeAll = true)
+		public DbGenerator(CsvDb db, string zipfilepath, bool removeAll = true)
 		{
 			if ((Database = db) == null ||
 				!System.IO.File.Exists(ZipFile = zipfilepath) || !zipfilepath.EndsWith(".zip"))
@@ -35,7 +35,7 @@ namespace CsvDb
 			//generic method
 			MethodInfo processTable_Method =
 				this.GetType()
-					.GetMethod(nameof(CsvDbGenerator.GenerateCsvTableText),
+					.GetMethod(nameof(DbGenerator.GenerateCsvTableText),
 					BindingFlags.Instance | BindingFlags.NonPublic);
 
 			foreach (var table in Database.Tables)
@@ -78,7 +78,7 @@ namespace CsvDb
 			{
 				var content = outStream.ReadToEnd();
 
-				byte[] byteArray = System.Text.Encoding.ASCII.GetBytes(content);
+				byte[] byteArray = Encoding.ASCII.GetBytes(content);
 
 				io.MemoryStream mstream = new io.MemoryStream(byteArray);
 
@@ -93,7 +93,7 @@ namespace CsvDb
 		void GenerateCsvTableText<TClass>(
 			CsvHelper.CsvReader csv,
 			io.Compression.ZipArchiveEntry entry,
-			CsvDbTable table,
+			DbTable table,
 			string rootPath)
 		{
 			string pagerName = $"{table.Name}.pager";
@@ -163,7 +163,7 @@ namespace CsvDb
 				var sb = new StringBuilder();
 				var sw = new System.Diagnostics.Stopwatch();
 				sw.Start();
-				var csvParser = new CsvRecordParser(csv, table);
+				var csvParser = new DbRecordParser(csv, table);
 
 				//read each record of csv entry
 				while (csv.Read())
@@ -423,7 +423,7 @@ namespace CsvDb
 		}
 
 		List<KeyValuePair<T, List<int>>> GenerateIndexCollectionKeysMultipleValues<T>(
-			CsvDbColumn index,
+			DbColumn index,
 			Type indexType
 		)
 		{
@@ -507,7 +507,7 @@ namespace CsvDb
 		BTreePageBase<T> CompileIndex<T>(
 			List<KeyValuePair<T, List<int>>> collection,
 			int pageSize,
-			CsvDbColumn index
+			DbColumn index
 		)
 					where T : IComparable<T>
 		{
@@ -594,7 +594,7 @@ namespace CsvDb
 			}
 		}
 
-		void SaveBinaryIndex<T>(BTreePageBase<T> rootPage, CsvDbColumn index)
+		void SaveBinaryIndex<T>(BTreePageBase<T> rootPage, DbColumn index)
 			where T : IComparable<T>
 		{
 			if (rootPage == null)
@@ -629,7 +629,7 @@ namespace CsvDb
 
 				//pages
 				//sizeof: pageCollectionCount, keyType
-				var offset = CsvDbGenerator.ItemsPageStart;   // 8;
+				var offset = DbGenerator.ItemsPageStart;   // 8;
 				foreach (var page in collectionPage)
 				{
 					page.Offset = offset;

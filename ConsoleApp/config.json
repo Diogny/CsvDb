@@ -3,7 +3,7 @@
 	{
 		"Database":
 		{
-			"BasePath": "PATH TO DATABASE FOLDER"
+			"BasePath": "PATH TO DATABASE FILES"
 		}
 	}
 }

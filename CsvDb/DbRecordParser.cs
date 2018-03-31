@@ -4,9 +4,9 @@ using System.Text;
 
 namespace CsvDb
 {
-	public class CsvRecordParser
+	public class DbRecordParser
 	{
-		public CsvDbTable Table { get; set; }
+		public DbTable Table { get; set; }
 
 		public CsvHelper.CsvReader Csv { get; set; }
 
@@ -20,7 +20,7 @@ namespace CsvDb
 
 		int Count = 0;
 
-		public CsvRecordParser(CsvHelper.CsvReader csv, CsvDbTable table)
+		public DbRecordParser(CsvHelper.CsvReader csv, DbTable table)
 		{
 			if ((Table = table) == null || (Csv = csv) == null)
 			{

@@ -6,17 +6,17 @@ using io = System.IO;
 
 namespace CsvDb
 {
-	public class CsvDbIndexItems<T>
+	public class DbIndexItems<T>
 			where T : IComparable<T>
 	{
 
 		public CsvDb Database { get; protected internal set; }
 
-		public CsvDbColumn Index { get; protected internal set; }
+		public DbColumn Index { get; protected internal set; }
 
 		public Int32 PageCount { get; protected internal set; }
 
-		public CsvDbColumnTypeEnum KeyType { get; protected internal set; }
+		public DbColumnTypeEnum KeyType { get; protected internal set; }
 
 		public string PathToItems { get; protected internal set; }
 
@@ -26,12 +26,16 @@ namespace CsvDb
 
 		public List<MetaItemsPage<T>> Pages { get; protected internal set; }
 
+		public Dictionary<int, MetaItemsPage<T>> Hash { get; protected internal set; }
+
+		public MetaItemsPage<T> this[int offset] => Hash.TryGetValue(offset, out MetaItemsPage<T> page) ? page : null;
+
 		public bool ValidPage(int offset)
 		{
 			return Pages.Any(p => p.Offset == offset);
 		}
 
-		public CsvDbIndexItems(CsvDb db, string tableName, string columnName)
+		public DbIndexItems(CsvDb db, string tableName, string columnName)
 		{
 			if ((Database = db) == null)
 			{
@@ -50,6 +54,7 @@ namespace CsvDb
 			}
 
 			Pages = new List<MetaItemsPage<T>>();
+			Hash = new Dictionary<int, MetaItemsPage<T>>();
 
 			//read main structure of item pages
 			using (reader = new io.BinaryReader(io.File.OpenRead(PathToItems)))
@@ -59,7 +64,7 @@ namespace CsvDb
 				PageCount = reader.ReadInt32();
 
 				Int32 keyTypeValue = reader.ReadInt32();
-				KeyType = (CsvDbColumnTypeEnum)keyTypeValue;
+				KeyType = (DbColumnTypeEnum)keyTypeValue;
 
 				//read all pages main info
 				for (var pi = 0; pi < PageCount; pi++)
@@ -99,14 +104,19 @@ namespace CsvDb
 						Frequency = 0.0,
 						Number = pi
 					};
+
+					//add page to collection of pages
 					Pages.Add(page);
+
+					//add to hash dictionary for fast retrieval
+					Hash.Add(page.Offset, page);
 				}
 			}
 			//update item page count
 			Index.ItemPages = Pages.Count;
 		}
 
-		public CsvDbKeyValues<T> Find(int offset, T key)
+		public DbKeyValues<T> Find(int offset, T key)
 		{
 			var page = Pages.FirstOrDefault(p => p.Offset == offset);
 
@@ -117,7 +127,7 @@ namespace CsvDb
 			var pair = page.Items.FirstOrDefault(i => i.Key.Equals(key));
 			return (pair.Key == null) ?
 				null :
-				new CsvDbKeyValues<T>()
+				new DbKeyValues<T>()
 				{
 					Key = pair.Key,
 					Values = pair.Value
@@ -149,7 +159,7 @@ namespace CsvDb
 
 		public int Number { get; internal set; }
 
-		public CsvDbIndexItems<T> Parent { get; protected internal set; }
+		public DbIndexItems<T> Parent { get; protected internal set; }
 
 		public Double Frequency { get; internal set; }
 
@@ -175,7 +185,7 @@ namespace CsvDb
 						var ii = 0;
 						KeyValuePair<T, List<int>> pair;
 
-						if (Parent.KeyType == CsvDbColumnTypeEnum.String)
+						if (Parent.KeyType == DbColumnTypeEnum.String)
 						{
 							var keyLengths = new byte[ItemsCount];
 							reader.Read(keyLengths, 0, ItemsCount);

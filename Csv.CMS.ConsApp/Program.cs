@@ -1,4 +1,5 @@
 ﻿using CsvDb;
+using CsvDb.Query;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
@@ -54,6 +55,24 @@ namespace Csv.CMS.ConsApp
 				return false;
 			}
 
+			object CreateClass(Type type, object[] parameters)
+			{
+				if (type == null)
+				{
+					return null;
+				}
+				try
+				{
+					object obj = Activator.CreateInstance(type, parameters ?? new object[] { });
+					return obj;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"error: {ex.Message}");
+					return null;
+				}
+			}
+
 			//Action displayHelp = () =>
 			void displayHelp()
 			{
@@ -85,7 +104,10 @@ namespace Csv.CMS.ConsApp
 				Console.WriteLine(" Display Index Tree (N)ode Structure");
 				Console.WriteLine(" Display (I)ndex Tree Structure");
 				Console.WriteLine(" (E)execute Queries");
+				Console.WriteLine(" (X)treme class");
 			}
+
+			System.Reflection.Assembly assembly = null;
 
 			//Console.TreatControlCAsInput = true;
 			bool end = false;
@@ -101,6 +123,68 @@ namespace Csv.CMS.ConsApp
 				Console.WriteLine();
 				switch (key.Key)
 				{
+					case ConsoleKey.X:
+						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+						{
+							Console.Write("\r\n  database table as class: ");
+							var tbleName = Console.ReadLine();
+							DbTable table = db.Table(tbleName);
+							//
+							if (table == null)
+							{
+								Console.WriteLine($"cannot find table [{tbleName}]");
+							}
+							else
+							{
+								if (assembly == null)
+								{
+									assembly = Utils.CreateDbClasses(db);
+									if (assembly == null)
+									{
+										Console.WriteLine("Cannot generate database table classes");
+									}
+									else
+									{
+										Console.WriteLine("database table classes generated succesfully!");
+									}
+								}
+								if (assembly != null)
+								{
+									//I can compile code once and load assembly at start
+									//   just recompile when database table changes
+
+									//var an = System.Reflection.AssemblyName.GetAssemblyName(filePath);
+									//System.Reflection.Assembly.Load(an);
+									//AppDomain.CurrentDomain.Load(assembly.GetName());
+
+									//get it OK!
+									//Type type = assembly.GetType($"CsvDb.Dynamic.{tbleName}");
+									//object obj = Activator.CreateInstance(type);
+
+									//this was a test, constructor must be parameterless so CsvHelper can create it
+									Type dynTbleClass = assembly.GetType($"CsvDb.Dynamic.{tbleName}");
+									object obj = CreateClass(
+										dynTbleClass,
+										new object[] {
+											//table
+										}
+									);
+									var mthd = dynTbleClass.GetMethod("Link");
+									mthd.Invoke(obj, new object[]
+									{
+										table
+									});
+									//now I can use CsvHelper to parse CSV rows using this classes if needed
+
+									//don't get it
+									var classType = Type.GetType($"CsvDb.Dynamic.{tbleName}");
+
+									Console.WriteLine("ok");
+								}
+							}
+
+						}
+						break;
 					case ConsoleKey.E:
 						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 						{
@@ -115,7 +199,7 @@ namespace Csv.CMS.ConsApp
 								{
 									try
 									{
-										var parser = new CsvDbQueryParser();
+										var parser = new DbQueryParser();
 										sw.Restart();
 										var dbQuery = parser.Parse(db, query);
 										sw.Stop();
@@ -213,7 +297,7 @@ namespace Csv.CMS.ConsApp
 								Console.WriteLine();
 								//Console.WriteLine($" processing: {query}");
 
-								var parser = new CsvDbQueryParser();
+								var parser = new DbQueryParser();
 								sw.Start();
 								var dbQuery = parser.Parse(db, query);
 								sw.Stop();
@@ -223,8 +307,9 @@ namespace Csv.CMS.ConsApp
 								//to calculate times
 								sw.Restart();
 
-								var visualizer = new CsvDbVisualizer(dbQuery);
+								var visualizer = new DbVisualizer(dbQuery);
 								var rows = visualizer.Execute();
+								visualizer.Dispose();
 
 								sw.Stop();
 								var rowCount = rows.Count();
@@ -238,13 +323,29 @@ namespace Csv.CMS.ConsApp
 								Console.WriteLine($"\r\n{header}");
 								Console.WriteLine($"{new string('-', header.Length)}");
 
+								int visualizedRows = 0;
+								int pagerRows = 0;
+								var unstop = false;
 								foreach (var record in rows)
 								{
+									visualizedRows++;
 									Console.WriteLine($"{String.Join(",", record)}");
+
+									if (!unstop && pagerRows++ >= 32)
+									{
+										pagerRows = 0;
+										Console.Write("press any key...");
+										var keyCode = Console.ReadKey();
+										Console.WriteLine();
+										if (keyCode.Key == ConsoleKey.Escape)
+										{
+											unstop = true;
+										}
+									}
 								}
 
 								sw.Stop();
-								Console.WriteLine("\r\n displayed on {0} ms", sw.ElapsedMilliseconds);
+								Console.WriteLine($"\r\n {visualizedRows} row(s) displayed on {0} ms", sw.ElapsedMilliseconds);
 							}
 						}
 						catch (Exception ex)

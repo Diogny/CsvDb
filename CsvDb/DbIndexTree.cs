@@ -6,12 +6,12 @@ using System.Collections;
 
 namespace CsvDb
 {
-	public class CsvDbIndexTree<T>
+	public class DbIndexTree<T>
 		where T : IComparable<T>
 	{
 		public CsvDb Database { get { return Index.Table.Database; } }
 
-		public CsvDbColumn Index { get; protected internal set; }
+		public DbColumn Index { get; protected internal set; }
 
 		public PageIndexTreeHeader Header { get; protected internal set; }
 
@@ -21,13 +21,13 @@ namespace CsvDb
 
 		public bool IsLeaf { get; protected internal set; }
 
-		public CsvDbColumnTypeEnum KeyType { get; protected internal set; }
+		public DbColumnTypeEnum KeyType { get; protected internal set; }
 
 		io.BinaryReader reader = null;
 
 		public PageIndexNodeBase<T> Root { get; protected internal set; }
 
-		public CsvDbIndexTree(CsvDb db, string tableName, string columnName)
+		public DbIndexTree(CsvDb db, string tableName, string columnName)
 		{
 			if ((db) == null)
 			{
@@ -54,7 +54,7 @@ namespace CsvDb
 				IsLeaf = (Header.Flags & Consts.IndexHeaderIsLeaf) != 0;
 
 				byte keyTypeValue = (byte)Header.Flags;
-				KeyType = (CsvDbColumnTypeEnum)keyTypeValue;
+				KeyType = (DbColumnTypeEnum)keyTypeValue;
 
 				//amount of tree node pages
 				Index.NodePages = 0;
@@ -278,7 +278,7 @@ namespace CsvDb
 
 		public override MetaIndexType Type => MetaIndexType.Node;
 
-		internal PageIndexNode(int flags, int number, io.BinaryReader reader, CsvDbColumnTypeEnum keyType)
+		internal PageIndexNode(int flags, int number, io.BinaryReader reader, DbColumnTypeEnum keyType)
 			: base(flags, number)
 		{
 			//read info

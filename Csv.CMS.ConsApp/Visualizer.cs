@@ -23,9 +23,9 @@ namespace Csv.CMS.ConsApp
 
 		#region Tree Structure
 
-		CsvDbColumn GetIndex(string tableColumn)
+		DbColumn GetIndex(string tableColumn)
 		{
-			CsvDbColumn index = Database.Index(tableColumn);
+			DbColumn index = Database.Index(tableColumn);
 			if (index == null)
 			{
 				Console.WriteLine(" index not found, format: [table].index");
@@ -44,7 +44,7 @@ namespace Csv.CMS.ConsApp
 		/// <param name="tableColumn">table.index</param>
 		public void DisplayTreeNodePageStructureInfo(string tableColumn)
 		{
-			CsvDbColumn index = GetIndex(tableColumn);
+			DbColumn index = GetIndex(tableColumn);
 			if (index == null)
 			{
 				return;
@@ -52,7 +52,7 @@ namespace Csv.CMS.ConsApp
 			//get type of index class instance
 			var indexClassType = index.GetType();
 			//get non-public method
-			var mthd = indexClassType.GetMethod(nameof(CsvDbColumn.IndexTree)//,
+			var mthd = indexClassType.GetMethod(nameof(DbColumn.IndexTree)//,
 																																			 //BindingFlags.Instance | BindingFlags.NonPublic
 			);
 			//get the type of the index
@@ -74,7 +74,7 @@ namespace Csv.CMS.ConsApp
 			Console.WriteLine(output);
 		}
 
-		string DisplayTreeStructureInfo<T>(CsvDbIndexTree<T> index)
+		string DisplayTreeStructureInfo<T>(DbIndexTree<T> index)
 			where T : IComparable<T>
 		{
 			var sb = new StringBuilder();
@@ -151,7 +151,7 @@ namespace Csv.CMS.ConsApp
 
 		public void DisplayItemsPageStructureInfo(string tableColumn)
 		{
-			CsvDbColumn index = GetIndex(tableColumn);
+			DbColumn index = GetIndex(tableColumn);
 			if (index == null)
 			{
 				return;
@@ -159,7 +159,7 @@ namespace Csv.CMS.ConsApp
 			//get type of index class instance
 			var indexClassType = index.GetType();
 			//get non-public method
-			var mthd = indexClassType.GetMethod(nameof(CsvDbColumn.IndexItems)//,
+			var mthd = indexClassType.GetMethod(nameof(DbColumn.IndexItems)//,
 																																				//BindingFlags.Instance | BindingFlags.NonPublic
 			);
 			//get the type of the index
@@ -181,7 +181,7 @@ namespace Csv.CMS.ConsApp
 			Console.WriteLine(output);
 		}
 
-		string DisplayItemsPageInfo<T>(CsvDbIndexItems<T> index)
+		string DisplayItemsPageInfo<T>(DbIndexItems<T> index)
 			where T : IComparable<T>
 		{
 			var sb = new StringBuilder();

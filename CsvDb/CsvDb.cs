@@ -7,7 +7,7 @@ using io = System.IO;
 namespace CsvDb
 {
 	[Flags]
-	public enum CsvDbOption
+	public enum DbOption
 	{
 		/// <summary>
 		/// Creates a new empty database if no __tables.json provided
@@ -23,16 +23,21 @@ namespace CsvDb
 		OpenEdit
 	}
 
-	public enum CsvDbIndexItemsPolicy
+	public enum DbIndexItemsPolicy
 	{
 		ReadAlways,
 		ReadAndStoreAlways,
 		ReadKeepMostFrequentAlways
 	}
 
-	internal class CsvDbStructure
+	internal class DbSchemaConfig
 	{
+		//binary structure of database, test speed
+
 		public String Version { get; set; }
+
+		//Major.Minor.Build.Revision	3.5.234.02
+		public System.Version VersionInfo => new System.Version(Version);
 
 		public String Description { get; set; }
 
@@ -40,7 +45,94 @@ namespace CsvDb
 
 		public int PageSize { get; set; }
 
-		public List<CsvDbTable> Tables { get; set; }
+		public List<DbTable> Tables { get; set; }
+
+		public DbSchemaConfig() { }
+
+		public static DbSchemaConfig Load(io.BinaryReader reader)
+		{
+			var obj = new DbSchemaConfig()
+			{
+				Version = reader.BinaryRead(),
+				Description = reader.BinaryRead(),
+				Name = reader.BinaryRead(),
+
+				PageSize = reader.ReadInt32(),
+				Tables = new List<DbTable>()
+			};
+			//tables
+			var pageCount = reader.ReadInt32();
+			for (var t = 0; t < pageCount; t++)
+			{
+				var table = new DbTable()
+				{
+					Name = reader.BinaryRead(),
+					FileName = reader.BinaryRead(),
+					Generate = reader.ReadBoolean(),
+					Multikey = reader.ReadBoolean(),
+					Rows = reader.ReadInt32(),
+					Pager = DbTablePager.Load(reader),
+					Count = reader.ReadInt32(),
+					Columns = new List<DbColumn>()
+				};
+				//read columns
+				for (var c = 0; c < table.Count; c++)
+				{
+					var col = new DbColumn()
+					{
+						Indexer = reader.BinaryRead(),
+						Unique = reader.ReadBoolean(),
+						Name = reader.BinaryRead(),
+						Index = reader.ReadInt32(),
+						Type = reader.BinaryRead(),
+						Key = reader.ReadBoolean(),
+						Indexed = reader.ReadBoolean()
+					};
+					table.Columns.Add(col);
+				}
+				obj.Tables.Add(table);
+			}
+			return obj;
+		}
+
+		public void Save(io.BinaryWriter writer, bool saveJson = false)
+		{
+			Version.BinarySave(writer);
+			Description.BinarySave(writer);
+			Name.BinarySave(writer);
+
+			//page size
+			writer.Write(PageSize);
+
+			//tables
+			int pageCount = Tables.Count;
+			writer.Write(pageCount);
+
+			foreach (var table in Tables)
+			{
+				table.Name.BinarySave(writer);
+				table.FileName.BinarySave(writer);
+				writer.Write(table.Generate);
+				writer.Write(table.Multikey);
+				//
+				writer.Write(table.Rows);
+				//pager
+				table.Pager.Store(writer);
+				//columns
+				writer.Write(table.Count);
+
+				foreach (var column in table.Columns)
+				{
+					column.Indexer.BinarySave(writer);
+					writer.Write(column.Unique);
+					column.Name.BinarySave(writer);
+					writer.Write(column.Index);
+					column.Type.BinarySave(writer);
+					writer.Write(column.Key);
+					writer.Write(column.Indexed);
+				}
+			}
+		}
 
 	}
 
@@ -50,66 +142,40 @@ namespace CsvDb
 
 		public string BinaryPath { get; protected internal set; }
 
-		protected internal String FileStructurePath = "";
+		public string Name { get { return Schema.Name; } }
 
-		public string Name { get { return Structure.Name; } }
+		public int PageSize { get { return Schema.PageSize; } }
 
-		public int PageSize { get { return Structure.PageSize; } }
+		public DbIndexItemsPolicy ReadPolicy { get; set; }
 
-		public CsvDbIndexItemsPolicy ReadPolicy { get; set; }
-
-		internal CsvDbStructure Structure;
+		internal DbSchemaConfig Schema;
 
 		/// <summary>
 		/// Reference to tables
 		/// </summary>
-		public List<CsvDbTable> Tables
+		public List<DbTable> Tables
 		{
-			get { return Structure.Tables; }
-			set { Structure.Tables = value; }
+			get { return Schema.Tables; }
+			set { Schema.Tables = value; }
 		}
 
 		public bool Modified { get; set; }
 
-		public static String SystemStructureFile { get { return "__tables.json"; } }
+		public static String SchemaSystemName => "__schema";
 
-		public CsvDb(string structure, string path)
-		{
-			if (String.IsNullOrWhiteSpace(structure))
-			{
-				throw new ArgumentException($"Invalid databse structure");
-			}
-			//Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
-			//fastJSON is 2X+ faster than Newtonsoft.Json parser
-			//https://github.com/mgholam/fastJSON
+		public static String SchemaSystemExtension => "sys";
 
-			Structure =
-				fastJSON.JSON.ToObject<CsvDbStructure>(structure);
+		public static String SchemaJsonName => "__tables";
 
-			ReadPolicy = CsvDbIndexItemsPolicy.ReadAlways;
+		public static String SchemaJsonExtension => "json";
 
-			//link
-			Tables.ForEach(t =>
-			{
-				t.Database = this;
-				t.Columns.ForEach(c =>
-				{
-					c.Table = t;
-				});
-			});
-			//test for [LogPath] root path
-			if (!io.Directory.Exists(LogPath = path))
-			{
-				io.Directory.CreateDirectory(LogPath);
-			}
-			//test for: [LogPath]\bin    system tables bin path
-			if (!io.Directory.Exists(BinaryPath = io.Path.Combine(LogPath, "bin\\")))
-			{
-				io.Directory.CreateDirectory(BinaryPath);
-			}
-			FileStructurePath = io.Path.Combine(BinaryPath, SystemStructureFile);
-			Save();
-		}
+		public static String SchemaSystemFilename => $"{SchemaSystemName}.{SchemaSystemExtension}";
+
+		public static String SchemaJsonFilename => $"{SchemaJsonName}.{SchemaJsonExtension}";
+
+		protected internal String SchemaFilePath = String.Empty;
+
+		protected internal String SchemaJsonFilePath = String.Empty;
 
 		/// <summary>
 		/// Creates a new CSV database
@@ -120,13 +186,14 @@ namespace CsvDb
 		{
 
 			// path\bin\
-			//		__tables.json
+			//		__schema.sys		// => old  __tables.json
 			//		[table].csv
 			//		[table].pager
 			//		[table].[index].index
 			//		[table].[index].index.bin
 			//
 			// path\
+			//		--all files here can be safely deleted, except bin folder and logs is needed
 			//		[table].[index].index.txt
 			//		[table].[index].index.tree.txt
 			//		[table].[index].index.duplicates.txt
@@ -137,37 +204,36 @@ namespace CsvDb
 			BinaryPath = io.Path.Combine(LogPath = path, "bin\\");
 
 			//read 
-			FileStructurePath = io.Path.Combine(BinaryPath, SystemStructureFile);
-			if (!io.File.Exists(FileStructurePath))
+			SchemaFilePath = io.Path.Combine(BinaryPath, SchemaSystemFilename);
+			SchemaJsonFilePath = io.Path.Combine(BinaryPath, SchemaJsonFilename);
+
+			if (!io.File.Exists(SchemaFilePath))
 			{
-				throw new ArgumentException($"cannot load database structure on: {FileStructurePath}");
-				////create an empty __tables.json file
-				//if (!io.Directory.Exists(BinaryPath))
-				//{
-				//	io.Directory.CreateDirectory(BinaryPath);
-
-				//	//later add option to clean directory with flag if dessired
-
-				//}
-
-				//var obj = new
-				//{
-				//	Version = "1.01",
-				//	Description = "Implementing a system hidden variables",
-				//	PageSize = 255,
-				//	Tables = new String[0]
-				//};
-				//var json =
-				//			 Newtonsoft.Json.JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.Indented);
-				////
-				//io.File.WriteAllText(FileStructurePath, json);
+				throw new ArgumentException($"cannot load database structure on: {SchemaFilePath}");
 			}
-			//Name = io.Path.GetFileNameWithoutExtension(Path = path);
-			//
 
-			ReadPolicy = CsvDbIndexItemsPolicy.ReadAlways;
+			ReadPolicy = DbIndexItemsPolicy.ReadAlways;
 
 			Load();
+		}
+
+		public bool ExportToJson()
+		{
+			try
+			{
+				fastJSON.JSON.Parameters.UseExtensions = false;
+				var json =
+				//Newtonsoft.Json.JsonConvert.SerializeObject(Structure, Newtonsoft.Json.Formatting.Indented);
+				fastJSON.JSON.ToNiceJSON(Schema);
+				//
+				io.File.WriteAllText(SchemaJsonFilePath, json);
+				return true;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(ex.Message);
+				return false;
+			}
 		}
 
 		/// <summary>
@@ -179,14 +245,18 @@ namespace CsvDb
 		{
 			try
 			{
-				var text = io.File.ReadAllText(FileStructurePath);
+				//var text = io.File.ReadAllText(FileStructurePath);
 
-				//Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
-				//fastJSON is 2X+ faster than Newtonsoft.Json parser
-				//https://github.com/mgholam/fastJSON
+				////Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
+				////fastJSON is 2X+ faster than Newtonsoft.Json parser
+				////https://github.com/mgholam/fastJSON
 
-				Structure =
-					fastJSON.JSON.ToObject<CsvDbStructure>(text);
+				//Structure =
+				//	fastJSON.JSON.ToObject<DbHeaderStructure>(text);
+
+				var reader = new io.BinaryReader(io.File.OpenRead(SchemaFilePath));
+				Schema = DbSchemaConfig.Load(reader);
+				reader.Dispose();
 
 				//link
 				Tables.ForEach(table =>
@@ -217,12 +287,10 @@ namespace CsvDb
 		{
 			try
 			{
-				fastJSON.JSON.Parameters.UseExtensions = false;
-				var json =
-				//Newtonsoft.Json.JsonConvert.SerializeObject(Structure, Newtonsoft.Json.Formatting.Indented);
-				fastJSON.JSON.ToNiceJSON(Structure);
-				//
-				io.File.WriteAllText(FileStructurePath, json);
+				var writer = new io.BinaryWriter(io.File.Create(SchemaFilePath));
+				Schema.Save(writer);
+				writer.Dispose();
+
 				return true;
 			}
 			catch (Exception ex)
@@ -232,7 +300,7 @@ namespace CsvDb
 			}
 		}
 
-		public CsvDbTable Table(string tableName)
+		public DbTable Table(string tableName)
 		{
 			return Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
 		}
@@ -243,7 +311,7 @@ namespace CsvDb
 		/// <param name="tableName">table name</param>
 		/// <param name="columnName">column name</param>
 		/// <returns></returns>
-		public CsvDbColumn Index(string tableName, string columnName)
+		public DbColumn Index(string tableName, string columnName)
 		{
 			return Table(tableName)?.Columns.FirstOrDefault(c => String.Compare(c.Name, columnName) == 0);
 		}
@@ -253,10 +321,10 @@ namespace CsvDb
 		/// </summary>
 		/// <param name="tableColumnName">table.index</param>
 		/// <returns></returns>
-		public CsvDbColumn Index(string tableColumnName)
+		public DbColumn Index(string tableColumnName)
 		{
 			var cols = tableColumnName?.Split('.', StringSplitOptions.RemoveEmptyEntries);
-			CsvDbColumn index = null;
+			DbColumn index = null;
 			if (cols != null && cols.Length == 2)
 			{
 				index = Index(cols[0], cols[1]);
@@ -280,7 +348,7 @@ namespace CsvDb
 	}
 
 	[Serializable]
-	public class CsvDbTable
+	public class DbTable
 	{
 		public string Name { get; set; }
 
@@ -292,11 +360,11 @@ namespace CsvDb
 
 		public int Rows { get; set; }
 
-		public CsvDbTablePager Pager { get; set; }
+		public DbTablePager Pager { get; set; }
 
 		public int Count { get; set; }
 
-		public List<CsvDbColumn> Columns { get; set; }
+		public List<DbColumn> Columns { get; set; }
 
 		protected internal CsvDb Database { get; set; }
 
@@ -310,19 +378,21 @@ namespace CsvDb
 			}
 		}
 
-		public CsvDbColumn Column(string name)
+		public DbColumn Column(string name) => Columns.FirstOrDefault(c => c.Name == name);
+
+		public override string ToString() => $"{Name} ({Count})";
+
+		public IDictionary<string, Type> ToDictionary()
 		{
-			return Columns.FirstOrDefault(c => c.Name == name);
+			return new Dictionary<string, Type>(
+				Columns.Select(c => new KeyValuePair<string, Type>(c.Name, Type.GetType($"System.{c.Type}")))
+			);
 		}
 
-		public override string ToString()
-		{
-			return $"{Name} ({Count})";
-		}
 	}
 
 	[Serializable]
-	public class CsvDbColumn
+	public class DbColumn
 	{
 		public string Indexer { get; set; }
 
@@ -345,25 +415,25 @@ namespace CsvDb
 		public int NodePages { get; set; }
 
 		[Newtonsoft.Json.JsonIgnore]
-		public CsvDbColumnTypeEnum TypeEnum
+		public DbColumnTypeEnum TypeEnum
 		{
 			get
 			{
-				if (Enum.TryParse<CsvDbColumnTypeEnum>(Type, out CsvDbColumnTypeEnum type))
+				if (Enum.TryParse<DbColumnTypeEnum>(Type, out DbColumnTypeEnum type))
 				{
 					return type;
 				}
-				return CsvDbColumnTypeEnum.None;
+				return DbColumnTypeEnum.None;
 			}
 		}
 
 		[System.Xml.Serialization.XmlIgnore]
 		//[ScriptIgnore]
-		public CsvDbTable Table { get; internal set; }
+		public DbTable Table { get; internal set; }
 
 		private object _itemsIndex;
 
-		public CsvDbIndexItems<T> IndexItems<T>()
+		public DbIndexItems<T> IndexItems<T>()
 			where T : IComparable<T>
 		{
 			//made [protected internal] to remove type checking later
@@ -375,19 +445,19 @@ namespace CsvDb
 			}
 			if (_itemsIndex == null)
 			{
-				_itemsIndex = Activator.CreateInstance(typeof(CsvDbIndexItems<T>), new object[]
+				_itemsIndex = Activator.CreateInstance(typeof(DbIndexItems<T>), new object[]
 				 {
 					 Table.Database,
 					 Table.Name,
 					 Name
 				 });
 			}
-			return (CsvDbIndexItems<T>)_itemsIndex;
+			return (DbIndexItems<T>)_itemsIndex;
 		}
 
 		private object _indexTree;
 
-		public CsvDbIndexTree<T> IndexTree<T>()
+		public DbIndexTree<T> IndexTree<T>()
 			where T : IComparable<T>
 		{
 			//made [protected internal] to remove type checking later
@@ -399,33 +469,48 @@ namespace CsvDb
 			}
 			if (_indexTree == null)
 			{
-				_indexTree = Activator.CreateInstance(typeof(CsvDbIndexTree<T>), new object[]
+				_indexTree = Activator.CreateInstance(typeof(DbIndexTree<T>), new object[]
 				 {
 					 Table.Database,
 					 Table.Name,
 					 Name
 				 });
 			}
-			return (CsvDbIndexTree<T>)_indexTree;
+			return (DbIndexTree<T>)_indexTree;
 		}
 
-		public CsvDbColumn()
-		{ }
+		public DbColumn() { }
 
-		public override string ToString()
-		{
-			return $"[{Index}] {Name}: {Type}{(Key ? " [Key]" : "")}";
-		}
+		public override string ToString() => $"[{Index}] {Name}: {Type}{(Key ? " [Key]" : "")}";
 	}
 
 	[Serializable]
-	public class CsvDbTablePager
+	public class DbTablePager
 	{
 		public int PagerSize { get; set; }
 
 		public int Count { get; set; }
 
 		public string File { get; set; }
+
+		public DbTablePager() { }
+
+		public static DbTablePager Load(io.BinaryReader reader)
+		{
+			return new DbTablePager()
+			{
+				PagerSize = reader.ReadInt32(),
+				Count = reader.ReadInt32(),
+				File = reader.BinaryRead()
+			};
+		}
+
+		public void Store(io.BinaryWriter writer)
+		{
+			writer.Write(PagerSize);
+			writer.Write(Count);
+			File.BinarySave(writer);
+		}
 
 		public override string ToString()
 		{

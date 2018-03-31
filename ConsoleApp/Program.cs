@@ -4,6 +4,8 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
+using CsvDb.Query;
+using io = System.IO;
 
 namespace ConsoleApp
 {
@@ -21,13 +23,17 @@ namespace ConsoleApp
 
 			var handledWait = false;
 
-			Generators();
+			//Generators();
 
 			//SqlQueryExecuteTests();
 
 			//handledWait = SqlQueryFinalParseTests();
 
 			//TreeTests();
+
+			//TestDynamic();
+
+			CsvToBin();
 
 			if (!handledWait)
 			{
@@ -94,7 +100,7 @@ namespace ConsoleApp
 			// section["BasePath"];
 			var basePath = appConfig.Database.BasePath;
 
-			var gen = new CsvDbGenerator(
+			var gen = new DbGenerator(
 				db,
 				//$@"{basePath}bus_data.zip",
 				$@"{basePath}bus_data-full.zip",
@@ -133,7 +139,7 @@ namespace ConsoleApp
 			Console.WriteLine($"\r\nIn query: {query}");
 
 			sw.Restart();
-			var parser = new CsvDbQueryParser();
+			var parser = new DbQueryParser();
 			var dbQuery = parser.Parse(db, query); // old one: CsvDb.CsvDbQuery.Parse(db, query);
 
 			sw.Stop();
@@ -146,8 +152,9 @@ namespace ConsoleApp
 			//to calculate times
 			sw.Restart();
 
-			var visualizer = new CsvDbVisualizer(dbQuery);
+			var visualizer = new DbVisualizer(dbQuery);
 			var rows = visualizer.Execute().ToList();
+			visualizer.Dispose();
 
 			sw.Stop();
 			Console.WriteLine(">{rows.Count} row(s) retrieved on {0} ms", sw.ElapsedMilliseconds);
@@ -159,7 +166,7 @@ namespace ConsoleApp
 			Console.WriteLine($"\r\n{header}");
 			Console.WriteLine($"{new string('-', header.Length)}");
 
-			foreach (var record in visualizer.Execute())
+			foreach (var record in rows)
 			{
 				Console.WriteLine($"{String.Join(",", record)}");
 			}
@@ -218,7 +225,7 @@ namespace ConsoleApp
 
 					Console.WriteLine($"\r\n>{query}");
 
-					var parser = new CsvDbQueryParser();
+					var parser = new DbQueryParser();
 					var queryDb = parser.Parse(db, query);
 
 					var outQuery = queryDb.ToString();
@@ -231,6 +238,162 @@ namespace ConsoleApp
 				}
 			}
 			return false;
+		}
+
+		static void CsvToBin()
+		{
+			var db = OpenDatabase(dbName: "data-full");
+			string tableName = null;
+			Console.WriteLine("enter table name of empty to exit! ");
+			do
+			{
+				Console.Write("table: ");
+				tableName = Console.ReadLine();
+
+				var sw = new System.Diagnostics.Stopwatch();
+				sw.Start();
+				var response = CsvToBinTable(db, tableName);
+				sw.Stop();
+				if (response)
+				{
+					Console.WriteLine("  ellapsed {0} ms\r\n\t {1}", sw.ElapsedMilliseconds, sw.Elapsed);
+				}
+			} while (!String.IsNullOrWhiteSpace(tableName));
+		}
+
+		static bool CsvToBinTable(CsvDb.CsvDb db, string tableName)
+		{
+			//FIND THIS
+			// "stops" table row count csv doesn't match with bin file
+
+			var table = db.Table(tableName);
+			if (table == null)
+			{
+				Console.WriteLine($"cannot find table: {tableName} in database");
+				return false;
+			}
+			//calculate bytes needed to store null flags for every column in every record
+			//  this way reduce space for many null values on columns
+			//   and support nulls for any field type
+			int bytes = Math.DivRem(table.Columns.Count, 8, out int remainder);
+			int bits = bytes * 8 + remainder;
+			UInt64 mask = (UInt64)Math.Pow(2, bits - 1);
+			if (remainder != 0)
+			{
+				bytes++;
+			}
+
+			//
+			var path = io.Path.Combine(db.BinaryPath, $"{table.Name}.bin");
+			var cvspath = io.Path.Combine(db.BinaryPath, $"{table.FileName}");
+
+			var stream = new io.MemoryStream();
+			var bufferWriter = new io.BinaryWriter(stream);
+
+			using (var writer = new io.BinaryWriter(io.File.Create(path)))
+			using (var reader = new io.StreamReader(cvspath))
+			{
+				//placeholder for row count
+				Int32 value = 0;
+				writer.Write(value);
+
+				//write mask 32-bits unsigned int 64 bits UInt64, so max table columns is 64
+				writer.Write(mask);
+
+				//var buffer = new io.MemoryStream(5 * 1024);
+
+				var vis = new DbVisualizer(new DbQueryParser().Parse(db, $"SELECT * FROM {table.Name}"));
+
+				var columnTypes = table.Columns.Select(c => Enum.Parse<DbColumnTypeEnum>(c.Type)).ToArray();
+				int columnCount = table.Columns.Count;
+
+				int rowCount = 0;
+
+				foreach (var record in vis.Execute())
+				{
+					rowCount++;
+
+					//start with mask, first column, leftmost
+					UInt64 flags = 0;
+					//
+					var columnBit = mask;
+
+					stream.Position = 0;
+
+					for (var index = 0; index < columnCount; index++)
+					{
+						string textValue = record[index];
+						var colType = columnTypes[index];
+
+						if (textValue == null)
+						{
+							//signal only the null flag as true
+							flags |= columnBit;
+						}
+						else
+						{
+							switch (colType)
+							{
+								case DbColumnTypeEnum.String:
+									bufferWriter.Write(textValue ?? String.Empty);
+									break;
+								case DbColumnTypeEnum.Int32:
+									Int32 int32Value = 0;
+									if (String.IsNullOrEmpty(textValue))
+									{
+										//find a mark for null Int32 values
+										int32Value = Int32.MinValue;
+									}
+									else if (!Int32.TryParse(textValue, out int32Value))
+									{
+										int32Value = Int32.MinValue;
+										//throw new ArgumentException($"unable to cast: {textValue} to: {col.Type}");
+									}
+									//write to 
+									bufferWriter.Write(int32Value);
+									break;
+								case DbColumnTypeEnum.Double:
+									Double doubleValue = 0.0;
+									if (String.IsNullOrEmpty(textValue))
+									{
+										//find a mark for null Int32 values
+										doubleValue = Double.NegativeInfinity;
+									}
+									else if (!Double.TryParse(textValue, out doubleValue))
+									{
+										doubleValue = Double.NegativeInfinity;
+										//throw new ArgumentException($"unable to cast: {textValue} to: {col.Type}");
+									}
+									//write to 
+									bufferWriter.Write(doubleValue);
+									break;
+								default:
+									throw new ArgumentException($"unsupported type: {colType}");
+							}
+						}
+						//shift right column Bit until it reaches 0 -the last column rightmost
+						columnBit >>= 1;
+					}
+					if (columnBit != 0)
+					{
+						Console.WriteLine("Error on column bit flags");
+					}
+					//write true binary record
+					var flagsBuffer = BitConverter.GetBytes(flags);
+					writer.Write(flagsBuffer, 0, bytes);
+
+					//write non-null records
+					var recBinary = stream.ToArray();
+					writer.Write(recBinary, 0, recBinary.Length);
+				}
+
+				//write row count
+				writer.BaseStream.Position = 0;
+				writer.Write(rowCount);
+
+				Console.WriteLine($"writen {rowCount} row(s)");
+			}
+			return true;
 		}
 
 		static void TreeTests()
@@ -368,6 +531,25 @@ namespace ConsoleApp
 				}
 			}
 
+		}
+
+		static void TestDynamic()
+		{
+			var values = new Dictionary<string, object>();
+			values.Add("Title", "Hello World!");
+			values.Add("Text", "My first post");
+			values.Add("Tags", new[] { "hello", "world" });
+			values.Add("Age", 10);
+
+			var post = new DynamicEntity(values);
+
+			dynamic dynPost = post;
+			var text = dynPost.Text;
+			var g = dynPost["Text"];
+			var age = dynPost["Age"];
+			var k = dynPost["lo"];
+
+			var age2 = dynPost.Get<int>("Age");
 		}
 	}
 

@@ -8,6 +8,16 @@ SELECT a.agency_id, agency_name FROM agency a
 
 SELECT a.agency_id, agency_name FROM agency a WHERE a.agency_id = "NJB" AND agency_name = "what"
 
+JOIN queries
+---------------------------------------------------------------------------------------------
+
+SELECT * FROM agency a 
+	INNER JOIN routes r ON a.agency_id = r.route_id
+	WHERE r.route_id > 45
+
+
+
+
 general queries
 ---------------------------------------------------------------------------------------------
 
