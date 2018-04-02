@@ -1,4 +1,281 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="CsvDb.CsvDb" BaseTypeListCollapsed="true">
+    <Position X="0.5" Y="0.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAhIAgACAIAAAGABAAQIQEACAAIAAVACEQGAABAAA=</HashCode>
+      <FileName>CsvDb.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="CsvDb.DbSchemaConfig">
+    <Position X="8" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>IAAAhIAAAAAgAAAAAAAAQAQAAAAAAAgAAAAAEAAAAAA=</HashCode>
+      <FileName>CsvDb.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.DbTable">
+    <Position X="2.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>ABAAAQAAAEAAAEAEgABAAAQAAAAAAAAACQAAAEhAgAA=</HashCode>
+      <FileName>CsvDb.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.DbColumn">
+    <Position X="4.5" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>QBAABBAAgABAAAQMAEAAQAQAgAAAAAAAAQUAAAAAABA=</HashCode>
+      <FileName>CsvDb.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.DbTablePager">
+    <Position X="6.25" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAgAAIAAAAAAAEAAAAAAQAAAAEAAAAAAAAAQAAAAA=</HashCode>
+      <FileName>CsvDb.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.BTreePageBase&lt;T&gt;" Collapsed="true">
+    <Position X="1.75" Y="7.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAUAAAAAAAQAAABQGAAAAACAA=</HashCode>
+      <FileName>BTreePage.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.BTreePageNode&lt;T&gt;" Collapsed="true">
+    <Position X="2.75" Y="8.75" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAACAAAAAAEAAAAAAAQAAADQCAAAAAAAA=</HashCode>
+      <FileName>BTreePage.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.BTreePageItems&lt;T&gt;" Collapsed="true">
+    <Position X="0.5" Y="8.75" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAIAAAAAAAAACAAAAAAAEAAAAAAAQAAABQCAAAAAgAA=</HashCode>
+      <FileName>BTreePage.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.DbIndexItems&lt;T&gt;" Collapsed="true">
+    <Position X="2.75" Y="5.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAQAAAEEIAAAAgCEAAAAAAAAAYAAAAAAEAAAAQAAA=</HashCode>
+      <FileName>DbIndexItems.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.MetaItemsPage&lt;T&gt;" Collapsed="true">
+    <Position X="4.75" Y="5.75" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAABAAQCAgAAEAAQEAAAJAAAAAAAAAAEAAAgAA=</HashCode>
+      <FileName>DbIndexItems.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.DbIndexTree&lt;T&gt;" Collapsed="true">
+    <Position X="6" Y="8" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>BAAAAAAAAEACADAggAAAEAAAAAAQAAAAAAEAAAAQAAA=</HashCode>
+      <FileName>DbIndexTree.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.PageIndexNodeBase&lt;T&gt;" Collapsed="true">
+    <Position X="7" Y="5.75" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAAAAAAABAAAEAAAAAAAAAAAAAEAQAAAAAAAAA=</HashCode>
+      <FileName>DbIndexTree.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="CsvDb.PageIndexNode&lt;T&gt;" Collapsed="true">
+    <Position X="8" Y="7" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAABQEAAAAEAAAAAAAAAAACQCgEAAAAAA=</HashCode>
+      <FileName>DbIndexTree.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.PageIndexItems&lt;T&gt;" Collapsed="true">
+    <Position X="5.75" Y="7" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAABAEAAAAAAAAAAAAAAAAAQAAAAAAgAA=</HashCode>
+      <FileName>DbIndexTree.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQuery" Collapsed="true">
+    <Position X="0.75" Y="13.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAAAEAAAAwEAAAAAQAACAEAAAgAAAAAAAgAEAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.SqlJoin" Collapsed="true">
+    <Position X="0.75" Y="14.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAEAAAAQAAAAAAAAAAQAQAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryColumnSelector" Collapsed="true">
+    <Position X="3" Y="13.75" Width="2" />
+    <TypeIdentifier>
+      <HashCode>BAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAIAAACAAgAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.NameIdentifier" Collapsed="true">
+    <Position X="5.75" Y="14" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAQAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryTableIdentifier" Collapsed="true">
+    <Position X="4.25" Y="15.25" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAEAAAAQAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryColumnIdentifier" Collapsed="true">
+    <Position X="7.25" Y="15.25" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAEAABAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryExpressionItem" Collapsed="true">
+    <Position X="6" Y="9.5" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryOperand" Collapsed="true">
+    <Position X="8.5" Y="10.75" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAgAAAAAAAAAAAEAAAAAAQAAAAAAAAAAAAgACAAEAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryTableColumnOperand" Collapsed="true">
+    <Position X="6.25" Y="12.25" Width="2.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAEAABAAASAAAAAAAAAAAAgQCAAEAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryConstantOperand" Collapsed="true">
+    <Position X="9" Y="12.25" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAACAAAAAgAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryStringOperand" Collapsed="true">
+    <Position X="8" Y="13.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAEAAAAAAQAAAAEAAAAAAAgACAAEAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryNumberOperand" Collapsed="true">
+    <Position X="10.5" Y="13.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>ABAAAAAAAAAAAAAAAAAABAQAAAABAAAAAAAgACAAEAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryOperator" Collapsed="true">
+    <Position X="0.5" Y="10.75" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAABAAAAAAAAAEAAAAAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryExpressionBase" Collapsed="true">
+    <Position X="2.75" Y="10.75" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryExpression" Collapsed="true">
+    <Position X="1.75" Y="12.25" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAABAAAAEAAAAQgAAAAAAAAAACACAAAAAIQA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CsvDb.Query.DbQueryLogical" Collapsed="true">
+    <Position X="4" Y="12.25" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAABAAAAEAAAQAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Struct Name="CsvDb.PageIndexTreeHeader" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="7.75" Y="8" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAAEAAAgAAAAMAAAAAAAgAAAAAAAAAgAAAAAAA=</HashCode>
+      <FileName>DbIndexTree.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Struct>
+  <Interface Name="CsvDb.IBuffered" Collapsed="true">
+    <Position X="10" Y="2.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>DbIndexTree.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Interface Name="CsvDb.Query.INameIdentifier" Collapsed="true">
+    <Position X="0.75" Y="15.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAQAAAAAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Enum Name="CsvDb.DbOption">
+    <Position X="8.5" Y="0.5" Width="1.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAIAAAAAAAgAAAAAAAAEAAAAAAAAAAAAA=</HashCode>
+      <FileName>CsvDb.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Enum Name="CsvDb.DbIndexItemsPolicy">
+    <Position X="6.25" Y="0.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAIEAAAAAAAAAAAAAAAAAAAAAAAAAAIA=</HashCode>
+      <FileName>CsvDb.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Enum Name="CsvDb.MetaIndexType" Collapsed="true">
+    <Position X="10" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAEAAAA=</HashCode>
+      <FileName>DbIndexTree.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Enum Name="CsvDb.Query.DbQueryExpressionItemType" Collapsed="true">
+    <Position X="3" Y="17" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAQAAAAAAEAIAA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Enum Name="CsvDb.Query.DbQueryConditionOper" Collapsed="true">
+    <Position X="1.25" Y="17" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAgAAAAAAAAAAAAEAAQQAAAAQAAAE=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Enum Name="CsvDb.Query.DbQueryLogic" Collapsed="true">
+    <Position X="1.25" Y="17.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAgIAAAAAAAAAAAAACA=</HashCode>
+      <FileName>DbQuery.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
   <Font Name="Segoe UI" Size="9" />
 </ClassDiagram>

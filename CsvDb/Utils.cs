@@ -17,6 +17,23 @@ namespace CsvDb
 	{
 		//https://msdn.microsoft.com/en-us/magazine/mt808499.aspx
 
+		public static bool IsNumeric(this DbColumnTypeEnum type)
+		{
+			switch (type)
+			{
+				case DbColumnTypeEnum.Byte:
+				case DbColumnTypeEnum.Int16:
+				case DbColumnTypeEnum.Int32:
+				case DbColumnTypeEnum.Int64:
+				case DbColumnTypeEnum.Float:
+				case DbColumnTypeEnum.Double:
+				case DbColumnTypeEnum.Decimal:
+					return true;
+				default:
+					return false;
+			}
+		}
+
 		public static string Difference(this TimeSpan span)
 		{
 			if (span.Seconds == 0)
@@ -63,7 +80,7 @@ namespace CsvDb
 
 		public static string ToYesNo(this bool value) => value ? "Yes" : "No";
 
-		public static string IfYes(this bool value, string text) => value ? text : String.Empty;
+		public static string IfTrue(this bool value, string text) => value ? text : String.Empty;
 
 		public static IEnumerable<K> GetAllKeysAs<T, K>(
 			this IEnumerable<KeyValuePair<T, int>> collection)
@@ -104,15 +121,32 @@ namespace CsvDb
 		{
 			switch (keyType)
 			{
+				case DbColumnTypeEnum.Char:
+					//
+					return reader.ReadChar();
 				case DbColumnTypeEnum.Byte:
+					//
 					return reader.ReadByte();
 				case DbColumnTypeEnum.Int16:
+					//
 					return reader.ReadInt16();
 				case DbColumnTypeEnum.Int32:
+					//
 					return reader.ReadInt32();
+				case DbColumnTypeEnum.Int64:
+					//
+					return reader.ReadInt64();
+				case DbColumnTypeEnum.Float:
+					//
+					return reader.ReadSingle();
 				case DbColumnTypeEnum.Double:
+					//
 					return reader.ReadDouble();
+				case DbColumnTypeEnum.Decimal:
+					//
+					return reader.ReadDecimal();
 				case DbColumnTypeEnum.String:
+					//
 					var length = reader.ReadByte();
 					var chars = reader.ReadChars(length);
 					return new string(chars);
@@ -126,6 +160,10 @@ namespace CsvDb
 			var typeName = key.GetType().Name;
 			switch (typeName)
 			{
+				case nameof(DbColumnTypeEnum.Char):
+					char valueChar = Convert.ToChar(key);
+					writer.Write(valueChar);
+					break;
 				case nameof(DbColumnTypeEnum.Byte):
 					byte valueByte = Convert.ToByte(key); //.ChangeType(key, TypeCode.Byte);
 					writer.Write(valueByte);
@@ -138,9 +176,21 @@ namespace CsvDb
 					var valueInt32 = Convert.ToInt32(key);
 					writer.Write(valueInt32);
 					break;
+				case nameof(DbColumnTypeEnum.Int64):
+					var valueInt64 = Convert.ToInt64(key);
+					writer.Write(valueInt64);
+					break;
+				case nameof(DbColumnTypeEnum.Float):
+					var valueFloat = Convert.ToSingle(key);
+					writer.Write(valueFloat);
+					break;
 				case nameof(DbColumnTypeEnum.Double):
 					var valueDouble = Convert.ToDouble(key);
 					writer.Write(valueDouble);
+					break;
+				case nameof(DbColumnTypeEnum.Decimal):
+					var valueDecimal = Convert.ToDecimal(key);
+					writer.Write(valueDecimal);
 					break;
 				case nameof(DbColumnTypeEnum.String):
 					var valueString = Convert.ToString(key);
@@ -164,7 +214,7 @@ namespace CsvDb
 			byte length = (byte)text.Length;
 			writer.Write(length);
 			var chars = text.ToCharArray();
-			
+
 			//simple encode
 			for (var i = 0; i < length; i++)
 			{
@@ -183,14 +233,12 @@ namespace CsvDb
 				throw new ArgumentException("corrupted string reading");
 			}
 			//simple decode
-			for(var i = 0; i < length; i++)
+			for (var i = 0; i < length; i++)
 			{
 				chars[i] = (char)((byte)(chars[i]) ^ MASK);
 			}
 			return new string(chars);
 		}
-
-		public static string IfTrue(this bool value, string ifTrue) => value ? ifTrue : "";
 
 		/// <summary>
 		/// Graps an string with "" if it has a comma inside

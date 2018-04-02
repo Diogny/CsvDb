@@ -2,23 +2,181 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using io = System.IO;
 
 namespace CsvDb
 {
-	public class DbVisualizer : IDisposable
+	public abstract class DbVisualizer : IDisposable
 	{
 		public DbQuery Query { get; protected internal set; }
 
 		public int ColumnCount { get; private set; }
 
+		public DbColumnTypeEnum[] ColumnTypes { get; private set; }
+
+		public abstract IEnumerable<object[]> Execute();
+
+		public abstract bool IsValid(CsvDb db);
+
+		protected internal string Path = String.Empty;
+
+		protected internal string Extension = String.Empty;
+
+		/// <summary>
+		/// Abstract base type of db visualizer, must be disposed to release resources
+		/// </summary>
+		/// <param name="query"></param>
+		/// <param name="extension"></param>
+		internal DbVisualizer(DbQuery query, string extension)
+		{
+			if ((Query = query) == null)
+			{
+				throw new ArgumentException("Query cannot be null or undefined");
+			}
+			//default to CSV
+			Extension = String.IsNullOrWhiteSpace(extension) ? "csv" : extension.Trim();
+			//path to file
+			Path = io.Path.Combine(Query.Database.BinaryPath, $"{Query.FromTableIdentifier.Table.Name}.{Extension}");
+			//save column count
+			ColumnCount = Query.FromTableIdentifier.Table.Columns.Count;
+			//
+			ColumnTypes = Query.FromTableIdentifier.Table.Columns
+				.Select(c => Enum.Parse<DbColumnTypeEnum>(c.Type)).ToArray();
+		}
+
+		public abstract void Dispose();
+
+		public static DbVisualizer Create(DbQuery query)
+		{
+			if (query == null)
+			{
+				return null;
+			}
+			if ((query.Database.Flags & DbSchemaConfigEnum.Binary) != 0)
+			{
+				return new DbBinVisualizer(query);
+			}
+			else
+			{
+				return new DbCsvVisualizer(query);
+			}
+		}
+
+	}
+
+	public class DbBinVisualizer : DbVisualizer
+	{
+		public int RowCount { get; private set; }
+
+		public UInt64 Mask { get; private set; }
+
+		protected internal io.BinaryReader reader = null;
+
+		internal DbBinVisualizer(DbQuery query)
+			: base(query, "bin")
+		{
+			//open reader
+			reader = new io.BinaryReader(io.File.OpenRead(Path));
+		}
+
+		public override IEnumerable<object[]> Execute()
+		{
+			var collection = Query.Execute();
+
+			foreach (var record in ReadRecords(collection))
+			{
+				yield return record;
+			}
+		}
+
+		IEnumerable<object[]> ReadRecords(IEnumerable<Int32> offsetCollection)
+		{
+			var mainMask = Query.FromTableIdentifier.Table.RowMask;
+			var bytes = Query.FromTableIdentifier.Table.RowMaskLength;
+
+			foreach (var offs in offsetCollection)
+			{
+				//point to record offset
+				reader.BaseStream.Position = offs;
+
+				//read record 
+				var buffer = new byte[sizeof(UInt64)];
+				reader.Read(buffer, 0, bytes);
+				var recordMask = BitConverter.ToUInt64(buffer, 0);
+				//copy main
+				var bitMask = mainMask;
+
+				var record = new object[ColumnCount];
+
+				for (var i = 0; i < ColumnCount; i++)
+				{
+					var colType = ColumnTypes[i];
+
+					if ((recordMask & bitMask) == 0)
+					{
+						//not null
+						switch (colType)
+						{
+							case DbColumnTypeEnum.Char:
+								record[i] = reader.ReadChar();
+								break;
+							case DbColumnTypeEnum.Byte:
+								record[i] = reader.ReadByte();
+								break;
+							case DbColumnTypeEnum.Int16:
+								record[i] = reader.ReadInt16();
+								break;
+							case DbColumnTypeEnum.Int32:
+								record[i] = reader.ReadInt32();
+								break;
+							case DbColumnTypeEnum.Int64:
+								record[i] = reader.ReadInt64();
+								break;
+							case DbColumnTypeEnum.Float:
+								record[i] = reader.ReadSingle();
+								break;
+							case DbColumnTypeEnum.Double:
+								record[i] = reader.ReadDouble();
+								break;
+							case DbColumnTypeEnum.Decimal:
+								record[i] = reader.ReadDecimal();
+								break;
+							case DbColumnTypeEnum.String:
+								record[i] = reader.ReadString();
+								break;
+						}
+					}
+					bitMask >>= 1;
+				}
+				//return record
+				yield return record;
+			}
+		}
+
+		public override bool IsValid(CsvDb db)
+		{
+			return (db != null) && (db.Flags & DbSchemaConfigEnum.Binary) != 0;
+		}
+
+		public override void Dispose()
+		{
+			if (reader != null)
+			{
+				reader.Dispose();
+			}
+		}
+
+	}
+
+	public class DbCsvVisualizer : DbVisualizer
+	{
 		//char buffer
 		char[] buffer = new char[1024];
 		int charIndex = 0;
 		StringBuilder sb = new StringBuilder();
-		io.StreamReader reader = null;
 
-		string path = String.Empty;
+		protected internal io.StreamReader reader = null;
 
 		void FillBuffer()
 		{
@@ -44,20 +202,14 @@ namespace CsvDb
 			return buffer[charIndex];
 		}
 
-		public DbVisualizer(DbQuery query)
+		internal DbCsvVisualizer(DbQuery query)
+			: base(query, "csv")
 		{
-			if ((Query = query) == null)
-			{
-				throw new ArgumentException("Query cannot be null or undefined");
-			}
-			path = io.Path.Combine(Query.Database.BinaryPath, $"{Query.FromTableIdentifier.Table.Name}.csv");
-
-			reader = new io.StreamReader(path);
-
-			ColumnCount = Query.FromTableIdentifier.Table.Columns.Count;
+			//open reader
+			reader = new io.StreamReader(Path);
 		}
 
-		public IEnumerable<string[]> Execute()
+		public override IEnumerable<object[]> Execute()
 		{
 			var collection = Query.Execute();
 
@@ -74,7 +226,7 @@ namespace CsvDb
 			var count = ColumnCount;
 			var record = new string[count];
 			var columnIndex = 0;
-			
+
 			sb.Length = 0;
 			char ch = (char)0;
 
@@ -176,7 +328,12 @@ namespace CsvDb
 			return list;
 		}
 
-		public void Dispose()
+		public override bool IsValid(CsvDb db)
+		{
+			return (db != null) && (db.Flags & DbSchemaConfigEnum.Csv) != 0;
+		}
+
+		public override void Dispose()
 		{
 			if (reader != null)
 			{

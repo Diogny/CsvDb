@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using con = System.Console;
 
 namespace Csv.CMS.ConsApp
 {
@@ -22,13 +23,13 @@ namespace Csv.CMS.ConsApp
 				//.AddInMemoryCollection(dict)
 				.Build();
 
-			// Console.WriteLine($"Hello {Configuration["Profile:MachineName"]}");
+			// con.WriteLine($"Hello {Configuration["Profile:MachineName"]}");
 			//  var left = Configuration.GetValue<int>("App:MainWindow:Left", 80);
 
 			SqlQueryExecute();
 
-			Console.WriteLine("\r\nPress any key to finish!");
-			Console.ReadKey();
+			con.WriteLine("\r\nPress any key to finish!");
+			con.ReadKey();
 		}
 
 		static bool SqlQueryExecute()
@@ -36,9 +37,10 @@ namespace Csv.CMS.ConsApp
 			var availableDatabases = new string[]
 			{
 				"data-full",
-				"data",
-				"data-light",
-				"data-extra-light"
+				//"data",
+				//"data-light",
+				//"data-extra-light",
+				"data-bin"
 			};
 
 			var sw = new System.Diagnostics.Stopwatch();
@@ -49,7 +51,7 @@ namespace Csv.CMS.ConsApp
 			{
 				if ((obj == null) == testFor)
 				{
-					Console.WriteLine(msg);
+					con.WriteLine(msg);
 					return true;
 				}
 				return false;
@@ -68,7 +70,7 @@ namespace Csv.CMS.ConsApp
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine($"error: {ex.Message}");
+					con.WriteLine($"error: {ex.Message}");
 					return null;
 				}
 			}
@@ -76,63 +78,59 @@ namespace Csv.CMS.ConsApp
 			//Action displayHelp = () =>
 			void displayHelp()
 			{
-				// (H)elp
-				// (C)lear console
-				// (Q)uit
-				//
-				// (U)se [database].[table]
-				// (K)ill/close database
-				// (S)tructure									-database info
-				// (D)isplay [table]						-table info
-				// (D)isplay [table].column			-table column info
-				// (S)earch											-query search database
-				// (L)ist												-list available databases
-				// (L)ist [table]								-list al records of table
-				//
-				Console.WriteLine("");
-				Console.WriteLine("Menu");
-				Console.WriteLine(" (H)elp");
-				Console.WriteLine(" Clea(r)");
-				Console.WriteLine(" (Q)uit");
+				con.WriteLine("	┌────────────────────────────────┬─────────────────────────────┬─────────────────────────────┐");
+				con.WriteLine("	│ (H)elp                         │ Clea(r)                     │ (Q)uit                      │");
+				con.WriteLine("	├────────────────────────────────┴─────────────┬───────────────┴─────────────────────────────┤");
+				con.WriteLine("	│ (D)isplay available database(s)              │                                             │");
+				con.WriteLine("	│ (M)ount database                             │ (K)ill/close database                       │");
+				con.WriteLine("	│ (S)earch Database                            │ (E)execute Queries                          │");
+				con.WriteLine("	│ Display (I)nformation of Database            │ Display (T)ables Info                       │");
+				con.WriteLine("	│ Display Index Tree (N)ode Structure          │ Display (I)ndex Tree Structure              │");
+				con.WriteLine("	│ (X)treme class                               │                                             │");
+				con.WriteLine("	├──────────────────────────────────────────────┴─────────────────────────────────────────────┤");
+				con.WriteLine("	│  SELECT [*] | [t0.col0, t0.col1,..] | [COUNT|AVG|SUM](col)                                 │");
+				con.WriteLine("	│      FROM table [t0]                                                                       │");
+				con.WriteLine("	│      WHERE                                                                                 │");
+				con.WriteLine("	│      [INNER|CROSS|(LEFT|RIGHT|FULL) OUTER] JOIN table0 t0 ON expr:<left> oper <right>      │");
+				con.WriteLine("	└────────────────────────────────────────────────────────────────────────────────────────────┘");
 
-				Console.WriteLine(" (D)isplay available database(s)");
-				Console.WriteLine(" (M)ount database");
-				Console.WriteLine(" (K)ill/close database");
-				Console.WriteLine(" (S)earch Database");
-				Console.WriteLine(" Display (I)nformation of Database");
-				Console.WriteLine(" Display (T)ables Info");
-				Console.WriteLine(" Display Index Tree (N)ode Structure");
-				Console.WriteLine(" Display (I)ndex Tree Structure");
-				Console.WriteLine(" (E)execute Queries");
-				Console.WriteLine(" (X)treme class");
+				//	SELECT * FROM [table] t
+				//		WHERE t.Name == ""
+				//
+				// *\t[table]\t[[column],==,[value]>]
+				//SELECT route_id, rout_short_name FROM routes r
+				//		WHERE r.agency_id == "NJT" AND
+				//					r.route_type == 2
+				// route_id,route_short_name\t[routes]\t[agency_id],==,"NJT"\tAND\t[route_type],==,2
+
 			}
 
 			System.Reflection.Assembly assembly = null;
 
-			//Console.TreatControlCAsInput = true;
+			//con.TreatControlCAsInput = true;
 			bool end = false;
 			//displayHelp();
 			while (!end)
 			{
-				Console.Write(">");
+				con.Write(">");
 
-				while (Console.KeyAvailable == false)
+				while (con.KeyAvailable == false)
 					Thread.Sleep(250); // Loop until input is entered.
 
-				ConsoleKeyInfo key = Console.ReadKey();
-				Console.WriteLine();
+				ConsoleKeyInfo key = con.ReadKey();
+				con.WriteLine();
 				switch (key.Key)
 				{
 					case ConsoleKey.X:
 						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 						{
-							Console.Write("\r\n  database table as class: ");
-							var tbleName = Console.ReadLine();
+							con.Write("\r\n  database table as class: ");
+							var tbleName = con.ReadLine();
 							DbTable table = db.Table(tbleName);
 							//
 							if (table == null)
 							{
-								Console.WriteLine($"cannot find table [{tbleName}]");
+								con.WriteLine($"cannot find table [{tbleName}]");
 							}
 							else
 							{
@@ -141,11 +139,11 @@ namespace Csv.CMS.ConsApp
 									assembly = Utils.CreateDbClasses(db);
 									if (assembly == null)
 									{
-										Console.WriteLine("Cannot generate database table classes");
+										con.WriteLine("Cannot generate database table classes");
 									}
 									else
 									{
-										Console.WriteLine("database table classes generated succesfully!");
+										con.WriteLine("database table classes generated succesfully!");
 									}
 								}
 								if (assembly != null)
@@ -179,7 +177,7 @@ namespace Csv.CMS.ConsApp
 									//don't get it
 									var classType = Type.GetType($"CsvDb.Dynamic.{tbleName}");
 
-									Console.WriteLine("ok");
+									con.WriteLine("ok");
 								}
 							}
 
@@ -188,13 +186,13 @@ namespace Csv.CMS.ConsApp
 					case ConsoleKey.E:
 						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 						{
-							Console.WriteLine("Execute database queries:\r\n  -empty query ends");
+							con.WriteLine("Execute database queries:\r\n  -empty query ends");
 							string query = null;
 							bool finish = false;
 							do
 							{
-								Console.Write("\r\n  query: ");
-								query = Console.ReadLine();
+								con.Write("\r\n  query: ");
+								query = con.ReadLine();
 								if (!(finish = String.IsNullOrWhiteSpace(query)))
 								{
 									try
@@ -203,12 +201,12 @@ namespace Csv.CMS.ConsApp
 										sw.Restart();
 										var dbQuery = parser.Parse(db, query);
 										sw.Stop();
-										Console.WriteLine("    query parsed on {0} ms", sw.ElapsedMilliseconds);
-										Console.WriteLine($"     {dbQuery}");
+										con.WriteLine("    query parsed on {0} ms", sw.ElapsedMilliseconds);
+										con.WriteLine($"     {dbQuery}");
 									}
 									catch (Exception ex)
 									{
-										Console.WriteLine($"    error: {ex.Message}");
+										con.WriteLine($"    error: {ex.Message}");
 									}
 								}
 							} while (!finish);
@@ -218,8 +216,8 @@ namespace Csv.CMS.ConsApp
 						//display index structure
 						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 						{
-							Console.Write("[table].index: ");
-							var tbleColumn = Console.ReadLine();
+							con.Write("[table].index: ");
+							var tbleColumn = con.ReadLine();
 							var vis = new Visualizer(db);
 							vis.DisplayItemsPageStructureInfo(tbleColumn);
 						}
@@ -228,8 +226,8 @@ namespace Csv.CMS.ConsApp
 						//display index structure
 						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 						{
-							Console.Write("[table].index: ");
-							var tbleColumn = Console.ReadLine();
+							con.Write("[table].index: ");
+							var tbleColumn = con.ReadLine();
 							var vis = new Visualizer(db);
 							vis.DisplayTreeNodePageStructureInfo(tbleColumn);
 						}
@@ -237,18 +235,18 @@ namespace Csv.CMS.ConsApp
 					case ConsoleKey.M:
 						if (!IsObjectNull(db, $"\r\nplease first unmount current database", testFor: false))
 						{
-							Console.Write("database name >");
-							var dbName = Console.ReadLine();
+							con.Write("database name >");
+							var dbName = con.ReadLine();
 							if ((db = OpenDatabase(dbName: dbName, logTimes: true)) != null)
 							{
-								Console.WriteLine($"\r\nUsing database: {db.Name}");
+								con.WriteLine($"\r\nUsing database: {db.Name}{db.IsBinary.IfTrue(" [Binary]")}{db.IsCsv.IfTrue(" [Csv]")}");
 							}
 						}
 						break;
 					case ConsoleKey.K:
 						if (!IsObjectNull(db, $" no database to close"))
 						{
-							Console.WriteLine($" closing database [{db.Name}]");
+							con.WriteLine($" closing database [{db.Name}]");
 							db.Dispose();
 							db = null;
 						}
@@ -264,7 +262,7 @@ namespace Csv.CMS.ConsApp
 						{
 							txt = $"{prefix}{txt}";
 						}
-						Console.WriteLine($" database(s){txt}");
+						con.WriteLine($" database(s){txt}");
 						break;
 					case ConsoleKey.H:
 						displayHelp();
@@ -275,14 +273,14 @@ namespace Csv.CMS.ConsApp
 						{
 							foreach (var table in db.Tables)
 							{
-								var text = $" [{table.Name}]{(table.Multikey.IfYes(" [Multikey] "))}{(table.Rows > 0 ? $" {table.Rows} row(s)" : "")}";
-								Console.WriteLine(text.ToLower());
+								var text = $" [{table.Name}]{(table.Multikey.IfTrue(" [Multikey] "))}{(table.Rows > 0 ? $" {table.Rows} row(s)" : "")}";
+								con.WriteLine(text.ToLower());
 								//show columns
 								foreach (var col in table.Columns)
 								{
 									text = $"   {col.Name}: {col.Type}" +
-									 $"  {(col.Key.IfYes(" [Key]"))}{(col.Indexed.IfYes(" [Indexed]"))}{(col.Unique.IfYes(" [Unique]"))} {(col.PageCount > 0 ? $" {col.PageCount} page(s)" : "")}";
-									Console.WriteLine(text.ToLower());
+									 $"  {(col.Key.IfTrue(" [Key]"))}{(col.Indexed.IfTrue(" [Indexed]"))}{(col.Unique.IfTrue(" [Unique]"))} {(col.PageCount > 0 ? $" {col.PageCount} page(s)" : "")}";
+									con.WriteLine(text.ToLower());
 								}
 							}
 						}
@@ -292,65 +290,66 @@ namespace Csv.CMS.ConsApp
 						{
 							if (!IsObjectNull(db, " there's no database in use"))
 							{
-								Console.Write(" query >");
-								var query = Console.In.ReadLine();
-								Console.WriteLine();
-								//Console.WriteLine($" processing: {query}");
+								con.Write(" query >");
+								var query = con.In.ReadLine();
+								con.WriteLine();
+								//con.WriteLine($" processing: {query}");
 
 								var parser = new DbQueryParser();
 								sw.Start();
 								var dbQuery = parser.Parse(db, query);
 								sw.Stop();
-								Console.WriteLine(" query parsed on {0} ms", sw.ElapsedMilliseconds);
-								Console.WriteLine($"  {dbQuery}");
+								con.WriteLine(" query parsed on {0} ms", sw.ElapsedMilliseconds);
+								con.WriteLine($"  {dbQuery}");
 
 								//to calculate times
 								sw.Restart();
 
-								var visualizer = new DbVisualizer(dbQuery);
-								var rows = visualizer.Execute();
-								visualizer.Dispose();
+								var visualizer = DbVisualizer.Create(dbQuery);
+								var rowsEnumerable = visualizer.Execute();
 
 								sw.Stop();
-								var rowCount = rows.Count();
-								Console.Write($" {rowCount} row(s) ");
-								Console.WriteLine("retrieved on {0} ms", sw.ElapsedMilliseconds);
+								var ellapsedExecuted = $"query executed on {sw.ElapsedMilliseconds} ms";
+
+								var rowCount = 0;
 
 								//header
 								sw.Restart();
 
 								var header = String.Join("|", dbQuery.Columns.Header);
-								Console.WriteLine($"\r\n{header}");
-								Console.WriteLine($"{new string('-', header.Length)}");
+								con.WriteLine($"\r\n{header}");
+								con.WriteLine($"{new string('-', header.Length)}");
 
-								int visualizedRows = 0;
 								int pagerRows = 0;
 								var unstop = false;
+								var rows = rowsEnumerable.ToList();
+								sw.Stop();
+								var ellapsedRetrieved = $" {rowCount} row(s) retrieved on {sw.ElapsedMilliseconds} ms";
+
 								foreach (var record in rows)
 								{
-									visualizedRows++;
-									Console.WriteLine($"{String.Join(",", record)}");
+									rowCount++;
+									con.WriteLine($"{String.Join(",", record)}");
 
 									if (!unstop && pagerRows++ >= 32)
 									{
 										pagerRows = 0;
-										Console.Write("press any key...");
-										var keyCode = Console.ReadKey();
-										Console.WriteLine();
+										con.Write("press any key...");
+										var keyCode = con.ReadKey();
+										con.WriteLine();
 										if (keyCode.Key == ConsoleKey.Escape)
 										{
 											unstop = true;
 										}
 									}
 								}
-
-								sw.Stop();
-								Console.WriteLine($"\r\n {visualizedRows} row(s) displayed on {0} ms", sw.ElapsedMilliseconds);
+								visualizer.Dispose();
+								con.WriteLine($"\r\n {ellapsedExecuted}\r\n{ellapsedRetrieved}");
 							}
 						}
 						catch (Exception ex)
 						{
-							Console.WriteLine($"error: {ex.Message}");
+							con.WriteLine($"error: {ex.Message}");
 						}
 						break;
 					case ConsoleKey.Q:
@@ -361,10 +360,10 @@ namespace Csv.CMS.ConsApp
 						}
 						break;
 					case ConsoleKey.R:
-						Console.Clear();
+						con.Clear();
 						break;
 					default:
-						Console.WriteLine(" -invalid option, press [h] for help");
+						con.WriteLine(" -invalid option, press [h] for help");
 						break;
 				}
 			}
@@ -403,13 +402,13 @@ namespace Csv.CMS.ConsApp
 				if (logTimes)
 				{
 					sw.Stop();
-					Console.WriteLine(" opened on {0} ms", sw.ElapsedMilliseconds);
+					con.WriteLine(" opened on {0} ms", sw.ElapsedMilliseconds);
 				}
 			}
 			catch (Exception ex)
 			{
 				db = null;
-				Console.WriteLine($"error: {ex.Message}");
+				con.WriteLine($"error: {ex.Message}");
 			}
 			return db;
 		}

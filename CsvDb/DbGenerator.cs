@@ -7,36 +7,92 @@ using io = System.IO;
 
 namespace CsvDb
 {
+	/// <summary>
+	/// Database generator
+	/// </summary>
 	public class DbGenerator
 	{
-		public string ZipFile { get; protected internal set; }
+		public string ZipFile { get; private set; }
 
-		public CsvDb Database { get; protected internal set; }
+		public CsvDb Database { get; private set; }
+
+		public bool IsBinary { get { return Database.IsBinary; } }
+
+		public string Sufix { get; private set; }
 
 		public static Int32 ItemsPageStart => 8;
 
-		public DbGenerator(CsvDb db, string zipfilepath, bool removeAll = true)
+		/// <summary>
+		/// Creates a database generator for compiling only
+		/// </summary>
+		/// <param name="db">database</param>
+		/// <param name="removeAll">start from scratch, clean database directory</param>
+		public DbGenerator(CsvDb db, bool removeAll = true)
 		{
-			if ((Database = db) == null ||
-				!System.IO.File.Exists(ZipFile = zipfilepath) || !zipfilepath.EndsWith(".zip"))
+			if ((Database = db) == null)
 			{
-				throw new ArgumentException($"Csv Database db or zip file path donot exists: {zipfilepath}");
+				throw new ArgumentException($"Csv Database not provided");
 			}
-			// remove all but the __tables.json file
+			ZipFile = null;
 
+			Sufix = IsBinary ? ".bin" : String.Empty;
+
+			// remove all but the __tables.json file
+			//this's for cleaning, start from scratch
 
 		}
 
+		/// <summary>
+		/// Creates a database generator for everything, generate text data and compiling
+		/// </summary>
+		/// <param name="db">database</param>
+		/// <param name="zipfilepath">zZIP file with database data</param>
+		/// <param name="removeAll">start from scratch, clean database directory</param>
+		public DbGenerator(CsvDb db, string zipfilepath, bool removeAll = true)
+			: this(db, removeAll: removeAll)
+		{
+			if (!io.File.Exists(ZipFile = zipfilepath) || !zipfilepath.EndsWith(".zip"))
+			{
+				throw new ArgumentException($"ZIP file path doesnot exists: {zipfilepath}");
+			}
+		}
+
+		#region Schemas
+
+		/// <summary>
+		/// Returns the json schema of the system tables
+		/// </summary>
+		/// <returns></returns>
+		public static Newtonsoft.Json.Schema.JSchema Schema()
+		{
+			var generator = new Newtonsoft.Json.Schema.Generation.JSchemaGenerator();
+			var schema = generator.Generate(typeof(DbSchemaConfig));
+
+			return schema;
+		}
+
+		#endregion
+
 		#region Text Data Generator
 
-		public void GenerateTxtData()
+		/// <summary>
+		/// Generate database starting data
+		/// </summary>
+		public void Generate()
 		{
+			if (String.IsNullOrWhiteSpace(ZipFile))
+			{
+				throw new ArgumentException("ZIP file not provided");
+			}
+
+			var methodName = IsBinary ?
+				nameof(DbGenerator.GenerateBinTableText) :
+				nameof(DbGenerator.GenerateCsvTableText);
+
 			var zip = io.Compression.ZipFile.OpenRead(ZipFile);
 			//generic method
-			MethodInfo processTable_Method =
-				this.GetType()
-					.GetMethod(nameof(DbGenerator.GenerateCsvTableText),
-					BindingFlags.Instance | BindingFlags.NonPublic);
+			MethodInfo method =
+				this.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
 
 			foreach (var table in Database.Tables)
 			{
@@ -45,9 +101,7 @@ namespace CsvDb
 				Console.WriteLine($"\r\n  table: {table.Name}\r\n  processing file ({csvfile})");
 
 				//get zip entry
-				var zipentryfilename = io.Path.ChangeExtension(table.FileName, ".txt");
-
-				var entry = zip.GetEntry(zipentryfilename);
+				var entry = zip.GetEntry(io.Path.ChangeExtension(table.FileName, ".txt"));
 				if (entry == null)
 				{
 					Console.WriteLine($"  cannot find: {table.FileName} CSV file");
@@ -60,9 +114,9 @@ namespace CsvDb
 					//read CSV file data
 					var csv = OpenCsvFile(entry);
 					//call generic table processing method
-					MethodInfo generic = processTable_Method.MakeGenericMethod(table.Type);
+					MethodInfo genMethod = method.MakeGenericMethod(table.Type);
 					//invoke
-					generic.Invoke(this, new object[] { csv, entry, table, Database.LogPath });
+					genMethod.Invoke(this, new object[] { csv, entry, table, Database.LogPath });
 					Console.WriteLine($"  done!");
 				}
 				catch (Exception ex)
@@ -70,6 +124,10 @@ namespace CsvDb
 					Console.WriteLine($"error-> {ex.Message}");
 				}
 			}
+			//update system schema
+			Database.Save();
+			//this's for developing purposes only
+			Database.ExportToJson(io.Path.Combine(Database.BinaryPath, "__tables.data.json"));
 		}
 
 		CsvHelper.CsvReader OpenCsvFile(io.Compression.ZipArchiveEntry entry)
@@ -87,6 +145,279 @@ namespace CsvDb
 				var csv = new CsvHelper.CsvReader(stream);
 
 				return csv;
+			}
+		}
+
+		void GenerateBinTableText<TClass>(
+			CsvHelper.CsvReader csv,
+			io.Compression.ZipArchiveEntry entry,
+			DbTable table,
+			string rootPath)
+		{
+			string pagerName = $"{table.Name}.pager";
+			string pagerFilename = io.Path.Combine(rootPath, $"{pagerName}.txt");
+			var pageCount = 1;
+			var pageSize = table.Pager.PagerSize;
+			//set to 0 initially, but now starts with "1"
+			var globalRow = 1;
+
+			var prevPosition = 0;
+			var prevGlobalRow = 0;
+
+			var binaryPosition = 0;
+			var stream = new io.MemoryStream();
+			var bufferWriter = new io.BinaryWriter(stream);
+			var columnTypes = table.ColumnTypes;
+
+			//page size calculator
+			Func<int, int, int> calculatePageSize = (prePos, currPos) => currPos - prePos; // + 1;
+
+			using (var csvPagerwriter = new io.StreamWriter(io.File.Create(pagerFilename)))
+			{
+				IndexStruct[] indexesArray = null;
+				//Bin writer
+				io.BinaryWriter binWriter = null;
+
+				if (table.Generate)
+				{
+					//Bin writer
+					binWriter = new io.BinaryWriter(io.File.Create(io.Path.Combine(rootPath, $"bin\\{table.Name}.bin")));
+
+					//save column mask
+					table.RowMaskLength = Math.DivRem(table.Columns.Count, 8, out int remainder);
+					int bits = table.RowMaskLength * 8 + remainder;
+					table.RowMask = (UInt64)Math.Pow(2, bits - 1);
+					if (remainder != 0)
+					{
+						table.RowMaskLength++;
+					}
+
+					Console.WriteLine($"  creating temporary text index files.");
+					//create temporary files for csv pager, and all indexes
+					indexesArray = (from col in table.Columns
+													where col.Indexed
+													let tmpfile = io.Path.Combine(rootPath, $"{col.Indexer}.bin.txt")
+													select new IndexStruct
+													{
+														column = col,
+														//csv
+														file = tmpfile,
+														writer = new io.StreamWriter(io.File.Create(tmpfile))
+													}).ToArray();
+					Console.WriteLine($"   ({indexesArray.Length}) index(es) found.");
+					Console.WriteLine($"{String.Join("", indexesArray.Select(i => $"    -{i.file}\r\n"))}");
+				}
+				if (!csv.Read())
+				{
+					Console.WriteLine($"  error: table header expected!");
+				}
+				Console.WriteLine($"  CSV headers read.");
+
+				//check field headers indexes with table metadata
+				var ndx = 0;
+				foreach (var col in table.Columns)
+				{
+					var headcol = csv.GetField(ndx);
+					if (headcol != col.Name || ndx != col.Index)
+					{
+						Console.WriteLine($"  error: table header name and/or ordering is invalid!");
+						return;
+					}
+					ndx++;
+				}
+				Console.WriteLine($"  CSV headers checked.\r\n  Writing Bin database text file, and generating index files...");
+				//
+				var tableUniqueKeyCol = table.Columns.Where(c => c.Key).First();
+				//
+				int rowLine = 0;
+				var sw = new System.Diagnostics.Stopwatch();
+				sw.Start();
+				var csvParser = new DbRecordParser(csv, table);
+
+				//read each record of csv entry
+				while (csv.Read())
+				{
+					rowLine++;
+					//
+					if (table.Generate)
+					{
+						//get csv record columns string
+						csvParser.ReadRecord();
+
+						//get unique key value (non-casted)
+						var tableUniqueKeyValue = csvParser.Values[tableUniqueKeyCol.Index];
+
+						//process pager
+						if (pageSize-- <= 0)
+						{
+							pageCount++;
+							//reset page size
+							pageSize = table.Pager.PagerSize;
+
+							//save previous one
+							//page header
+							//[start row]
+							//[start position]
+							csvPagerwriter.WriteLine(
+								$"{prevGlobalRow}|{prevPosition}|{calculatePageSize(prevPosition, binaryPosition)}");
+							//
+							prevGlobalRow = globalRow;
+							prevPosition = binaryPosition;
+						}
+
+						//process indexes
+						foreach (var index in indexesArray)
+						{
+							var indexColValue = csvParser.Values[index.column.Index];
+
+							//position index: $"{value}|{position}"
+							//row index:			$"{value}|{globalRow}"
+							//if index is key, store its position
+							//  otherwise its line number 1-based   must be the key value for single key table.
+							string indexBinLine = null;
+
+							if (index.column.Key)
+							{
+								//for Keys store the position inside the .CSV file
+								indexBinLine = $"{indexColValue}|{binaryPosition}";
+							}
+							else
+							{
+								//do it too here, so no need to read key tree
+								//indexLine = $"{indexColValue}|{tableUniqueKeyValue}";
+								indexBinLine = $"{indexColValue}|{binaryPosition}";
+							}
+							//write line
+							index.writer.WriteLine(indexBinLine);
+						}
+
+						//save binary data
+						UInt64 flags = 0;
+						var columnBit = table.RowMask;
+						stream.Position = 0;
+
+						foreach (var col in table.Columns)
+						{
+							var _ndx = col.Index;
+							var textValue = csvParser.Values[_ndx];
+							//parser get Empty string when should be null
+							if (String.IsNullOrEmpty(textValue))
+							{
+								textValue = null;
+							}
+							var colType = columnTypes[_ndx];
+
+							if (textValue == null)
+							{
+								//signal only the null flag as true
+								flags |= columnBit;
+							}
+							else
+							{
+								var throwException = false;
+								switch (colType)
+								{
+									case DbColumnTypeEnum.Char:
+										char charValue = (char)0;
+										throwException = !Char.TryParse(textValue, out charValue);
+										//write
+										bufferWriter.Write(charValue);
+										break;
+									case DbColumnTypeEnum.Byte:
+										byte byteValue = 0;
+										throwException = !Byte.TryParse(textValue, out byteValue);
+										//write
+										bufferWriter.Write(byteValue);
+										break;
+									case DbColumnTypeEnum.Int16:
+										Int16 int16Value = 0;
+										throwException = !Int16.TryParse(textValue, out int16Value);
+										//write
+										bufferWriter.Write(int16Value);
+										break;
+									case DbColumnTypeEnum.Int32:
+										Int32 int32Value = 0;
+										throwException = !Int32.TryParse(textValue, out int32Value);
+										//write
+										bufferWriter.Write(int32Value);
+										break;
+									case DbColumnTypeEnum.Float:
+										float floatValue = 0.0f;
+										throwException = !float.TryParse(textValue, out floatValue);
+										//write
+										bufferWriter.Write(floatValue);
+										break;
+									case DbColumnTypeEnum.Double:
+										Double doubleValue = 0.0;
+										throwException = !Double.TryParse(textValue, out doubleValue);
+										//write
+										bufferWriter.Write(doubleValue);
+										break;
+									case DbColumnTypeEnum.Decimal:
+										Decimal decimalValue = 0;
+										throwException = !Decimal.TryParse(textValue, out decimalValue);
+										//write
+										bufferWriter.Write(decimalValue);
+										break;
+									case DbColumnTypeEnum.String:
+										//write
+										bufferWriter.Write(textValue);
+										break;
+									default:
+										throw new ArgumentException($"unsupported type on {col.Name}.{colType} row: {rowLine}");
+								}
+								if (throwException)
+								{
+									throw new ArgumentException($"unable to cast: {textValue} on {col.Name}.{colType} row: {rowLine}");
+								}
+							}
+							//shift right column Bit until it reaches 0 -the last column rightmost
+							columnBit >>= 1;
+						}
+						//write true binary record
+						var flagsBuffer = BitConverter.GetBytes(flags);
+						binWriter.Write(flagsBuffer, 0, table.RowMaskLength);
+
+						//write non-null records
+						var recBinary = stream.ToArray();
+						binWriter.Write(recBinary, 0, recBinary.Length);
+
+						//update binary position for next row
+						binaryPosition += table.RowMaskLength + recBinary.Length;
+					}
+				};
+
+				//ellapsed time
+				sw.Stop();
+				Console.WriteLine("ellapsed {0} ms", sw.ElapsedMilliseconds);
+				//var timespan = DateTime.Now - startTime;
+				//var ellapsed = $"  ellapsed: {timespan}";
+				//Console.WriteLine(ellapsed);
+
+				//store/update line count
+				table.Rows = rowLine;
+				table.Pager.Count = pageCount;
+				table.Pager.File = pagerName;
+
+				//save last page
+				if (table.Generate)
+				{
+					csvPagerwriter.WriteLine(
+									$"{prevGlobalRow}|{prevPosition}|{calculatePageSize(prevPosition, binaryPosition)}");
+				}
+
+				Console.WriteLine($"  ({rowLine}) line(s) processed.");
+
+				//close all index writers, and delete temporary files
+				indexesArray?.ToList().ForEach(index =>
+				{
+					index.writer.Dispose();
+				});
+				binWriter?.Dispose();
+			}
+			if (!table.Generate)
+			{
+				Console.WriteLine($"  indexers were not generated!");
 			}
 		}
 
@@ -113,6 +444,7 @@ namespace CsvDb
 			using (var csvPagerwriter = new io.StreamWriter(io.File.Create(pagerFilename)))
 			{
 				IndexStruct[] indexesArray = null;
+
 				//CSV text writer
 				io.StreamWriter csvwriter = null;
 
@@ -122,7 +454,9 @@ namespace CsvDb
 				}
 				else
 				{
+					//CSV text writer
 					csvwriter = new io.StreamWriter(io.File.Create(io.Path.Combine(rootPath, $"bin\\{table.Name}.csv")));
+
 					Console.WriteLine($"  creating temporary text index files.");
 					//create temporary files for csv pager, and all indexes
 					indexesArray = (from col in table.Columns
@@ -131,6 +465,7 @@ namespace CsvDb
 													select new IndexStruct
 													{
 														column = col,
+														//csv
 														file = tmpfile,
 														writer = new io.StreamWriter(io.File.Create(tmpfile))
 													}).ToArray();
@@ -176,7 +511,7 @@ namespace CsvDb
 						csvParser.ReadRecord();
 						var csvRow = csvParser.Record();
 
-						//write line to temporary buffer
+						//write line to temporary CSV buffer
 						sb.Append($"{csvRow}\r\n");
 
 						if (sb.Length > 16 * 1024)
@@ -215,28 +550,26 @@ namespace CsvDb
 							//row index:			$"{value}|{globalRow}"
 							//if index is key, store its position
 							//  otherwise its line number 1-based   must be the key value for single key table.
-							string indexLine = null;
+							string indexCsvLine = null;
+
 							if (index.column.Key)
 							{
 								//for Keys store the position inside the .CSV file
-								indexLine = $"{indexColValue}|{position}";
+								indexCsvLine = $"{indexColValue}|{position}";
 							}
 							else
 							{
 								//do it too here, so no need to read key tree
 								//indexLine = $"{indexColValue}|{tableUniqueKeyValue}";
-								indexLine = $"{indexColValue}|{position}";
+								indexCsvLine = $"{indexColValue}|{position}";
 							}
 							//write line
-							index.writer.WriteLine(indexLine);
+							index.writer.WriteLine(indexCsvLine);
 						}
-
 						//calculate values for next row
 						globalRow++;
 						position += csvRow.Length + 2; // +2 for \r\n
-
 					}
-
 				};
 				//write missing rows if any
 				if (sb.Length > 0)
@@ -264,31 +597,21 @@ namespace CsvDb
 					csvPagerwriter.WriteLine(
 									$"{prevGlobalRow}|{prevPosition}|{calculatePageSize(prevPosition, position)}");
 				}
-				//
+
 				Console.WriteLine($"  ({rowLine}) line(s) processed.");
 
-				//
-				if (indexesArray != null)
+				//close all index writers, and delete temporary files
+				indexesArray?.ToList().ForEach(index =>
 				{
-					//close all index writers, and delete temporary files
-					indexesArray.ToList().ForEach(index =>
-					{
-						index.writer.Dispose();
-					});
-				}
-				if (csvwriter != null)
-				{
-					csvwriter.Dispose();
-				}
-
+					index.writer.Dispose();
+				});
+				csvwriter?.Dispose();
 			}
 			if (!table.Generate)
 			{
 				Console.WriteLine($"  indexers were not generated!");
 			}
-			/*
-						
- */
+
 		}
 
 		#endregion
@@ -350,7 +673,10 @@ namespace CsvDb
 
 		#region Compile Indexes
 
-		public void CompileIndexes()  // int pageSize = 255
+		/// <summary>
+		/// Compile database, generate binary indices
+		/// </summary>
+		public void Compile()  // int pageSize = 255
 		{
 			Console.WriteLine($"\r\nCompiling table indexes:");
 			var thisType = this.GetType();
@@ -381,7 +707,8 @@ namespace CsvDb
 							new object[]
 							{
 								index,
-								indexType
+								indexType,
+								Sufix
 							});
 
 						//compile index collection
@@ -413,18 +740,18 @@ namespace CsvDb
 					//skip pages without the generate:flag
 					Console.WriteLine($"   skipped.");
 				}
+			}
 
-			}
-			if (Database.Modified)
-			{
-				Console.WriteLine($"  updating database structure.");
-				Database.Save();
-			}
+			//update system schema
+			Database.Save();
+			//this's for developing purposes only
+			Database.ExportToJson(io.Path.Combine(Database.BinaryPath, "__tables.compiled.json"));
 		}
 
 		List<KeyValuePair<T, List<int>>> GenerateIndexCollectionKeysMultipleValues<T>(
 			DbColumn index,
-			Type indexType
+			Type indexType,
+			string sufix
 		)
 		{
 			//Creating the Type for Generic List.
@@ -440,7 +767,7 @@ namespace CsvDb
 
 			string line;
 			//read index data in .TXT file
-			var textIndexPath = io.Path.Combine(Database.LogPath, $"{index.Indexer}.txt");
+			var textIndexPath = io.Path.Combine(Database.LogPath, $"{index.Indexer}{sufix}.txt");
 			using (var reader = new io.StreamReader(io.File.OpenRead(textIndexPath)))
 			{
 				while ((line = reader.ReadLine()) != null)
@@ -479,7 +806,7 @@ namespace CsvDb
 									.ToList();
 
 			//save grouped index for reference
-			var duplicatedIndexPath = io.Path.Combine(Database.LogPath, $"{index.Indexer}.duplicates.txt");
+			var duplicatedIndexPath = io.Path.Combine(Database.LogPath, $"{index.Indexer}{sufix}.duplicates.txt");
 			if (groupedList.Any(g => g.Value.Count > 1))
 			{
 				using (var writer =
@@ -604,7 +931,7 @@ namespace CsvDb
 			var pageCount = rootPage.ChildrenCount;
 			Console.WriteLine($"   saving ({pageCount}) page(s)");
 
-			//update column page count
+			//update column tree page count
 			index.PageCount = pageCount;
 			index.Table.Database.Modified = true;
 
@@ -616,6 +943,9 @@ namespace CsvDb
 			using (var writer = new io.BinaryWriter(io.File.Create(indexBinFilePath)))
 			{
 				var collectionPage = GetNodeItemPages<T>(rootPage).ToList();
+
+				//update column item page count
+				index.ItemPages = collectionPage.Count;
 
 				//MAIN HEADER
 

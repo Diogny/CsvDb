@@ -21,9 +21,24 @@ namespace ConsoleApp
 				.AddCommandLine(args)
 				.Build();
 
+			var appConfig = Configuration.GetSection("App").Get<Config.ConfigSettings>();
+
 			var handledWait = false;
 
+			//JsonSchemas();
+
 			//Generators();
+
+			//Create Db with binary table rows and indexes
+			//data
+			//data-light
+			//data-extra-light
+			//data-bin,			DbSchemaConfigEnum.Binary,  "bus_data-full.zip"
+			//data-full,		DbSchemaConfigEnum.Csv,		"bus_data-full.zip"
+			GenerateInitialDbData(appConfig, "data-full", DbSchemaConfigEnum.Csv, "bus_data-full.zip");
+
+			//compile indices
+			CompileDb(appConfig, "data-full");
 
 			//SqlQueryExecuteTests();
 
@@ -33,7 +48,7 @@ namespace ConsoleApp
 
 			//TestDynamic();
 
-			CsvToBin();
+			//CsvToBin();
 
 			if (!handledWait)
 			{
@@ -42,11 +57,14 @@ namespace ConsoleApp
 			}
 		}
 
-		static CsvDb.CsvDb OpenDatabase(string dbName = null, bool logTimes = true)
+		static void JsonSchemas()
 		{
-			//var section = Program.Configuration.GetSection("Data");
-			var appConfig = Configuration.GetSection("App").Get<Config.ConfigSettings>();
-			// section["BasePath"];
+			var schema = DbGenerator.Schema();
+			Console.WriteLine(schema);
+		}
+
+		static CsvDb.CsvDb OpenDatabase(Config.ConfigSettings appConfig, string dbName = null, bool logTimes = true)
+		{
 			var basePath = appConfig.Database.BasePath;
 
 			if (string.IsNullOrWhiteSpace(dbName))
@@ -86,43 +104,43 @@ namespace ConsoleApp
 			return db;
 		}
 
-		static void Generators()
+		static void GenerateInitialDbData(
+			Config.ConfigSettings appConfig,
+			string dbname,
+			DbSchemaConfigEnum dbConfig,
+			string zipfile
+		)
 		{
-			//update CreateDatabase() rootPath to match with [name].zip file  data\ with bus_data.zip
-
-			//data
-			//data-full
-			//data-light
-			//data-extra-light
-			var db = OpenDatabase(dbName: "data-full");
-
-			var appConfig = Configuration.GetSection("App").Get<Config.ConfigSettings>();
-			// section["BasePath"];
 			var basePath = appConfig.Database.BasePath;
 
-			var gen = new DbGenerator(
-				db,
-				//$@"{basePath}bus_data.zip",
-				$@"{basePath}bus_data-full.zip",
-				//$@"{basePath}bus_data-light.zip",
-				//$@"{basePath}bus_data-extra-light.zip",
+			var jsonfilepath = $"{basePath}\\{dbname}\\bin\\__tables.init.json";
 
-				//comment this when uncommented: gen.GenerateTxtData(); for a clean output
-				removeAll: false
-			);
-			gen.GenerateTxtData();
+			var db = CsvDb.CsvDb.CreateFromJson(jsonfilepath, dbConfig);
+
+			var gen = new DbGenerator(db, $@"{basePath}{zipfile}", removeAll: false);
+
+			gen.Generate();
+		}
+
+		static void CompileDb(Config.ConfigSettings appConfig, string dbname)
+		{
+			var db = OpenDatabase(appConfig, dbName: dbname);
+
+			var basePath = appConfig.Database.BasePath;
+
+			var gen = new DbGenerator(db, removeAll: false);
 
 			gen.CompilePagers();
 
-			gen.CompileIndexes();
+			gen.Compile();
 		}
 
-		static void SqlQueryExecuteTests()
+		static void SqlQueryExecuteTests(Config.ConfigSettings appConfig)
 		{
 			var sw = new System.Diagnostics.Stopwatch();
 			sw.Start();
 
-			var db = OpenDatabase();
+			var db = OpenDatabase(appConfig);
 
 			sw.Stop();
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
@@ -152,7 +170,7 @@ namespace ConsoleApp
 			//to calculate times
 			sw.Restart();
 
-			var visualizer = new DbVisualizer(dbQuery);
+			var visualizer = DbVisualizer.Create(dbQuery);
 			var rows = visualizer.Execute().ToList();
 			visualizer.Dispose();
 
@@ -175,9 +193,9 @@ namespace ConsoleApp
 			Console.WriteLine("\r\n>row(s) displayed on {0} ms", sw.ElapsedMilliseconds);
 		}
 
-		static bool SqlQueryFinalParseTests()
+		static bool SqlQueryFinalParseTests(Config.ConfigSettings appConfig)
 		{
-			var db = OpenDatabase();
+			var db = OpenDatabase(appConfig);
 
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
 
@@ -240,14 +258,14 @@ namespace ConsoleApp
 			return false;
 		}
 
-		static void CsvToBin()
+		static void CsvToBin(Config.ConfigSettings appConfig)
 		{
-			var db = OpenDatabase(dbName: "data-full");
+			var db = OpenDatabase(appConfig, dbName: "data-full");
 			string tableName = null;
-			Console.WriteLine("enter table name of empty to exit! ");
+			Console.WriteLine("enter table name, empty to exit, prefix with dash - to show percentage ");
 			do
 			{
-				Console.Write("table: ");
+				Console.Write("\r\ntable: ");
 				tableName = Console.ReadLine();
 
 				var sw = new System.Diagnostics.Stopwatch();
@@ -266,133 +284,179 @@ namespace ConsoleApp
 			//FIND THIS
 			// "stops" table row count csv doesn't match with bin file
 
+			var showPer = tableName.StartsWith('-');
+
+			if (showPer)
+			{
+				tableName = tableName.Substring(1);
+			}
+
 			var table = db.Table(tableName);
 			if (table == null)
 			{
 				Console.WriteLine($"cannot find table: {tableName} in database");
 				return false;
 			}
-			//calculate bytes needed to store null flags for every column in every record
-			//  this way reduce space for many null values on columns
-			//   and support nulls for any field type
-			int bytes = Math.DivRem(table.Columns.Count, 8, out int remainder);
-			int bits = bytes * 8 + remainder;
-			UInt64 mask = (UInt64)Math.Pow(2, bits - 1);
-			if (remainder != 0)
+			//get file size of csv file
+			var csvPath = io.Path.Combine(db.BinaryPath, $"{table.Name}.csv");
+			var csvFileInfo = new io.FileInfo(csvPath);
+
+			var binPath = io.Path.Combine(db.BinaryPath, $"{table.Name}.bin");
+
+			if (!showPer)
 			{
-				bytes++;
-			}
-
-			//
-			var path = io.Path.Combine(db.BinaryPath, $"{table.Name}.bin");
-			var cvspath = io.Path.Combine(db.BinaryPath, $"{table.FileName}");
-
-			var stream = new io.MemoryStream();
-			var bufferWriter = new io.BinaryWriter(stream);
-
-			using (var writer = new io.BinaryWriter(io.File.Create(path)))
-			using (var reader = new io.StreamReader(cvspath))
-			{
-				//placeholder for row count
-				Int32 value = 0;
-				writer.Write(value);
-
-				//write mask 32-bits unsigned int 64 bits UInt64, so max table columns is 64
-				writer.Write(mask);
-
-				//var buffer = new io.MemoryStream(5 * 1024);
-
-				var vis = new DbVisualizer(new DbQueryParser().Parse(db, $"SELECT * FROM {table.Name}"));
-
-				var columnTypes = table.Columns.Select(c => Enum.Parse<DbColumnTypeEnum>(c.Type)).ToArray();
-				int columnCount = table.Columns.Count;
-
-				int rowCount = 0;
-
-				foreach (var record in vis.Execute())
+				//calculate bytes needed to store null flags for every column in every record
+				//  this way reduce space for many null values on columns
+				//   and support nulls for any field type
+				int bytes = Math.DivRem(table.Columns.Count, 8, out int remainder);
+				int bits = bytes * 8 + remainder;
+				UInt64 mask = (UInt64)Math.Pow(2, bits - 1);
+				if (remainder != 0)
 				{
-					rowCount++;
-
-					//start with mask, first column, leftmost
-					UInt64 flags = 0;
-					//
-					var columnBit = mask;
-
-					stream.Position = 0;
-
-					for (var index = 0; index < columnCount; index++)
-					{
-						string textValue = record[index];
-						var colType = columnTypes[index];
-
-						if (textValue == null)
-						{
-							//signal only the null flag as true
-							flags |= columnBit;
-						}
-						else
-						{
-							switch (colType)
-							{
-								case DbColumnTypeEnum.String:
-									bufferWriter.Write(textValue ?? String.Empty);
-									break;
-								case DbColumnTypeEnum.Int32:
-									Int32 int32Value = 0;
-									if (String.IsNullOrEmpty(textValue))
-									{
-										//find a mark for null Int32 values
-										int32Value = Int32.MinValue;
-									}
-									else if (!Int32.TryParse(textValue, out int32Value))
-									{
-										int32Value = Int32.MinValue;
-										//throw new ArgumentException($"unable to cast: {textValue} to: {col.Type}");
-									}
-									//write to 
-									bufferWriter.Write(int32Value);
-									break;
-								case DbColumnTypeEnum.Double:
-									Double doubleValue = 0.0;
-									if (String.IsNullOrEmpty(textValue))
-									{
-										//find a mark for null Int32 values
-										doubleValue = Double.NegativeInfinity;
-									}
-									else if (!Double.TryParse(textValue, out doubleValue))
-									{
-										doubleValue = Double.NegativeInfinity;
-										//throw new ArgumentException($"unable to cast: {textValue} to: {col.Type}");
-									}
-									//write to 
-									bufferWriter.Write(doubleValue);
-									break;
-								default:
-									throw new ArgumentException($"unsupported type: {colType}");
-							}
-						}
-						//shift right column Bit until it reaches 0 -the last column rightmost
-						columnBit >>= 1;
-					}
-					if (columnBit != 0)
-					{
-						Console.WriteLine("Error on column bit flags");
-					}
-					//write true binary record
-					var flagsBuffer = BitConverter.GetBytes(flags);
-					writer.Write(flagsBuffer, 0, bytes);
-
-					//write non-null records
-					var recBinary = stream.ToArray();
-					writer.Write(recBinary, 0, recBinary.Length);
+					bytes++;
 				}
 
-				//write row count
-				writer.BaseStream.Position = 0;
-				writer.Write(rowCount);
+				var stream = new io.MemoryStream();
+				var bufferWriter = new io.BinaryWriter(stream);
 
-				Console.WriteLine($"writen {rowCount} row(s)");
+				using (var writer = new io.BinaryWriter(io.File.Create(binPath)))
+				using (var reader = new io.StreamReader(csvPath))
+				{
+					//placeholder for row count
+					Int32 value = 0;
+					writer.Write(value);
+
+					//write mask 32-bits unsigned int 64 bits UInt64, so max table columns is 64
+					writer.Write(mask);
+
+					//var buffer = new io.MemoryStream(5 * 1024);
+
+					var vis = DbVisualizer.Create(new DbQueryParser().Parse(db, $"SELECT * FROM {table.Name}"));
+					int rowCount = 0;
+
+					foreach (var record in vis.Execute())
+					{
+						rowCount++;
+
+						//start with mask, first column, leftmost
+						UInt64 flags = 0;
+						//
+						var columnBit = mask;
+
+						stream.Position = 0;
+
+						for (var index = 0; index < vis.ColumnCount; index++)
+						{
+							string textValue = (string)record[index];
+							var colType = vis.ColumnTypes[index];
+
+							if (textValue == null)
+							{
+								//signal only the null flag as true
+								flags |= columnBit;
+							}
+							else
+							{
+								switch (colType)
+								{
+									case DbColumnTypeEnum.String:
+										bufferWriter.Write(textValue);
+										break;
+									case DbColumnTypeEnum.Char:
+										char charValue = (char)0;
+										if (!Char.TryParse(textValue, out charValue))
+										{
+											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+										}
+										//write
+										bufferWriter.Write(charValue);
+										break;
+									case DbColumnTypeEnum.Byte:
+										byte byteValue = 0;
+										if (!Byte.TryParse(textValue, out byteValue))
+										{
+											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+										}
+										//write
+										bufferWriter.Write(byteValue);
+										break;
+									case DbColumnTypeEnum.Int16:
+										Int16 int16Value = 0;
+										if (!Int16.TryParse(textValue, out int16Value))
+										{
+											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+										}
+										//write
+										bufferWriter.Write(int16Value);
+										break;
+									case DbColumnTypeEnum.Int32:
+										Int32 int32Value = 0;
+										if (!Int32.TryParse(textValue, out int32Value))
+										{
+											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+										}
+										//write
+										bufferWriter.Write(int32Value);
+										break;
+									case DbColumnTypeEnum.Float:
+										float floatValue = 0.0f;
+										if (!float.TryParse(textValue, out floatValue))
+										{
+											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+										}
+										//write
+										bufferWriter.Write(floatValue);
+										break;
+									case DbColumnTypeEnum.Double:
+										Double doubleValue = 0.0;
+										if (!Double.TryParse(textValue, out doubleValue))
+										{
+											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+										}
+										//write
+										bufferWriter.Write(doubleValue);
+										break;
+									case DbColumnTypeEnum.Decimal:
+										Decimal decimalValue = 0;
+										if (!Decimal.TryParse(textValue, out decimalValue))
+										{
+											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+										}
+										//write
+										bufferWriter.Write(decimalValue);
+										break;
+									default:
+										throw new ArgumentException($"unsupported type: {colType}");
+								}
+							}
+							//shift right column Bit until it reaches 0 -the last column rightmost
+							columnBit >>= 1;
+						}
+						if (columnBit != 0)
+						{
+							Console.WriteLine("Error on column bit flags");
+						}
+						//write true binary record
+						var flagsBuffer = BitConverter.GetBytes(flags);
+						writer.Write(flagsBuffer, 0, bytes);
+
+						//write non-null records
+						var recBinary = stream.ToArray();
+						writer.Write(recBinary, 0, recBinary.Length);
+					}
+
+					//write row count
+					writer.BaseStream.Position = 0;
+					writer.Write(rowCount);
+
+					Console.WriteLine($"writen {rowCount} row(s)");
+				}
 			}
+
+			var binFileInfo = new io.FileInfo(binPath);
+			var percent = ((double)binFileInfo.Length / csvFileInfo.Length);
+			Console.WriteLine("binary file is {0:P2}", percent);
+
 			return true;
 		}
 

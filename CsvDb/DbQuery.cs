@@ -66,8 +66,6 @@ namespace CsvDb.Query
 			Where = where ?? new List<DbQueryExpressionBase>();
 			Skip = skip <= 0 ? -1 : skip;
 			Limit = limit <= 0 ? -1 : limit;
-			//	SELECT * FROM [table] t
-			//		WHERE t.Name == ""
 		}
 
 		public override string ToString()
@@ -184,13 +182,6 @@ namespace CsvDb.Query
 		}
 
 		#endregion
-
-		// *\t[table]\t[[column],==,[value]>]
-		//SELECT route_id, rout_short_name FROM routes r
-		//		WHERE r.agency_id == "NJT" AND
-		//					r.route_type == 2
-		// route_id,route_short_name\t[routes]\t[agency_id],==,"NJT"\tAND\t[route_type],==,2
-
 	}
 
 	public class SqlJoin
@@ -227,19 +218,77 @@ namespace CsvDb.Query
 
 	public class DbQueryColumnSelector
 	{
-		public List<DbQueryColumnIdentifier> Columns { get; protected internal set; }
+		public Token Quantifier { get; private set; }
 
-		public bool IsFull { get; protected internal set; }
+		public List<DbQueryColumnIdentifier> Columns { get; private set; }
 
-		internal DbQueryColumnSelector(List<DbQueryColumnIdentifier> columns, bool isFull)
+		public bool IsFull { get; private set; }
+
+		/// <summary>
+		/// Creates a quantifier column selector
+		/// </summary>
+		/// <param name="quantifier">COUNT, AVG, SUM quantifier</param>
+		/// <param name="column">numeric column</param>
+		internal DbQueryColumnSelector(Token quantifier, DbQueryColumnIdentifier column)
 		{
-			Columns = columns;
-			IsFull = isFull;
+			if (!((Quantifier = quantifier) == Token.COUNT || quantifier == Token.AVG || quantifier == Token.SUM) ||
+				column == null)
+			{
+				throw new ArgumentException($"invalid quantifier ({quantifier}) or empty column in SELECT statement");
+			}
+			if(!column.Column.TypeEnum.IsNumeric())
+			{
+				throw new ArgumentException($"Quantifier table column must be numeric");
+			}
+			Columns = new List<DbQueryColumnIdentifier>() { column };
+			IsFull = false;
+		}
+
+		/// <summary>
+		/// Creates a restricted column selector SELECT col0, col1, col2
+		/// </summary>
+		/// <param name="columns"></param>
+		/// <param name="isFull"></param>
+		internal DbQueryColumnSelector(List<DbQueryColumnIdentifier> columns)
+		{
+			if ((Columns = columns) == null)
+			{
+				throw new ArgumentException($"no table columns specified in SELECT statement");
+			}
+			IsFull = false;
+			Quantifier = Token.None;
+		}
+
+		/// <summary>
+		/// Creates a SELECT * column selector
+		/// </summary>
+		/// <param name="table"></param>
+		internal DbQueryColumnSelector(DbTable table)
+		{
+			IsFull = true;
+			Columns = table.Columns
+					.Select(c => new DbQueryColumnIdentifier(c))
+					.ToList();
+			Quantifier = Token.None;
 		}
 
 		public string[] Header => Columns.Select(c => c.Column.Name).ToArray();
 
-		public override string ToString() => IsFull ? "*" : String.Join(",", Columns.Select(c => c.ToString()));
+		public override string ToString()
+		{
+			if (IsFull)
+			{
+				return "*";
+			}
+			else if (Quantifier != Token.None)
+			{
+				return $"{Quantifier.ToString()}({Columns[0].ToString()})";
+			}
+			else
+			{
+				return String.Join(", ", Columns.Select(c => c.ToString()));
+			}
+		}
 	}
 
 	#region INameIdentifier
@@ -297,6 +346,16 @@ namespace CsvDb.Query
 			if ((Column = column) == null)
 			{
 				throw new ArgumentException("column identifier cannot have an undefined column");
+			}
+		}
+
+		//later see if COUNT(d.route_id) is ok for complex queries
+		internal DbQueryColumnIdentifier(DbTable table, string columnName)
+			: base(null)
+		{
+			if ((Column = table.Column(columnName)) == null)
+			{
+				throw new ArgumentException($"column {columnName} doesnot belong to table {table.Name}");
 			}
 		}
 

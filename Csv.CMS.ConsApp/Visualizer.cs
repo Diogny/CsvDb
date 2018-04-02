@@ -200,7 +200,7 @@ namespace Csv.CMS.ConsApp
 				foreach (var page in index.Pages)
 				{
 					sb.Append($"  Page [{page.Number}]{nl}");
-					sb.Append($"   Flags: {page.Flags} | Offset: {page.Offset} | Size: {page.PageSize}{page.UniqueKeyValue.IfYes(" | [Unique Key]")}");
+					sb.Append($"   Flags: {page.Flags} | Offset: {page.Offset} | Size: {page.PageSize}{page.UniqueKeyValue.IfTrue(" | [Unique Key]")}");
 					sb.Append($"   ({page.ItemsCount}) item(s) | Frequency: {page.Frequency}{nl}");
 					//sb.Append($"{nl}");
 				}

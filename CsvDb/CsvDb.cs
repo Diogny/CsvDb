@@ -30,121 +30,21 @@ namespace CsvDb
 		ReadKeepMostFrequentAlways
 	}
 
-	internal class DbSchemaConfig
-	{
-		//binary structure of database, test speed
-
-		public String Version { get; set; }
-
-		//Major.Minor.Build.Revision	3.5.234.02
-		public System.Version VersionInfo => new System.Version(Version);
-
-		public String Description { get; set; }
-
-		public String Name { get; set; }
-
-		public int PageSize { get; set; }
-
-		public List<DbTable> Tables { get; set; }
-
-		public DbSchemaConfig() { }
-
-		public static DbSchemaConfig Load(io.BinaryReader reader)
-		{
-			var obj = new DbSchemaConfig()
-			{
-				Version = reader.BinaryRead(),
-				Description = reader.BinaryRead(),
-				Name = reader.BinaryRead(),
-
-				PageSize = reader.ReadInt32(),
-				Tables = new List<DbTable>()
-			};
-			//tables
-			var pageCount = reader.ReadInt32();
-			for (var t = 0; t < pageCount; t++)
-			{
-				var table = new DbTable()
-				{
-					Name = reader.BinaryRead(),
-					FileName = reader.BinaryRead(),
-					Generate = reader.ReadBoolean(),
-					Multikey = reader.ReadBoolean(),
-					Rows = reader.ReadInt32(),
-					Pager = DbTablePager.Load(reader),
-					Count = reader.ReadInt32(),
-					Columns = new List<DbColumn>()
-				};
-				//read columns
-				for (var c = 0; c < table.Count; c++)
-				{
-					var col = new DbColumn()
-					{
-						Indexer = reader.BinaryRead(),
-						Unique = reader.ReadBoolean(),
-						Name = reader.BinaryRead(),
-						Index = reader.ReadInt32(),
-						Type = reader.BinaryRead(),
-						Key = reader.ReadBoolean(),
-						Indexed = reader.ReadBoolean()
-					};
-					table.Columns.Add(col);
-				}
-				obj.Tables.Add(table);
-			}
-			return obj;
-		}
-
-		public void Save(io.BinaryWriter writer, bool saveJson = false)
-		{
-			Version.BinarySave(writer);
-			Description.BinarySave(writer);
-			Name.BinarySave(writer);
-
-			//page size
-			writer.Write(PageSize);
-
-			//tables
-			int pageCount = Tables.Count;
-			writer.Write(pageCount);
-
-			foreach (var table in Tables)
-			{
-				table.Name.BinarySave(writer);
-				table.FileName.BinarySave(writer);
-				writer.Write(table.Generate);
-				writer.Write(table.Multikey);
-				//
-				writer.Write(table.Rows);
-				//pager
-				table.Pager.Store(writer);
-				//columns
-				writer.Write(table.Count);
-
-				foreach (var column in table.Columns)
-				{
-					column.Indexer.BinarySave(writer);
-					writer.Write(column.Unique);
-					column.Name.BinarySave(writer);
-					writer.Write(column.Index);
-					column.Type.BinarySave(writer);
-					writer.Write(column.Key);
-					writer.Write(column.Indexed);
-				}
-			}
-		}
-
-	}
-
 	public class CsvDb : IDisposable
 	{
 		public string LogPath { get; protected internal set; }
 
 		public string BinaryPath { get; protected internal set; }
 
-		public string Name { get { return Schema.Name; } }
+		public DbSchemaConfigEnum Flags { get { return Schema == null ? DbSchemaConfigEnum.None : Schema.Flags; } }
 
-		public int PageSize { get { return Schema.PageSize; } }
+		public bool IsBinary { get { return (Flags & DbSchemaConfigEnum.Binary) != 0; } }
+
+		public bool IsCsv { get { return (Flags & DbSchemaConfigEnum.Csv) != 0; } }
+
+		public string Name { get { return Schema?.Name; } }
+
+		public int PageSize { get { return Schema == null ? -1 : Schema.PageSize; } }
 
 		public DbIndexItemsPolicy ReadPolicy { get; set; }
 
@@ -155,8 +55,14 @@ namespace CsvDb
 		/// </summary>
 		public List<DbTable> Tables
 		{
-			get { return Schema.Tables; }
-			set { Schema.Tables = value; }
+			get { return Schema?.Tables; }
+			set
+			{
+				if (Schema != null)
+				{
+					Schema.Tables = value;
+				}
+			}
 		}
 
 		public bool Modified { get; set; }
@@ -176,6 +82,33 @@ namespace CsvDb
 		protected internal String SchemaFilePath = String.Empty;
 
 		protected internal String SchemaJsonFilePath = String.Empty;
+
+		public static CsvDb CreateFromJson(string jsonfilepath, DbSchemaConfigEnum flags = DbSchemaConfigEnum.None)
+		{
+			//generate the __schema.sys file and create normal database
+			var text = io.File.ReadAllText(jsonfilepath);
+
+			////Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
+			////fastJSON is 4X+ faster than Newtonsoft.Json parser
+			////https://github.com/mgholam/fastJSON
+
+			var schema = fastJSON.JSON.ToObject<DbSchemaConfig>(text);
+
+			//define paths
+			var rootPath = io.Path.GetDirectoryName(jsonfilepath);
+			var sysPath = io.Path.Combine(rootPath, $"{SchemaSystemFilename}");
+
+			//set flags
+			schema.Flags = flags;
+
+			//save
+			var writer = new io.BinaryWriter(io.File.Create(sysPath));
+			schema.Save(writer);
+			writer.Dispose();
+
+			//remove the ending \bin\
+			return new CsvDb(io.Path.GetDirectoryName(rootPath));
+		}
 
 		/// <summary>
 		/// Creates a new CSV database
@@ -217,7 +150,7 @@ namespace CsvDb
 			Load();
 		}
 
-		public bool ExportToJson()
+		public bool ExportToJson(string jsonpath)
 		{
 			try
 			{
@@ -226,7 +159,7 @@ namespace CsvDb
 				//Newtonsoft.Json.JsonConvert.SerializeObject(Structure, Newtonsoft.Json.Formatting.Indented);
 				fastJSON.JSON.ToNiceJSON(Schema);
 				//
-				io.File.WriteAllText(SchemaJsonFilePath, json);
+				io.File.WriteAllText(jsonpath, json);
 				return true;
 			}
 			catch (Exception ex)
@@ -245,15 +178,6 @@ namespace CsvDb
 		{
 			try
 			{
-				//var text = io.File.ReadAllText(FileStructurePath);
-
-				////Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
-				////fastJSON is 2X+ faster than Newtonsoft.Json parser
-				////https://github.com/mgholam/fastJSON
-
-				//Structure =
-				//	fastJSON.JSON.ToObject<DbHeaderStructure>(text);
-
 				var reader = new io.BinaryReader(io.File.OpenRead(SchemaFilePath));
 				Schema = DbSchemaConfig.Load(reader);
 				reader.Dispose();
@@ -300,13 +224,18 @@ namespace CsvDb
 			}
 		}
 
+		/// <summary>
+		/// Gets the table
+		/// </summary>
+		/// <param name="tableName">table's name</param>
+		/// <returns></returns>
 		public DbTable Table(string tableName)
 		{
 			return Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
 		}
 
 		/// <summary>
-		/// 
+		/// Gets the table column
 		/// </summary>
 		/// <param name="tableName">table name</param>
 		/// <param name="columnName">column name</param>
@@ -317,9 +246,9 @@ namespace CsvDb
 		}
 
 		/// <summary>
-		/// 
+		/// Gets the table column
 		/// </summary>
-		/// <param name="tableColumnName">table.index</param>
+		/// <param name="tableColumnName">table.column</param>
 		/// <returns></returns>
 		public DbColumn Index(string tableColumnName)
 		{
@@ -347,6 +276,128 @@ namespace CsvDb
 		}
 	}
 
+	internal class DbSchemaConfig
+	{
+		//binary structure of database, test speed
+
+		public DbSchemaConfigEnum Flags { get; set; }
+
+		public String Version { get; set; }
+
+		//Major.Minor.Build.Revision	3.5.234.02
+		//[Newtonsoft.Json.JsonProperty(Required = Newtonsoft.Json.Required.Default)]
+		[Newtonsoft.Json.JsonIgnore]
+		public System.Version VersionInfo => new System.Version(Version);
+
+		public String Description { get; set; }
+
+		public String Name { get; set; }
+
+		public int PageSize { get; set; }
+
+		public List<DbTable> Tables { get; set; }
+
+		public DbSchemaConfig() { }
+
+		public static DbSchemaConfig Load(io.BinaryReader reader)
+		{
+			var schema = new DbSchemaConfig()
+			{
+				Flags = (DbSchemaConfigEnum)reader.ReadUInt32(),
+				Version = reader.BinaryRead(),
+				Description = reader.BinaryRead(),
+				Name = reader.BinaryRead(),
+
+				PageSize = reader.ReadInt32(),
+				Tables = new List<DbTable>()
+			};
+
+			//tables
+			var pageCount = reader.ReadInt32();
+			for (var t = 0; t < pageCount; t++)
+			{
+				var table = new DbTable()
+				{
+					Name = reader.BinaryRead(),
+					FileName = reader.BinaryRead(),
+					Generate = reader.ReadBoolean(),
+					Multikey = reader.ReadBoolean(),
+					Rows = reader.ReadInt32(),
+					RowMask = reader.ReadUInt64(),
+					RowMaskLength = reader.ReadInt32(),
+					Pager = DbTablePager.Load(reader),
+					Count = reader.ReadInt32(),
+					Columns = new List<DbColumn>()
+				};
+				//read columns
+				for (var c = 0; c < table.Count; c++)
+				{
+					var col = new DbColumn()
+					{
+						Indexer = reader.BinaryRead(),
+						Unique = reader.ReadBoolean(),
+						Name = reader.BinaryRead(),
+						Index = reader.ReadInt32(),
+						Type = reader.BinaryRead(),
+						Key = reader.ReadBoolean(),
+						Indexed = reader.ReadBoolean()
+					};
+					table.Columns.Add(col);
+				}
+				schema.Tables.Add(table);
+			}
+			return schema;
+		}
+
+		public void Save(io.BinaryWriter writer)
+		{
+			//flags
+			writer.Write((UInt32)Flags);
+			//
+			Version.BinarySave(writer);
+			Description.BinarySave(writer);
+			Name.BinarySave(writer);
+
+			//page size
+			writer.Write(PageSize);
+
+			//tables
+			int pageCount = Tables.Count;
+			writer.Write(pageCount);
+
+			foreach (var table in Tables)
+			{
+				table.Name.BinarySave(writer);
+				table.FileName.BinarySave(writer);
+				writer.Write(table.Generate);
+				writer.Write(table.Multikey);
+				//
+				writer.Write(table.Rows);
+
+				writer.Write(table.RowMask);
+				writer.Write(table.RowMaskLength);
+
+				//pager
+				table.Pager.Store(writer);
+				//columns
+				writer.Write(table.Count);
+
+				foreach (var column in table.Columns)
+				{
+					column.Indexer.BinarySave(writer);
+					writer.Write(column.Unique);
+					column.Name.BinarySave(writer);
+					writer.Write(column.Index);
+					column.Type.BinarySave(writer);
+					writer.Write(column.Key);
+					writer.Write(column.Indexed);
+				}
+			}
+		}
+
+	}
+
+
 	[Serializable]
 	public class DbTable
 	{
@@ -366,7 +417,23 @@ namespace CsvDb
 
 		public List<DbColumn> Columns { get; set; }
 
+		//[Newtonsoft.Json.JsonProperty(Required = Newtonsoft.Json.Required.Default)]
+		[Newtonsoft.Json.JsonIgnore]
 		protected internal CsvDb Database { get; set; }
+
+		/// <summary>
+		/// Mask of nullable rows
+		/// </summary>
+		public UInt64 RowMask { get; set; }
+
+		/// <summary>
+		/// bytes of RowMask
+		/// </summary>
+		public int RowMaskLength { get; set; }
+
+		//[Newtonsoft.Json.JsonProperty(Required = Newtonsoft.Json.Required.Default)]
+		[Newtonsoft.Json.JsonIgnore]
+		public DbColumnTypeEnum[] ColumnTypes => Columns.Select(c => Enum.Parse<DbColumnTypeEnum>(c.Type)).ToArray();
 
 		[Newtonsoft.Json.JsonIgnore]
 		public Type Type
@@ -429,6 +496,7 @@ namespace CsvDb
 
 		[System.Xml.Serialization.XmlIgnore]
 		//[ScriptIgnore]
+		[Newtonsoft.Json.JsonIgnore]
 		public DbTable Table { get; internal set; }
 
 		private object _itemsIndex;
@@ -479,8 +547,6 @@ namespace CsvDb
 			return (DbIndexTree<T>)_indexTree;
 		}
 
-		public DbColumn() { }
-
 		public override string ToString() => $"[{Index}] {Name}: {Type}{(Key ? " [Key]" : "")}";
 	}
 
@@ -492,8 +558,6 @@ namespace CsvDb
 		public int Count { get; set; }
 
 		public string File { get; set; }
-
-		public DbTablePager() { }
 
 		public static DbTablePager Load(io.BinaryReader reader)
 		{

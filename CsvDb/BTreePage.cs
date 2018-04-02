@@ -6,6 +6,10 @@ using System.Linq;
 
 namespace CsvDb
 {
+	/// <summary>
+	/// DbGenerator Base Page generic class
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
 	public abstract class BTreePageBase<T>
 		where T : IComparable<T>
 	{
@@ -34,6 +38,10 @@ namespace CsvDb
 
 	}
 
+	/// <summary>
+	/// DbGenerator Tree Page Node generic class
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
 	public class BTreePageNode<T> : BTreePageBase<T>
 		where T : IComparable<T>
 	{
@@ -130,6 +138,10 @@ namespace CsvDb
 
 	}
 
+	/// <summary>
+	/// DbGenerator Tree Page Items generic class
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
 	public class BTreePageItems<T> : BTreePageBase<T>
 		where T : IComparable<T>
 	{
@@ -140,13 +152,15 @@ namespace CsvDb
 		public override int ChildrenCount => 1;
 
 		public override BTreePageTypeEnum Type => BTreePageTypeEnum.Collection;
-
-
+		
 		/// <summary>
-		/// Offset 0-based of the start of this page
+		/// Offset 0-based of the start of this page in the index of items stream
 		/// </summary>
 		public int Offset { get; set; }
 
+		/// <summary>
+		/// List of key with their offset values in the main table data stream
+		/// </summary>
 		public List<KeyValuePair<T, List<int>>> Items { get; set; }
 
 		public BTreePageItems(IEnumerable<KeyValuePair<T, List<int>>> items = null)

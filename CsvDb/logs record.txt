@@ -8,7 +8,10 @@
 2018/03/23 - 2018/03/24
 .- fix index search engine bugs
 .-prepare Query parser for more complex sql queries
-2018/03/24 - 
+2018/03/24 - 2018/03/30
 .-rename classes
 .-change json to binary schema structure
 .-fix table dump
+2018/03/30 - 
+.-add new table column types
+.-add new Query Parser functions

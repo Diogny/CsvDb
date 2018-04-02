@@ -9,7 +9,7 @@ namespace CsvDb.Query
 	{
 		int index;
 		int startOfToken;
-		char[] queryBuffer; 
+		char[] queryBuffer;
 		int length;
 		char currentChar;
 
@@ -21,14 +21,26 @@ namespace CsvDb.Query
 			"SELECT", "FROM", "WHERE", "SKIP", "LIMIT",
 			"AND", "OR", "NOT",
 			"JOIN", "INNER", "LEFT", "RIGHT", "OUTER", "FULL", "CROSS",
-			"ON", "IS", "NULL", "EXISTS" };
+			"ON", "IS", "NULL", "EXISTS",
+			"COUNT", "AVG", "SUM" };
 
-		static List<string> castingTypes = new List<string> { "Byte", "Int16", "Int32", "String", "Double" };
+		static List<string> castingTypes = new List<string> {
+			//numeric
+			"Byte", "Int16", "Int32", "Int64", "Single", "Double", "Decimal",
+			//char/string
+			"Char", "String"
+		};
 
 		bool CanRead { get { return index < length; } }
 
-		internal static List<Token> JoinStarts = new List<Token>() {
+		internal static List<Token> JoinStarts = new List<Token>()
+		{
 			Token.INNER, Token.LEFT, Token.RIGHT, Token.FULL, Token.CROSS
+		};
+
+		internal static List<Token> SelectQuantifiers = new List<Token>()
+		{
+			Token.COUNT, Token.AVG, Token.SUM
 		};
 
 		StringBuilder charString = new StringBuilder();
@@ -277,6 +289,7 @@ namespace CsvDb.Query
 			bool EndOfStream = queue.Count == 0;
 			var columnSelectors = new List<TokenItem>();
 			bool isFullColums = false;
+			Token quantifier = Token.None;
 
 			// SELECT * | column0,column1,...
 			//					|	a.agency_id, b.serice_id,...
@@ -378,6 +391,22 @@ namespace CsvDb.Query
 				isFullColums = true;
 				columnSelectors.Add(CurrentToken);
 			}
+			else if (GetTokenIfContains(SelectQuantifiers))
+			{
+				quantifier = CurrentToken.Token;
+
+				if (!GetTokenIf(Token.OpenPar))
+				{
+					throw new ArgumentException($"expected ( after {CurrentToken.Token}");
+				}
+
+				columnSelectors.Add(ReadOperand($"cannot read quantifier {quantifier}"));
+
+				if (!GetTokenIf(Token.ClosePar))
+				{
+					throw new ArgumentException($"expected ) closing {CurrentToken.Token}");
+				}
+			}
 			else
 			{
 				//mut have at least one column identifier
@@ -429,10 +458,19 @@ namespace CsvDb.Query
 			}
 			tableCollection.Add(tableIdentifier);
 
-			var columns = new List<DbQueryColumnIdentifier>();
-
-			if (columnSelectors[0].Token != Token.Astherisk)
+			if (isFullColums) //(columnSelectors[0].Token == Token.Astherisk)
 			{
+				colSelector = new DbQueryColumnSelector(table);
+			}
+			else if (quantifier != Token.None)
+			{
+				colSelector = new DbQueryColumnSelector(quantifier,
+					new DbQueryColumnIdentifier(table, columnSelectors[0].Value));
+			}
+			else
+			{
+				var columns = new List<DbQueryColumnIdentifier>();
+
 				//unresolved column identifiers can exists for more complex queries
 				//	later add unresolved features
 				foreach (var tk in columnSelectors)
@@ -468,14 +506,8 @@ namespace CsvDb.Query
 						columns.Add(new DbQueryColumnIdentifier(col));
 					}
 				}
+				colSelector = new DbQueryColumnSelector(columns);
 			}
-			else
-			{
-				columns = table.Columns
-					.Select(c => new DbQueryColumnIdentifier(c))
-					.ToList();
-			}
-			colSelector = new DbQueryColumnSelector(columns, isFullColums);
 
 			#endregion
 
@@ -696,6 +728,9 @@ namespace CsvDb.Query
 		IS,
 		NULL,
 		EXISTS,
+		COUNT,
+		AVG,
+		SUM,
 		//table column, variable, descriptor
 		Identifier,
 		//[identifier as table name].[column name]
