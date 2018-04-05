@@ -932,7 +932,7 @@ namespace CsvDb
 			Console.WriteLine($"   saving ({pageCount}) page(s)");
 
 			//update column tree page count
-			index.PageCount = pageCount;
+			index.NodePages = pageCount;
 			index.Table.Database.Modified = true;
 
 			string indexfilepath = io.Path.Combine(Database.BinaryPath, $"{index.Indexer}");

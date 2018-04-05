@@ -340,7 +340,10 @@ namespace CsvDb
 						Index = reader.ReadInt32(),
 						Type = reader.BinaryRead(),
 						Key = reader.ReadBoolean(),
-						Indexed = reader.ReadBoolean()
+						Indexed = reader.ReadBoolean(),
+						//
+						NodePages = reader.ReadInt32(),
+						ItemPages = reader.ReadInt32()
 					};
 					table.Columns.Add(col);
 				}
@@ -391,6 +394,9 @@ namespace CsvDb
 					column.Type.BinarySave(writer);
 					writer.Write(column.Key);
 					writer.Write(column.Indexed);
+					//
+					writer.Write(column.NodePages);
+					writer.Write(column.ItemPages);
 				}
 			}
 		}
@@ -475,11 +481,15 @@ namespace CsvDb
 
 		public bool Indexed { get; set; }
 
-		public int PageCount { get; set; }
-
 		public int ItemPages { get; set; }
 
 		public int NodePages { get; set; }
+
+		/// <summary>
+		/// Returns the sum of item pages plus tree node pages
+		/// </summary>
+		[Newtonsoft.Json.JsonIgnore]
+		public int PageCount { get { return ItemPages + NodePages; } }
 
 		[Newtonsoft.Json.JsonIgnore]
 		public DbColumnTypeEnum TypeEnum

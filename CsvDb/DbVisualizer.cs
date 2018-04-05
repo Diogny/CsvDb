@@ -15,6 +15,8 @@ namespace CsvDb
 
 		public DbColumnTypeEnum[] ColumnTypes { get; private set; }
 
+		protected internal int[] IndexTranslator { get; private set; }
+
 		public abstract IEnumerable<object[]> Execute();
 
 		public abstract bool IsValid(CsvDb db);
@@ -36,13 +38,19 @@ namespace CsvDb
 			}
 			//default to CSV
 			Extension = String.IsNullOrWhiteSpace(extension) ? "csv" : extension.Trim();
+
 			//path to file
 			Path = io.Path.Combine(Query.Database.BinaryPath, $"{Query.FromTableIdentifier.Table.Name}.{Extension}");
-			//save column count
+
+			//save total column count
 			ColumnCount = Query.FromTableIdentifier.Table.Columns.Count;
-			//
+
+			//all column types
 			ColumnTypes = Query.FromTableIdentifier.Table.Columns
 				.Select(c => Enum.Parse<DbColumnTypeEnum>(c.Type)).ToArray();
+
+			//index translator to real visualized columns
+			IndexTranslator = Query.Columns.Columns.Select(c => c.Column.Index).ToArray();
 		}
 
 		public abstract void Dispose();
@@ -107,7 +115,7 @@ namespace CsvDb
 				//copy main
 				var bitMask = mainMask;
 
-				var record = new object[ColumnCount];
+				var dbRecord = new object[ColumnCount];
 
 				for (var i = 0; i < ColumnCount; i++)
 				{
@@ -119,38 +127,51 @@ namespace CsvDb
 						switch (colType)
 						{
 							case DbColumnTypeEnum.Char:
-								record[i] = reader.ReadChar();
+								dbRecord[i] = reader.ReadChar();
 								break;
 							case DbColumnTypeEnum.Byte:
-								record[i] = reader.ReadByte();
+								dbRecord[i] = reader.ReadByte();
 								break;
 							case DbColumnTypeEnum.Int16:
-								record[i] = reader.ReadInt16();
+								dbRecord[i] = reader.ReadInt16();
 								break;
 							case DbColumnTypeEnum.Int32:
-								record[i] = reader.ReadInt32();
+								dbRecord[i] = reader.ReadInt32();
 								break;
 							case DbColumnTypeEnum.Int64:
-								record[i] = reader.ReadInt64();
+								dbRecord[i] = reader.ReadInt64();
 								break;
 							case DbColumnTypeEnum.Float:
-								record[i] = reader.ReadSingle();
+								dbRecord[i] = reader.ReadSingle();
 								break;
 							case DbColumnTypeEnum.Double:
-								record[i] = reader.ReadDouble();
+								dbRecord[i] = reader.ReadDouble();
 								break;
 							case DbColumnTypeEnum.Decimal:
-								record[i] = reader.ReadDecimal();
+								dbRecord[i] = reader.ReadDecimal();
 								break;
 							case DbColumnTypeEnum.String:
-								record[i] = reader.ReadString();
+								dbRecord[i] = reader.ReadString();
 								break;
 						}
 					}
 					bitMask >>= 1;
 				}
-				//return record
-				yield return record;
+				if (!Query.Columns.IsFull)
+				{
+					//translate to real
+					var record = new object[IndexTranslator.Length];
+					for (var i = 0; i < IndexTranslator.Length; i++)
+					{
+						record[i] = dbRecord[IndexTranslator[i]];
+					}
+					yield return record;
+				}
+				else
+				{
+					//return record
+					yield return dbRecord;
+				}
 			}
 		}
 
@@ -224,7 +245,7 @@ namespace CsvDb
 				return null;
 			}
 			var count = ColumnCount;
-			var record = new string[count];
+			var dbRecord = new string[count];
 			var columnIndex = 0;
 
 			sb.Length = 0;
@@ -243,7 +264,7 @@ namespace CsvDb
 						if (sb.Length > 0)
 						{
 							//store column
-							record[columnIndex] = sb.ToString();
+							dbRecord[columnIndex] = sb.ToString();
 							sb.Length = 0;
 						}
 						//point to next column
@@ -254,7 +275,7 @@ namespace CsvDb
 						if (sb.Length > 0)
 						{
 							//store column
-							record[columnIndex] = sb.ToString();
+							dbRecord[columnIndex] = sb.ToString();
 							sb.Length = 0;
 						}
 						//signal end of record
@@ -307,7 +328,22 @@ namespace CsvDb
 						break;
 				}
 			}
-			return record;
+
+			if (!Query.Columns.IsFull)
+			{
+				//translate to real
+				var record = new string[IndexTranslator.Length];
+				for (var i = 0; i < IndexTranslator.Length; i++)
+				{
+					record[i] = dbRecord[IndexTranslator[i]];
+				}
+				return record;
+			}
+			else
+			{
+				//return record
+				return dbRecord;
+			}
 		}
 
 		internal List<string[]> ReadOffsetRecords(IEnumerable<Int32> offsetCollection)

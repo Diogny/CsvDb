@@ -56,31 +56,28 @@ namespace CsvDb
 			//fills Pages and return the amount of keys in this search
 			if (IsExpression)
 			{
-				switch (Expression.Operator.Name)
+				var nodeTree = Table.Column.IndexTree<T>();
+				int offset = -1;
+
+				var value = Constant.Value();
+				Type valueType = Type.GetType($"System.{Constant.OperandType}");
+
+				var key = (T)Convert.ChangeType(value, valueType);
+
+				var collection = Enumerable.Empty<int>();
+
+				if (nodeTree.Root == null)
 				{
-					case "=":
-						var nodeTree = Table.Column.IndexTree<T>();
-						int offset = -1;
-
-						var value = Constant.Value();
-						Type valueType = Type.GetType($"System.{Constant.OperandType}");
-
-						var key = (T)Convert.ChangeType(value, valueType);
-						var collection = Enumerable.Empty<int>();
-
-						if (nodeTree.Root == null)
-						{
-							//go to .bin file directly, it's ONE page of items
-							offset = DbGenerator.ItemsPageStart;
-
-							DbKeyValues<T> item = Table.Column.IndexItems<T>().Find(offset, key);
-							if (item != null && item.Values != null)
-							{
-								collection = item.Values;
-							}
-						}
-						else
-						{
+					//go to .bin file directly, it's ONE page of items
+					collection = Table.Column.IndexItems<T>()
+						.FindByOper(DbGenerator.ItemsPageStart, key, Expression.Operator.OperatorType);
+				}
+				else
+				{
+					//this's for tree node page structure
+					switch (Expression.Operator.Name)
+					{
+						case "=":
 							var baseNode = nodeTree.FindKey(key) as PageIndexNodeBase<T>;
 							if (baseNode == null)
 							{
@@ -105,19 +102,26 @@ namespace CsvDb
 									}
 									break;
 							}
-						}
-						foreach (var ofs in collection)
-						{
-							yield return ofs;
-						}
-						break;
-					case ">":
-					case ">=":
-					//return FindGreaterThan(column, oper, key);
-					case "<":
-					case "<=":
-						//return FindLessThan(column, oper, key);
-						throw new ArgumentException($"Operator: {Expression.Operator.Name} not implemented yet!");
+							break;
+						case "<":
+							collection = nodeTree.FindLessThanKey(key);
+							break;
+						case "<=":
+							collection = nodeTree.FindLessOrEqualThanKey(key);
+							break;
+						case ">":
+							collection = nodeTree.FindGreaterThanKey(key);
+							break;
+						case ">=":
+							collection = nodeTree.FindGreaterOrEqualThanKey(key);
+							break;
+							//throw new ArgumentException($"Operator: {Expression.Operator.Name} not implemented yet!");
+					}
+				}
+				//
+				foreach (var ofs in collection)
+				{
+					yield return ofs;
 				}
 			}
 			else
@@ -136,7 +140,7 @@ namespace CsvDb
 				else
 				{
 					//In-Order return all values
-					foreach (var offs in DumpFullTable(treeReader.Root))
+					foreach (var offs in treeReader.DumpTreeNodesInOrder(treeReader.Root)) //DumpFullTable(treeReader.Root))
 					{
 						yield return offs;
 					}
@@ -146,82 +150,82 @@ namespace CsvDb
 			yield break;
 		}
 
-		IEnumerable<int> DumpFullTable(PageIndexNodeBase<T> root)
-		{
-			var stack = new Stack<PageIndexNodeBase<T>>();
-			PageIndexNode<T> nodePage = null;
+		//IEnumerable<int> DumpFullTable(PageIndexNodeBase<T> root)
+		//{
+		//	var stack = new Stack<PageIndexNodeBase<T>>();
+		//	PageIndexNode<T> nodePage = null;
 
-			//set current to root
-			PageIndexNodeBase<T> current = root;
+		//	//set current to root
+		//	PageIndexNodeBase<T> current = root;
 
-			IEnumerable<int> EnumerateOffsets(PageIndexItems<T> page)
-			{
-				//find from dictionary for fast search
-				var metaPage = Column.IndexItems<T>()[page.Offset];
-				if (metaPage != null)
-				{
-					foreach (var ofs in metaPage.Items.SelectMany(i => i.Value))
-					{
-						yield return ofs;
-					}
-				}
-				else
-				{
-					yield break;
-				}
-			}
+		//	IEnumerable<int> EnumerateOffsets(PageIndexItems<T> page)
+		//	{
+		//		//find from dictionary for fast search
+		//		var metaPage = Column.IndexItems<T>()[page.Offset];
+		//		if (metaPage != null)
+		//		{
+		//			foreach (var ofs in metaPage.Items.SelectMany(i => i.Value))
+		//			{
+		//				yield return ofs;
+		//			}
+		//		}
+		//		else
+		//		{
+		//			yield break;
+		//		}
+		//	}
 
-			while (stack.Count > 0 || current != null)
-			{
-				if (current != null)
-				{
-					//if it's a items page, return all it's values
-					if (current.Type == MetaIndexType.Items)
-					{
-						//find items page by its offset
-						foreach (var ofs in EnumerateOffsets(current as PageIndexItems<T>))
-						{
-							yield return ofs;
-						}
-						//signal end
-						current = null;
-					}
-					else
-					{
-						//it's a node page, push current page
-						stack.Push(current);
+		//	while (stack.Count > 0 || current != null)
+		//	{
+		//		if (current != null)
+		//		{
+		//			//if it's a items page, return all it's values
+		//			if (current.Type == MetaIndexType.Items)
+		//			{
+		//				//find items page by its offset
+		//				foreach (var ofs in EnumerateOffsets(current as PageIndexItems<T>))
+		//				{
+		//					yield return ofs;
+		//				}
+		//				//signal end
+		//				current = null;
+		//			}
+		//			else
+		//			{
+		//				//it's a node page, push current page
+		//				stack.Push(current);
 
-						//try to go Left
-						current = ((PageIndexNode<T>)current).Left;
-					}
-				}
-				else
-				{
-					current = stack.Pop();
-					//return current node page items --first--
+		//				//try to go Left
+		//				current = ((PageIndexNode<T>)current).Left;
+		//			}
+		//		}
+		//		else
+		//		{
+		//			current = stack.Pop();
+		//			//return current node page items --first--
 
-					if (current.Type == MetaIndexType.Items)
-					{
-						//find items page by its offset
-						foreach (var ofs in EnumerateOffsets(current as PageIndexItems<T>))
-						{
-							yield return ofs;
-						}
-						//signal end
-						current = null;
-					}
-					else
-					{
-						//it's a node page, return Key values, and try to go Right
-						nodePage = current as PageIndexNode<T>;
-						foreach (var ofs in nodePage.Values)
-						{
-							yield return ofs;
-						}
-						current = nodePage.Right;
-					}
-				}
-			}
-		}
+		//			if (current.Type == MetaIndexType.Items)
+		//			{
+		//				//find items page by its offset
+		//				foreach (var ofs in EnumerateOffsets(current as PageIndexItems<T>))
+		//				{
+		//					yield return ofs;
+		//				}
+		//				//signal end
+		//				current = null;
+		//			}
+		//			else
+		//			{
+		//				//it's a node page, return Key values, and try to go Right
+		//				nodePage = current as PageIndexNode<T>;
+		//				foreach (var ofs in nodePage.Values)
+		//				{
+		//					yield return ofs;
+		//				}
+		//				current = nodePage.Right;
+		//			}
+		//		}
+		//	}
+		//}
 	}
 }

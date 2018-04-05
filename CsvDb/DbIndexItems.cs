@@ -116,15 +116,21 @@ namespace CsvDb
 			Index.ItemPages = Pages.Count;
 		}
 
+		/// <summary>
+		/// Finds an key in a page according to its offset
+		/// </summary>
+		/// <param name="offset">offset (ID) of page</param>
+		/// <param name="key">key</param>
+		/// <returns></returns>
 		public DbKeyValues<T> Find(int offset, T key)
 		{
-			var page = Pages.FirstOrDefault(p => p.Offset == offset);
-
-			if (page == null)
+			if (!Hash.TryGetValue(offset, out MetaItemsPage<T> page))
 			{
 				return null;
 			}
+
 			var pair = page.Items.FirstOrDefault(i => i.Key.Equals(key));
+
 			return (pair.Key == null) ?
 				null :
 				new DbKeyValues<T>()
@@ -133,6 +139,66 @@ namespace CsvDb
 					Values = pair.Value
 				};
 		}
+
+		/// <summary>
+		/// Used to search by comparison operators inside a given item page
+		/// </summary>
+		/// <param name="offset">offset (ID) of the item page</param>
+		/// <param name="key">key to compare</param>
+		/// <param name="oper">comparison operator</param>
+		/// <returns></returns>
+		public IEnumerable<int> FindByOper(int offset, T key, Query.DbQueryConditionOper oper)
+		{
+			if (!Hash.TryGetValue(offset, out MetaItemsPage<T> page))
+			{
+				yield break;
+			}
+			else
+			{
+				IEnumerable<int> collection = Enumerable.Empty<int>();
+				switch (oper)
+				{
+					case Query.DbQueryConditionOper.Equal:
+						collection = page.Items.Where(i => i.Key.Equals(key)).SelectMany(i => i.Value);
+						break;
+					case Query.DbQueryConditionOper.NotEqual:
+						collection = page.Items.Where(i => i.Key.CompareTo(key) != 0).SelectMany(i => i.Value);
+						break;
+					case Query.DbQueryConditionOper.Less:
+						collection = page.Items.Where(i => i.Key.CompareTo(key) < 0).SelectMany(i => i.Value);
+						break;
+					case Query.DbQueryConditionOper.LessOrEqual:
+						collection = page.Items.Where(i => i.Key.CompareTo(key) <= 0).SelectMany(i => i.Value);
+						break;
+					case Query.DbQueryConditionOper.Greater:
+						collection = page.Items.Where(i => i.Key.CompareTo(key) > 0).SelectMany(i => i.Value);
+						break;
+					case Query.DbQueryConditionOper.GreaterOrEqual:
+						collection = page.Items.Where(i => i.Key.CompareTo(key) >= 0).SelectMany(i => i.Value);
+						break;
+				}
+				foreach (var ofs in collection)
+				{
+					yield return ofs;
+				}
+			}
+		}
+
+		public IEnumerable<int> All(int offset)
+		{
+			if (!Hash.TryGetValue(offset, out MetaItemsPage<T> page))
+			{
+				yield break;
+			}
+			else
+			{
+				foreach (var ofs in page.Items.SelectMany(i => i.Value))
+				{
+					yield return ofs;
+				}
+			}
+		}
+
 	}
 
 	public class MetaItemsPage<T>

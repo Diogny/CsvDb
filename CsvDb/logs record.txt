@@ -12,6 +12,9 @@
 .-rename classes
 .-change json to binary schema structure
 .-fix table dump
-2018/03/30 - 
+2018/03/30 - 2018/04/04
 .-add new table column types
 .-add new Query Parser functions
+.-add query expression operators for single page indexes
+.-and multipages
+2018/04/04 -

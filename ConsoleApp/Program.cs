@@ -29,16 +29,17 @@ namespace ConsoleApp
 
 			//Generators();
 
+			string dbName = "data-full";
 			//Create Db with binary table rows and indexes
 			//data
 			//data-light
 			//data-extra-light
 			//data-bin,			DbSchemaConfigEnum.Binary,  "bus_data-full.zip"
 			//data-full,		DbSchemaConfigEnum.Csv,		"bus_data-full.zip"
-			GenerateInitialDbData(appConfig, "data-full", DbSchemaConfigEnum.Csv, "bus_data-full.zip");
+			GenerateInitialDbData(appConfig, dbName, DbSchemaConfigEnum.Csv, "bus_data-full.zip");
 
 			//compile indices
-			CompileDb(appConfig, "data-full");
+			CompileDb(appConfig, dbName);
 
 			//SqlQueryExecuteTests();
 

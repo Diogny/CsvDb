@@ -84,7 +84,7 @@ namespace Csv.CMS.ConsApp
 				con.WriteLine("	│ (D)isplay available database(s)              │                                             │");
 				con.WriteLine("	│ (M)ount database                             │ (K)ill/close database                       │");
 				con.WriteLine("	│ (S)earch Database                            │ (E)execute Queries                          │");
-				con.WriteLine("	│ Display (I)nformation of Database            │ Display (T)ables Info                       │");
+				con.WriteLine("	│ Display (I)nformation of Table.Column        │ Display (T)ables Info                       │");
 				con.WriteLine("	│ Display Index Tree (N)ode Structure          │ Display (I)ndex Tree Structure              │");
 				con.WriteLine("	│ (X)treme class                               │                                             │");
 				con.WriteLine("	├──────────────────────────────────────────────┴─────────────────────────────────────────────┤");
@@ -93,6 +93,8 @@ namespace Csv.CMS.ConsApp
 				con.WriteLine("	│      WHERE                                                                                 │");
 				con.WriteLine("	│      [INNER|CROSS|(LEFT|RIGHT|FULL) OUTER] JOIN table0 t0 ON expr:<left> oper <right>      │");
 				con.WriteLine("	└────────────────────────────────────────────────────────────────────────────────────────────┘");
+
+				// ORDER BY 
 
 				//	SELECT * FROM [table] t
 				//		WHERE t.Name == ""
@@ -273,13 +275,13 @@ namespace Csv.CMS.ConsApp
 						{
 							foreach (var table in db.Tables)
 							{
-								var text = $" [{table.Name}]{(table.Multikey.IfTrue(" [Multikey] "))}{(table.Rows > 0 ? $" {table.Rows} row(s)" : "")}";
+								var text = $"\r\n [{table.Name}]{(table.Multikey.IfTrue(" -m "))}{(table.Rows > 0).IfTrue($" {table.Rows} row(s)")}";
 								con.WriteLine(text.ToLower());
 								//show columns
 								foreach (var col in table.Columns)
 								{
 									text = $"   {col.Name}: {col.Type}" +
-									 $"  {(col.Key.IfTrue(" [Key]"))}{(col.Indexed.IfTrue(" [Indexed]"))}{(col.Unique.IfTrue(" [Unique]"))} {(col.PageCount > 0 ? $" {col.PageCount} page(s)" : "")}";
+									 $"  {(col.Key.IfTrue("-k"))}{(col.Indexed.IfTrue("-i"))}{(col.Unique.IfTrue("-u"))} {(col.PageCount > 0).IfTrue($" {col.PageCount} page(s)")}";
 									con.WriteLine(text.ToLower());
 								}
 							}
@@ -324,7 +326,7 @@ namespace Csv.CMS.ConsApp
 								var unstop = false;
 								var rows = rowsEnumerable.ToList();
 								sw.Stop();
-								var ellapsedRetrieved = $" {rowCount} row(s) retrieved on {sw.ElapsedMilliseconds} ms";
+								//var ellapsedRetrievedStr = sw.ElapsedMilliseconds.ToString();
 
 								foreach (var record in rows)
 								{
@@ -344,6 +346,7 @@ namespace Csv.CMS.ConsApp
 									}
 								}
 								visualizer.Dispose();
+								var ellapsedRetrieved = $" {rowCount} row(s) retrieved on {sw.ElapsedMilliseconds} ms";
 								con.WriteLine($"\r\n {ellapsedExecuted}\r\n{ellapsedRetrieved}");
 							}
 						}

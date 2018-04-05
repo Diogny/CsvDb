@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using io = System.IO;
 using System.Collections;
+using System.Linq;
 
 namespace CsvDb
 {
@@ -104,49 +105,347 @@ namespace CsvDb
 			}
 		}
 
-		///// <summary>
-		///// returns the offset page
-		///// </summary>
-		///// <param name="key"></param>
-		///// <returns></returns>
-		//public int Find(object key)
-		//{
-		//	var keyTypeName = key.GetType().Name;
-		//	CsvDbColumnTypeEnum keyType;
-		//	if (!Enum.TryParse<CsvDbColumnTypeEnum>(keyTypeName, out keyType) ||
-		//		keyType != KeyType)
-		//	{
-		//		return -2;
-		//	}
+		/// <summary>
+		/// Finds all keys less than an specific key
+		/// </summary>
+		/// <param name="key">key</param>
+		/// <returns></returns>
+		internal IEnumerable<int> FindLessThanKey(T key)
+		{
+			PageIndexNodeBase<T> root = Root;
 
-		//	if (Root == null)
-		//	{
-		//		//go to .bin file directly, it's ONE page of items
-		//		return CsvDbGenerator.ItemsPageStart;
-		//	}
-		//	else
-		//	{
-		//		//can be compared here
-		//		MetaIndexItems<T> page;
-		//		var thisType = this.GetType();
-		//		MethodInfo method = thisType
-		//				.GetMethod(nameof(FindKey), BindingFlags.Instance | BindingFlags.NonPublic);
+			while (root != null)
+			{
+				switch (root.Type)
+				{
+					case MetaIndexType.Items:
+						var itemsPage = root as PageIndexItems<T>;
+						foreach (var ofs in Index.IndexItems<T>()
+							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.Less))
+						{
+							yield return ofs;
+						}
+						//stop here
+						root = null;
+						break;
+					case MetaIndexType.Node:
+						var nodePage = root as PageIndexNode<T>;
+						//compare key to node:key
+						var comp = key.CompareTo(nodePage.Key);
+						if (comp < 0)
+						{
+							//go down to the left
+							root = nodePage.Left;
+						}
+						else
+						{
+							//key's greater or equal than node key
 
-		//		Type indexType = Type.GetType($"System.{keyTypeName}");
+							//return all left nodes -in-order
+							foreach (var ofs in DumpTreeNodesInOrder(nodePage.Left))
+							{
+								yield return ofs;
+							}
 
-		//		MethodInfo generic = method.MakeGenericMethod(indexType);
+							if (comp > 0)
+							{
+								//return root values
+								foreach (var ofs in nodePage.Values)
+								{
+									yield return ofs;
+								}
 
-		//		page = generic.Invoke(this,
-		//					new object[]
-		//					{
-		//						Root,
-		//						key
-		//					}) as MetaIndexItems<T>;
+								//continue probing right node
+								root = nodePage.Right;
+							}
+							else
+							{
+								//stop here
+								root = null;
+							}
+						}
+						break;
+				}
+			}
+		}
 
-		//		return (page == null) ? -4 : page.Offset;
-		//	}
-		//}
+		/// <summary>
+		/// Finds all keys less or equal than an specific key
+		/// </summary>
+		/// <param name="key">key</param>
+		/// <returns></returns>
+		internal IEnumerable<int> FindLessOrEqualThanKey(T key)
+		{
+			PageIndexNodeBase<T> root = Root;
 
+			while (root != null)
+			{
+				switch (root.Type)
+				{
+					case MetaIndexType.Items:
+						var itemsPage = root as PageIndexItems<T>;
+						foreach (var ofs in Index.IndexItems<T>()
+							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.LessOrEqual))
+						{
+							yield return ofs;
+						}
+						//stop here
+						root = null;
+						break;
+					case MetaIndexType.Node:
+						var nodePage = root as PageIndexNode<T>;
+						//compare key to node:key
+						var comp = key.CompareTo(nodePage.Key);
+						if (comp < 0)
+						{
+							//go down to the left
+							root = nodePage.Left;
+						}
+						else
+						{
+							//return all left nodes -in-order
+							foreach (var ofs in DumpTreeNodesInOrder(nodePage.Left))
+							{
+								yield return ofs;
+							}
+
+							//return root
+							foreach (var ofs in nodePage.Values)
+							{
+								yield return ofs;
+							}
+
+							if (comp > 0)
+							{
+								//continue probing right node
+								root = nodePage.Right;
+							}
+							else
+							{
+								//stop here
+								root = null;
+							}
+						}
+						break;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Finds all keys greater than an specific key
+		/// </summary>
+		/// <param name="key">key</param>
+		/// <returns></returns>
+		internal IEnumerable<int> FindGreaterThanKey(T key)
+		{
+			foreach (var ofs in FindGreaterThanKey(Root, key))
+			{
+				yield return ofs;
+			}
+		}
+
+		internal IEnumerable<int> FindGreaterThanKey(PageIndexNodeBase<T> root, T key)
+		{
+			while (root != null)
+			{
+				switch (root.Type)
+				{
+					case MetaIndexType.Items:
+						var itemsPage = root as PageIndexItems<T>;
+						foreach (var ofs in Index.IndexItems<T>()
+							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.Greater))
+						{
+							yield return ofs;
+						}
+						//stop here
+						root = null;
+						break;
+					case MetaIndexType.Node:
+						var nodePage = root as PageIndexNode<T>;
+						//compare key to node:key
+						var comp = key.CompareTo(nodePage.Key);
+						if (comp > 0)
+						{
+							//continue probing right node
+							root = nodePage.Right;
+						}
+						else
+						{
+							if (comp < 0)
+							{
+								//probe left node
+								foreach (var ofs in FindGreaterThanKey(nodePage.Left, key))
+								{
+									yield return ofs;
+								}
+							}
+
+							//return root values
+							foreach (var ofs in nodePage.Values)
+							{
+								yield return ofs;
+							}
+
+							//return all right nodes -in-order
+							foreach (var ofs in DumpTreeNodesInOrder(nodePage.Right))
+							{
+								yield return ofs;
+							}
+						}
+						break;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Finds all keys greater or equal than an specific key
+		/// </summary>
+		/// <param name="key">key</param>
+		/// <returns></returns>
+		internal IEnumerable<int> FindGreaterOrEqualThanKey(T key)
+		{
+			foreach (var ofs in FindGreaterOrEqualThanKey(Root, key))
+			{
+				yield return ofs;
+			}
+		}
+
+		internal IEnumerable<int> FindGreaterOrEqualThanKey(PageIndexNodeBase<T> root, T key)
+		{
+			while (root != null)
+			{
+				switch (root.Type)
+				{
+					case MetaIndexType.Items:
+						var itemsPage = root as PageIndexItems<T>;
+						foreach (var ofs in Index.IndexItems<T>()
+							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.GreaterOrEqual))
+						{
+							yield return ofs;
+						}
+						//stop here
+						root = null;
+						break;
+					case MetaIndexType.Node:
+						var nodePage = root as PageIndexNode<T>;
+						//compare key to node:key
+						var comp = key.CompareTo(nodePage.Key);
+						if (comp > 0)
+						{
+							//continue probing right node
+							root = nodePage.Right;
+						}
+						else
+						{
+							if (comp < 0)
+							{
+								//probe left node
+								foreach (var ofs in FindGreaterThanKey(nodePage.Left, key))
+								{
+									yield return ofs;
+								}
+							}
+
+							//return root values
+							foreach (var ofs in nodePage.Values)
+							{
+								yield return ofs;
+							}
+
+							//return all right nodes -in-order
+							foreach (var ofs in DumpTreeNodesInOrder(nodePage.Right))
+							{
+								yield return ofs;
+							}
+						}
+						break;
+				}
+			}
+		}
+
+		internal IEnumerable<int> DumpTreeNodesInOrder(PageIndexNodeBase<T> root)
+		{
+			var stack = new Stack<PageIndexNodeBase<T>>();
+			PageIndexNode<T> nodePage = null;
+
+			//set current to root
+			PageIndexNodeBase<T> current = root;
+
+			IEnumerable<int> EnumerateOffsets(PageIndexItems<T> page)
+			{
+				//find from dictionary for fast search
+				var metaPage = Index.IndexItems<T>()[page.Offset];
+				if (metaPage != null)
+				{
+					foreach (var ofs in metaPage.Items.SelectMany(i => i.Value))
+					{
+						yield return ofs;
+					}
+				}
+				else
+				{
+					yield break;
+				}
+			}
+
+			while (stack.Count > 0 || current != null)
+			{
+				if (current != null)
+				{
+					//if it's a items page, return all it's values
+					if (current.Type == MetaIndexType.Items)
+					{
+						//find items page by its offset
+						foreach (var ofs in EnumerateOffsets(current as PageIndexItems<T>))
+						{
+							yield return ofs;
+						}
+						//signal end
+						current = null;
+					}
+					else
+					{
+						//it's a node page, push current page
+						stack.Push(current);
+
+						//try to go Left
+						current = ((PageIndexNode<T>)current).Left;
+					}
+				}
+				else
+				{
+					current = stack.Pop();
+					//return current node page items --first--
+
+					if (current.Type == MetaIndexType.Items)
+					{
+						//find items page by its offset
+						foreach (var ofs in EnumerateOffsets(current as PageIndexItems<T>))
+						{
+							yield return ofs;
+						}
+						//signal end
+						current = null;
+					}
+					else
+					{
+						//it's a node page, return Key values, and try to go Right
+						nodePage = current as PageIndexNode<T>;
+						foreach (var ofs in nodePage.Values)
+						{
+							yield return ofs;
+						}
+						current = nodePage.Right;
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Finds a key in the key tree of nodes
+		/// </summary>
+		/// <param name="key">key</param>
+		/// <returns></returns>
 		internal PageIndexNodeBase<T> FindKey(T key)
 		{
 			PageIndexNodeBase<T> root = Root;
@@ -161,7 +460,8 @@ namespace CsvDb
 					case MetaIndexType.Node:
 						//
 						var nodePage = root as PageIndexNode<T>;
-						var comp = key.CompareTo((T)nodePage.Key);
+						//compare key to node:key
+						var comp = key.CompareTo(nodePage.Key);
 						if (comp < 0)
 						{
 							//go down to the left
