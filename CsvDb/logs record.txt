@@ -17,4 +17,6 @@
 .-add new Query Parser functions
 .-add query expression operators for single page indexes
 .-and multipages
-2018/04/04 -
+2018/04/04 - 2018/04/05
+.-add Samples folder with binary (data-bin) and csv (data-full) databases
+2018/04/05 - 
