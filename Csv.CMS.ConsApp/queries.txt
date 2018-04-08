@@ -2,104 +2,98 @@
 SELECT * FROM agency
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-agency_id|agency_name|agency_url|agency_timezone|agency_lang|agency_phone
--------------------------------------------------------------------------
-NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
+agency_id agency_name    agency_url                agency_timezone  agency_lang agency_phone
+--------------------------------------------------------------------------------------------
+NJB       NJ TRANSIT BUS http://www.njtransit.com/ America/New_York en
+ displayed 1 row(s)
+
+SELECT agency_id, agency_name, agency_timezone, agency_lang, agency_url FROM agency
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+┌───┬─────────┬──────────────┬────────────────┬───────────┬─────────────────────────┐
+│   │agency_id│agency_name   │agency_timezone │agency_lang│agency_url               │
+├───┼─────────┼──────────────┼────────────────┼───────────┼─────────────────────────┤
+│1  │NJB      │NJ TRANSIT BUS│America/New_York│en         │http://www.njtransit.com/│
+└───┴─────────┴──────────────┴────────────────┴───────────┴─────────────────────────┘
+ displayed 1 row(s)
+
+
+SELECT route_id, agency_id,route_short_name,route_type FROM routes
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+┌───┬────────┬─────────┬────────────────┬──────────┐
+│   │route_id│agency_id│route_short_name│route_type│
+├───┼────────┼─────────┼────────────────┼──────────┤
+│1  │1       │1        │1               │3         │
+│2  │2       │2        │10              │3         │
+│3  │3       │3        │107             │3         │
+│4  │4       │4        │108             │3         │
+│5  │5       │5        │11              │3         │
+│6  │6       │6        │111             │3         │
+│7  │7       │7        │112             │3         │
+│8  │8       │8        │113             │3         │
+...
+│251│251     │251      │AC4B            │3         │
+│252│252     │252      │AC5             │3         │
+│253│253     │253      │GO25            │3         │
+│254│254     │254      │GO28            │3         │
+└───┴────────┴─────────┴────────────────┴──────────┘
+ displayed 254 row(s)
+
 
 //search route by it's route short name
 
 SELECT * FROM routes WHERE route_short_name = "122"
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-route_id|agency_id|route_short_name|route_long_name|route_type|route_url|route_color
+route_id agency_id route_short_name route_long_name route_type route_url route_color
 ------------------------------------------------------------------------------------
-16,NJB,122,,3,,
+16       NJB       122                              3
+ displayed 1 row(s)
 
 //search trips by its route_id
 
 SELECT * FROM trips WHERE route_id = 16
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-route_id|service_id|trip_id|trip_headsign|direction_id|block_id|shape_id
-------------------------------------------------------------------------
-16,4,3078,122 NEW YORK,0,320ML006,319
-16,4,3079,122 NEW YORK,0,129ML005,319
-16,4,3080,122 NEW YORK,0,320ML012,319
-16,4,3081,122 NEW YORK,0,320ML006,319
-16,4,3082,122 NEW YORK,0,190WY008,319
-16,4,3083,122 NEW YORK,0,190WY014,319
-16,4,3084,122 NEW YORK,0,190WY005,319
-16,4,3085,122 NEW YORK,0,320ML011,319
-16,4,3086,122 NEW YORK,0,190WY019,319
-16,4,3087,122 NEW YORK,0,190WY011,319
-16,4,3088,122 NEW YORK,0,190WY024,319
-16,4,3089,122 NEW YORK,0,190WY003,319
-16,4,3090,122 NEW YORK,0,190WY008,319
-16,4,3091,122 SECAUCUS CUL-DE-SAC,1,190WY005,320
-16,4,3092,122 SECAUCUS CUL-DE-SAC,1,190WY011,320
-16,4,3093,122 SECAUCUS CUL-DE-SAC,1,320ML004,320
-16,4,3094,122 SECAUCUS CUL-DE-SAC,1,190WY008,320
-16,4,3095,122 SECAUCUS CUL-DE-SAC,1,128ML012,320
-16,4,3096,122 SECAUCUS CUL-DE-SAC,1,166ML030,320
-16,4,3097,122 SECAUCUS CUL-DE-SAC,1,190WY054,320
-16,4,3098,122 SECAUCUS CUL-DE-SAC,1,190ML003,320
-16,4,3099,122 SECAUCUS CUL-DE-SAC,1,190ML005,320
-16,4,3100,122 SECAUCUS CUL-DE-SAC,1,190ML006,320
-16,4,3101,122 SECAUCUS CUL-DE-SAC,1,190WY037,320
-16,4,3102,122 SECAUCUS CUL-DE-SAC,1,190WY036,320
-16,4,3103,122 SECAUCUS CUL-DE-SAC,1,320ML032,320
-16,4,3104,122 SECAUCUS CUL-DE-SAC,1,190ML003,320
-16,4,3105,122 SECAUCUS CUL-DE-SAC,1,128ML016,320
-16,4,3106,122 SECAUCUS CUL-DE-SAC,1,129ML012,320
-16,4,3107,122 SECAUCUS CUL-DE-SAC,1,320ML021,320
-16,5,3108,122 NEW YORK,0,190ML001,321
-16,5,3109,122 NEW YORK,0,129ML007,321
-16,5,3110,122 NEW YORK,0,320ML005,321
-16,5,3111,122 NEW YORK,0,190ML001,321
-16,5,3112,122 NEW YORK,0,190WY007,321
-16,5,3113,122 NEW YORK,0,320ML013,321
-16,5,3114,122 NEW YORK,0,190WY012,321
-16,5,3115,122 NEW YORK,0,190WY005,321
-16,5,3116,122 NEW YORK,0,190WY009,321
-16,5,3117,122 NEW YORK,0,190ML003,321
-16,5,3118,122 NEW YORK,0,190WY017,321
-16,5,3119,122 NEW YORK,0,190WY011,321
-16,5,3120,122 NEW YORK,0,190WY025,321
-16,5,3121,122 NEW YORK,0,190ML004,321
-16,5,3122,122 NEW YORK,0,190WY003,321
-16,5,3123,122 NEW YORK,0,190WY021,321
-16,5,3124,122 SECAUCUS CUL-DE-SAC,1,190WY005,322
-16,5,3125,122 SECAUCUS CUL-DE-SAC,1,190WY011,322
-16,5,3126,122 SECAUCUS CUL-DE-SAC,1,190ML004,322
-16,5,3127,122 SECAUCUS CUL-DE-SAC,1,190WY021,322
-16,5,3128,122 SECAUCUS CUL-DE-SAC,1,190ML008,322
-16,5,3129,122 SECAUCUS CUL-DE-SAC,1,166ML027,322
-16,5,3130,122 SECAUCUS CUL-DE-SAC,1,190WY067,322
-16,5,3131,122 SECAUCUS CUL-DE-SAC,1,190ML009,322
-16,5,3132,122 SECAUCUS CUL-DE-SAC,1,190ML011,322
-16,5,3133,122 SECAUCUS CUL-DE-SAC,1,190ML012,322
-16,5,3134,122 SECAUCUS CUL-DE-SAC,1,190ML013,322
-16,5,3135,122 SECAUCUS CUL-DE-SAC,1,190WY073,322
-16,5,3136,122 SECAUCUS CUL-DE-SAC,1,190WY037,322
-16,5,3137,122 SECAUCUS CUL-DE-SAC,1,320ML019,322
-16,5,3138,122 SECAUCUS CUL-DE-SAC,1,190ML009,322
-16,5,3139,122 SECAUCUS CUL-DE-SAC,1,129ML020,322
-16,5,3140,122 SECAUCUS CUL-DE-SAC,1,129ML018,322
-16,5,3141,122 SECAUCUS CUL-DE-SAC,1,320ML019,322
-64 row(s)
+route_id service_id trip_id trip_headsign           direction_id block_id shape_id
+----------------------------------------------------------------------------------
+16       7          5603    122 NEW YORK            0            320ML006 562
+16       7          5604    122 NEW YORK            0            129ML005 562
+16       7          5605    122 NEW YORK            0            320ML012 562
+16       7          5606    122 NEW YORK            0            320ML006 562
+16       7          5607    122 NEW YORK            0            190WY008 562
+16       7          5608    122 NEW YORK            0            190WY014 562
+16       7          5609    122 NEW YORK            0            190WY005 562
+16       7          5610    122 NEW YORK            0            320ML011 562
+16       7          5611    122 NEW YORK            0            190WY019 562
+16       7          5612    122 NEW YORK            0            190WY011 562
+16       7          5613    122 NEW YORK            0            190WY024 562
+16       7          5614    122 NEW YORK            0            190WY003 562
+16       7          5615    122 NEW YORK            0            190WY008 562
+16       7          5616    122 SECAUCUS CUL-DE-SAC 1            190WY005 563
+...
+16       6          5696    122 SECAUCUS CUL-DE-SAC 1            320ML019 567
+16       6          5697    122 SECAUCUS CUL-DE-SAC 1            190ML009 567
+16       6          5698    122 SECAUCUS CUL-DE-SAC 1            129ML019 567
+route_id service_id trip_id trip_headsign           direction_id block_id shape_id
+----------------------------------------------------------------------------------
+16       6          5699    122 SECAUCUS CUL-DE-SAC 1            129ML017 567
+16       6          5700    122 SECAUCUS CUL-DE-SAC 1            320ML019 567
+ displayed 98 row(s)
 
 //search calendar_dates by todays' data [yyyymmdd]
 
-SELECT * FROM calendar_dates WHERE date = 20180322
+SELECT * FROM calendar_dates WHERE date = 20180522
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-service_id|date|exception_type
-------------------------------
-3,20180322,1
-5,20180322,1
-6,20180322,1
-9,20180322,1
-4 row(s)
+service_id date     exception_type
+----------------------------------
+6          20180522 1
+10         20180522 1
+16         20180522 1
+17         20180522 1
+ displayed 4 row(s)
 
 //today's trips
 SELECT * FROM trips t
@@ -109,91 +103,169 @@ SELECT * FROM trips t
 SELECT * FROM stop_times WHERE trip_id = 3108
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-trip_id|arrival_time|departure_time|stop_id|stop_sequence|pickup_type|drop_off_type|shape_dist_traveled
+trip_id arrival_time departure_time stop_id stop_sequence pickup_type drop_off_type shape_dist_traveled
 -------------------------------------------------------------------------------------------------------
-3108,06:00:00,06:00:00,32457,1,0,0,0.0000
-3108,06:02:18,06:02:18,32459,2,0,0,0.3943
-3108,06:02:42,06:02:42,32460,3,0,0,0.4517
-3108,06:04:00,06:04:00,32461,4,0,0,0.6638
-3108,06:04:24,06:04:24,39621,5,0,0,0.7392
-3108,06:05:24,06:05:24,32462,6,0,0,0.9017
-3108,06:06:42,06:06:42,39622,7,0,0,1.1097
-3108,06:08:30,06:08:30,18962,8,0,0,1.4074
-3108,06:09:06,06:09:06,18963,9,0,0,1.5038
-3108,06:09:42,06:09:42,18964,10,0,0,1.5973
-3108,06:10:36,06:10:36,18965,11,0,0,1.7430
-3108,06:11:30,06:11:30,18967,12,0,0,1.8939
-3108,06:12:00,06:12:00,17160,13,0,0,1.9720
-3108,06:13:06,06:13:06,17079,14,0,0,2.2727
-3108,06:31:18,06:31:18,43310,15,1,0,7.2540
-3108,06:32:00,06:32:00,43274,16,0,0,7.4273
-16 row(s)
+3108    09:15:00     09:15:00       3511    1             0           1             0
+3108    09:24:48     09:24:48       38436   2             0           0             3.0669
+3108    09:25:12     09:25:12       3176    3             0           0             3.182
+3108    09:25:24     09:25:24       3234    4             0           0             3.2515
+3108    09:26:00     09:26:00       3220    5             0           0             3.4241
+3108    09:26:24     09:26:24       3177    6             0           0             3.6578
+3108    09:51:00     09:51:00       37233   7             0           0             17.6021
+3108    09:53:00     09:53:00       43335   8             0           0             18.0246
+3108    09:55:54     09:55:54       38504   9             0           0             18.7331
+3108    09:59:00     09:59:00       27132   10            0           0             19.4479
+ displayed 10 row(s)
 
 SELECT * FROM stops WHERE stop_id = 32457
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-stop_id|stop_code|stop_name|stop_desc|stop_lat|stop_lon|zone_id
----------------------------------------------------------------
-32457,21604,PATERSON PLANK RD CUL-DE-SAC,,40.802319,-74.059053,8192
-
-
-
-
-
-
-
+stop_id stop_code stop_name                    stop_desc stop_lat  stop_lon   zone_id
+-------------------------------------------------------------------------------------
+32457   21604     PATERSON PLANK RD CUL-DE-SAC           40.802319 -74.059053 8192
+ displayed 1 row(s)
 
 
 SELECT * FROM shapes WHERE shape_id = 1
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-shape_id|shape_pt_lat|shape_pt_lon|shape_pt_sequence|shape_dist_traveled
+shape_id shape_pt_lat shape_pt_lon shape_pt_sequence shape_dist_traveled
 ------------------------------------------------------------------------
-1,40.737739,-74.245290,1,0.0000
-1,40.737714,-74.245511,2,0.0116
-1,40.737712,-74.245460,3,0.0142
-1,40.737720,-74.245402,4,0.0172
+1        40.737739    -74.24529    1                 0
+1        40.737714    -74.245511   2                 0.0116
+1        40.737712    -74.24546    3                 0.0142
+1        40.73772     -74.245402   4                 0.0172
+1        40.737745    -74.245355   5                 0.0201
+1        40.73783     -74.245289   6                 0.0267
+1        40.737558    -74.244391   7                 0.0773
+1        40.737429    -74.243962   8                 0.1013
+1        40.737169    -74.243122   9                 0.1489
+1        40.736898    -74.242253   10                0.1981
+1        40.736599    -74.241283   11                0.253
+1        40.736298    -74.240303   12                0.3085
+1        40.736007    -74.239373   13                0.3612
+1        40.735358    -74.237173   14                0.485
+1        40.73598     -74.236841   15                0.5312
 ...
-363 row(s)
+1        40.71511     -74.035991   351               13.317
+1        40.715828    -74.035841   352               13.367
+shape_id shape_pt_lat shape_pt_lon shape_pt_sequence shape_dist_traveled
+------------------------------------------------------------------------
+1        40.716549    -74.035723   353               13.417
+1        40.716658    -74.035703   354               13.4246
+1        40.717319    -74.035593   355               13.4705
+1        40.717198    -74.035031   356               13.5011
+1        40.717138    -74.034601   357               13.5241
+1        40.717108    -74.034352   358               13.5371
+1        40.717069    -74.034053   359               13.553
+1        40.71642     -74.034152   360               13.5981
+1        40.716469    -74.034241   361               13.6038
+1        40.716507    -74.034371   362               13.611
+1        40.716658    -74.035703   363               13.6816
+ displayed 363 row(s)
 
 SELECT * FROM stop_times WHERE trip_id = 1 AND stop_id = 27677
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-trip_id|arrival_time|departure_time|stop_id|stop_sequence|pickup_type|drop_off_type|shape_dist_traveled
+trip_id arrival_time departure_time stop_id stop_sequence pickup_type drop_off_type shape_dist_traveled
 -------------------------------------------------------------------------------------------------------
-1,04:54:30,04:54:30,27677,18,0,0,2.3267
+1       04:54:30     04:54:30       27677   18            0           0             2.3267
+ displayed 1 row(s)
+
 
 SELECT * FROM stops WHERE stop_id = 194 AND stop_code = "10833"
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-stop_id|stop_code|stop_name|stop_desc|stop_lat|stop_lon|zone_id
----------------------------------------------------------------
-194,10833,MAIN ST AT E. MERION AVE,,39.397270,-74.517571,0
+stop_id stop_code stop_name                stop_desc stop_lat stop_lon   zone_id
+--------------------------------------------------------------------------------
+194     10833     MAIN ST AT E. MERION AVE           39.39727 -74.517571 0
+ displayed 1 row(s)
+
+
+SELECT stop_id, stop_code, stop_name, stop_lat, stop_lon, zone_id FROM stops WHERE stop_id = 194 AND stop_code = "10833"
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+stop_id stop_code stop_name                stop_lat stop_lon   zone_id
+----------------------------------------------------------------------
+194     10833     MAIN ST AT E. MERION AVE 39.39727 -74.517571 0
+ displayed 1 row(s)
+
 
 SELECT * FROM stops WHERE stop_id = 194
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-stop_id|stop_code|stop_name|stop_desc|stop_lat|stop_lon|zone_id
----------------------------------------------------------------
-194,10833,MAIN ST AT E. MERION AVE,,39.397270,-74.517571,0
+stop_id stop_code stop_name                stop_desc stop_lat stop_lon   zone_id
+--------------------------------------------------------------------------------
+194     10833     MAIN ST AT E. MERION AVE           39.39727 -74.517571 0
+ displayed 1 row(s)
+
 
 SELECT * FROM stops WHERE stop_code = "10833"
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-stop_id|stop_code|stop_name|stop_desc|stop_lat|stop_lon|zone_id
----------------------------------------------------------------
-194,10833,MAIN ST AT E. MERION AVE,,39.397270,-74.517571,0
+stop_id stop_code stop_name                stop_desc stop_lat stop_lon   zone_id
+--------------------------------------------------------------------------------
+194     10833     MAIN ST AT E. MERION AVE           39.39727 -74.517571 0
+ displayed 1 row(s)
+
 
 SELECT * FROM calendar_dates WHERE date = 20180504
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-service_id|date|exception_type
+service_id date     exception_type
+----------------------------------
+6          20180504 1
+10         20180504 1
+12         20180504 1
+14         20180504 1
+16         20180504 1
+17         20180504 1
+27         20180504 1
+ displayed 7 row(s)
+
+
+SELECT COUNT(*) FROM agency
 ------------------------------
-3,20180504,1
-5,20180504,1
-6,20180504,1
-7,20180504,1
-8,20180504,1
-9,20180504,1
-17,20180504,1
+
+COUNT
+-----
+1
+ displayed 1 row(s)
+
+
+SELECT COUNT(*) FROM routes
+------------------------------
+
+COUNT
+-----
+254
+ displayed 1 row(s)
+
+
+SELECT COUNT(*) FROM routes WHERE route_id > 247
+------------------------------------------------------------
+
+COUNT
+-----
+7
+ displayed 1 row(s)
+
+
+SELECT SUM(route_id) FROM routes
+------------------------------------------------------------
+
+SUM
+------
+566584
+ displayed 1 row(s)
+
+
+SELECT AVG(route_id) FROM routes
+------------------------------------------------------------
+
+AVG
+----------------
+2230.64566929134
+ displayed 1 row(s)
+
 

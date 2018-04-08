@@ -171,8 +171,8 @@ namespace ConsoleApp
 			//to calculate times
 			sw.Restart();
 
-			var visualizer = DbVisualizer.Create(dbQuery);
-			var rows = visualizer.Execute().ToList();
+			var visualizer = DbVisualizer.Create(dbQuery, DbVisualize.None);
+			var rows = visualizer.Rows().ToList();
 			visualizer.Dispose();
 
 			sw.Stop();
@@ -332,10 +332,10 @@ namespace ConsoleApp
 
 					//var buffer = new io.MemoryStream(5 * 1024);
 
-					var vis = DbVisualizer.Create(new DbQueryParser().Parse(db, $"SELECT * FROM {table.Name}"));
+					var vis = DbVisualizer.Create(new DbQueryParser().Parse(db, $"SELECT * FROM {table.Name}"), DbVisualize.None);
 					int rowCount = 0;
 
-					foreach (var record in vis.Execute())
+					foreach (var record in vis.Rows())
 					{
 						rowCount++;
 

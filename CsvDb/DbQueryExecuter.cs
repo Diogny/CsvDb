@@ -5,6 +5,10 @@ using System.Linq;
 
 namespace CsvDb
 {
+	/// <summary>
+	/// Query column executer
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
 	internal class DbQueryExecuter<T>
 		where T : IComparable<T>
 	{

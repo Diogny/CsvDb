@@ -7,17 +7,219 @@ using io = System.IO;
 
 namespace CsvDb
 {
+	[Flags]
+	public enum DbVisualize : int
+	{
+		None = 0,
+		//stops every page
+		Paged = 1,
+		//for not framed paged show a line under page header
+		UnderlineHeader = 2,
+		//show a box framed around every page
+		Framed = 4,
+		//display a column with line numbers
+		LineNumbers = 8
+	}
+
 	public abstract class DbVisualizer : IDisposable
 	{
-		public DbQuery Query { get; protected internal set; }
+		public DbQuery Query { get; protected set; }
 
 		public int ColumnCount { get; private set; }
+
+		public int RowCount { get; protected set; }
+
+		public bool Paged { get { return (Options & DbVisualize.Paged) != 0; } }
+
+		public DbVisualize Options { get; private set; }
+
+		private static int _pagesize = 32;
+		/// <summary>
+		/// get/set the page size of the visualization
+		/// </summary>
+		public static int PageSize
+		{
+			get { return _pagesize; }
+			set
+			{
+				if (value > 1)
+				{
+					_pagesize = value;
+				}
+			}
+		}
 
 		public DbColumnTypeEnum[] ColumnTypes { get; private set; }
 
 		protected internal int[] IndexTranslator { get; private set; }
 
-		public abstract IEnumerable<object[]> Execute();
+		public IEnumerable<object[]> Rows()
+		{
+			if (Query.IsQuantifier)
+			{
+				RowCount = 1;
+				//Paged doesn't matter, because always 1 row
+				yield return Query.Columns.Header;
+
+				yield return new object[] { Query.ExecuteQuantifier() };
+			}
+			else
+			{
+				var collection = Query.ExecuteCollection();
+				RowCount = 0;
+
+				foreach (var record in ReadRecords(collection))
+				{
+					RowCount++;
+
+					yield return record;
+				}
+			}
+		}
+
+		public void Display()
+		{
+			if (Query.IsQuantifier)
+			{
+				var row = Rows().ToList();
+				var header = row[0][0].ToString();
+				var valueStr = row[1][0].ToString();
+
+				Console.WriteLine(header);
+				if (Paged && (Options & DbVisualize.UnderlineHeader) != 0)
+				{
+					Console.WriteLine(new String('─', Math.Max(valueStr.Length, header.Length)));
+				}
+				Console.WriteLine(valueStr);
+			}
+			else
+			{
+				//format anyways with Pagesize for better visibility
+
+				var stop = false;
+				var showWait = Paged;
+				var headerColumns = Query.Columns.Header;
+				//page holder
+				var page = new List<List<string>>(PageSize);
+				var pageCount = 0;
+
+				var boxed = Paged && (Options & DbVisualize.Framed) != 0;
+
+				var lineNumbers = (Options & DbVisualize.LineNumbers) != 0;
+
+				var enumerator = Rows().GetEnumerator();
+				while (!stop)
+				{
+					//read page
+					var count = PageSize;
+					page.Clear();
+
+					//format header and column width
+					var headerWidths = Query.Columns.Header.Select(h => h.Length).ToList();
+
+					if (lineNumbers)
+					{
+						//insert minimum of 3 chars for line numbers
+						headerWidths.Insert(0, 3);
+					}
+
+					while (count-- > 0 && enumerator.MoveNext())
+					{
+						//convert to string for visualization
+						var row = enumerator.Current.Select(c => (c == null) ? String.Empty : c.ToString()).ToList();
+
+						if (lineNumbers)
+						{
+							row.Insert(0, (RowCount).ToString());
+						}
+
+						//add row to page
+						page.Add(row);
+
+						//format row columns
+						var columnCount = row.Count;
+						for (var i = 0; i < columnCount; i++)
+						{
+							var col = row[i];
+
+							headerWidths[i] = Math.Max(headerWidths[i], (col == null) ? 0 : col.ToString().Length);
+						}
+					}
+					//
+					if (!(stop = page.Count == 0))
+					{
+						var charB = boxed ? '│' : ' ';
+						var prefisufix = boxed ? "│" : "";
+						var skip = lineNumbers ? 1 : 0;
+
+						//show header
+						var header = String.Join(charB,
+							Query.Columns.Header.Select((s, ndx) => s.PadRight(headerWidths[ndx + skip])));
+
+						if (lineNumbers)
+						{
+							header = $"{"#".PadRight(headerWidths[0], ' ')}{charB}{header}";
+						}
+
+						if (boxed)
+						{
+							Console.WriteLine($"┌{String.Join('┬', headerWidths.Select(w => new String('─', w)))}┐");
+						}
+
+						if (Paged)
+						{
+							Console.WriteLine($"{prefisufix}{header}{prefisufix}");
+
+							if ((Options & DbVisualize.UnderlineHeader) != 0 && !boxed)
+							{
+								Console.WriteLine(new String('─', header.Length));
+							}
+						}
+
+						if (boxed)
+						{
+							Console.WriteLine($"├{String.Join('┼', headerWidths.Select(w => new String('─', w)))}┤");
+						}
+
+						//show columns
+						page.ForEach(p =>
+						{
+							var column = String.Join(charB,
+								p.Select((s, ndx) => s.PadRight(headerWidths[ndx])));
+
+							Console.WriteLine($"{prefisufix}{column}{prefisufix}");
+						});
+
+						if (boxed)
+						{
+							Console.WriteLine($"└{String.Join('┴', headerWidths.Select(w => new String('─', w)))}┘");
+						}
+
+						//if show wait and not first page
+						if (showWait && pageCount > 0)
+						{
+							Console.Write("press any key...");
+							var keyCode = Console.ReadKey();
+							//remove text
+							Console.CursorLeft = 0;
+							if (keyCode.Key == ConsoleKey.Escape)
+							{
+								showWait = false;
+							}
+						}
+
+						pageCount++;
+					}
+				}
+
+			}
+			Console.WriteLine($" displayed {RowCount} row(s)");
+		}
+
+		protected virtual IEnumerable<object[]> ReadRecords(IEnumerable<Int32> offsetCollection)
+		{
+			yield break;
+		}
 
 		public abstract bool IsValid(CsvDb db);
 
@@ -30,7 +232,7 @@ namespace CsvDb
 		/// </summary>
 		/// <param name="query"></param>
 		/// <param name="extension"></param>
-		internal DbVisualizer(DbQuery query, string extension)
+		internal DbVisualizer(DbQuery query, string extension, DbVisualize options)
 		{
 			if ((Query = query) == null)
 			{
@@ -51,11 +253,15 @@ namespace CsvDb
 
 			//index translator to real visualized columns
 			IndexTranslator = Query.Columns.Columns.Select(c => c.Column.Index).ToArray();
+
+			//dummy
+			RowCount = 0;
+			Options = options;
 		}
 
 		public abstract void Dispose();
 
-		public static DbVisualizer Create(DbQuery query)
+		public static DbVisualizer Create(DbQuery query, DbVisualize options = DbVisualize.Paged)
 		{
 			if (query == null)
 			{
@@ -63,11 +269,11 @@ namespace CsvDb
 			}
 			if ((query.Database.Flags & DbSchemaConfigEnum.Binary) != 0)
 			{
-				return new DbBinVisualizer(query);
+				return new DbBinVisualizer(query, options);
 			}
 			else
 			{
-				return new DbCsvVisualizer(query);
+				return new DbCsvVisualizer(query, options);
 			}
 		}
 
@@ -75,30 +281,18 @@ namespace CsvDb
 
 	public class DbBinVisualizer : DbVisualizer
 	{
-		public int RowCount { get; private set; }
-
 		public UInt64 Mask { get; private set; }
 
 		protected internal io.BinaryReader reader = null;
 
-		internal DbBinVisualizer(DbQuery query)
-			: base(query, "bin")
+		internal DbBinVisualizer(DbQuery query, DbVisualize options)
+			: base(query, "bin", options)
 		{
 			//open reader
 			reader = new io.BinaryReader(io.File.OpenRead(Path));
 		}
 
-		public override IEnumerable<object[]> Execute()
-		{
-			var collection = Query.Execute();
-
-			foreach (var record in ReadRecords(collection))
-			{
-				yield return record;
-			}
-		}
-
-		IEnumerable<object[]> ReadRecords(IEnumerable<Int32> offsetCollection)
+		protected override IEnumerable<object[]> ReadRecords(IEnumerable<Int32> offsetCollection)
 		{
 			var mainMask = Query.FromTableIdentifier.Table.RowMask;
 			var bytes = Query.FromTableIdentifier.Table.RowMaskLength;
@@ -223,22 +417,14 @@ namespace CsvDb
 			return buffer[charIndex];
 		}
 
-		internal DbCsvVisualizer(DbQuery query)
-			: base(query, "csv")
+		internal DbCsvVisualizer(DbQuery query, DbVisualize options)
+			: base(query, "csv", options)
 		{
 			//open reader
 			reader = new io.StreamReader(Path);
 		}
 
-		public override IEnumerable<object[]> Execute()
-		{
-			var collection = Query.Execute();
-
-			//go to csv and find it records
-			return ReadOffsetRecords(collection);
-		}
-
-		public string[] ReadRecord()
+		public string[] ReadCsVRecord()
 		{
 			if (reader.EndOfStream)
 			{
@@ -346,22 +532,18 @@ namespace CsvDb
 			}
 		}
 
-		internal List<string[]> ReadOffsetRecords(IEnumerable<Int32> offsetCollection)
+		protected override IEnumerable<object[]> ReadRecords(IEnumerable<Int32> offsetCollection)
 		{
-			var list = new List<string[]>();
-
 			foreach (var offs in offsetCollection)
 			{
 				//point to record offset
 				reader.BaseStream.Position = offs;
 
-				var record = ReadRecord();
+				var record = ReadCsVRecord();
 
-				//add new record
-				list.Add(record);
+				//record
+				yield return record;
 			}
-
-			return list;
 		}
 
 		public override bool IsValid(CsvDb db)

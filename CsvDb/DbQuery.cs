@@ -12,6 +12,8 @@ namespace CsvDb.Query
 
 		public string Query { get; protected internal set; }
 
+		public bool IsQuantifier { get { return Columns.IsQuantifier; } }
+
 		/// <summary>
 		/// Table definition after FROM
 		/// </summary>
@@ -98,7 +100,30 @@ namespace CsvDb.Query
 
 		#region Execute
 
-		protected internal IEnumerable<int> Execute()
+		internal double ExecuteQuantifier()
+		{
+			//apply quantifiers here
+			var result = ExecuteCollection();
+
+			switch (Columns.Quantifier)
+			{
+				case Token.COUNT:
+					//just return the amount of rows in the query
+					return result.Count();
+
+				case Token.AVG:
+					return result.Average();
+
+				case Token.SUM:
+					//this works only for ints, later expand it too
+					return result.Sum();
+
+				default:
+					throw new ArgumentException($"invalid quantifier {Columns.Quantifier} in query");
+			}
+		}
+
+		internal IEnumerable<int> ExecuteCollection()
 		{
 			//execute where expresion containing the indexed column
 			//	 returns a collection of offset:int
@@ -220,6 +245,8 @@ namespace CsvDb.Query
 	{
 		public Token Quantifier { get; private set; }
 
+		public bool IsQuantifier { get { return Quantifier != Token.None; } }
+
 		public List<DbQueryColumnIdentifier> Columns { get; private set; }
 
 		public bool IsFull { get; private set; }
@@ -231,18 +258,36 @@ namespace CsvDb.Query
 		/// <param name="column">numeric column</param>
 		internal DbQueryColumnSelector(Token quantifier, DbQueryColumnIdentifier column)
 		{
-			if (!((Quantifier = quantifier) == Token.COUNT || quantifier == Token.AVG || quantifier == Token.SUM) ||
+			if (!DbQueryParser.SelectQuantifiers.Contains(Quantifier = quantifier) ||
 				column == null)
 			{
 				throw new ArgumentException($"invalid quantifier ({quantifier}) or empty column in SELECT statement");
 			}
-			if(!column.Column.TypeEnum.IsNumeric())
+			//COUNT(*), AVG & SUM () single column numeric
+			if (Quantifier == Token.COUNT)
 			{
+				//any column or (*)
+				throw new ArgumentException($"syntax: COUNT (*), table column names not permited");
+			}
+			else if (!column.Column.TypeEnum.IsNumeric())
+			{
+				//AVG, SUM
 				throw new ArgumentException($"Quantifier table column must be numeric");
 			}
 			Columns = new List<DbQueryColumnIdentifier>() { column };
 			IsFull = false;
 		}
+
+		internal DbQueryColumnSelector(Token quantifier, DbTable table)
+			: this(table)
+		{
+			if (!DbQueryParser.SelectQuantifiers.Contains(Quantifier = quantifier) || (Quantifier != Token.COUNT))
+			{
+				//only COUNT (*)
+				throw new ArgumentException($"invalid SELECT quantifier {quantifier} for (*)");
+			}
+		}
+
 
 		/// <summary>
 		/// Creates a restricted column selector SELECT col0, col1, col2
@@ -266,23 +311,42 @@ namespace CsvDb.Query
 		internal DbQueryColumnSelector(DbTable table)
 		{
 			IsFull = true;
+			if (table == null)
+			{
+				throw new ArgumentException("Table not defined for column selectors");
+			}
 			Columns = table.Columns
 					.Select(c => new DbQueryColumnIdentifier(c))
 					.ToList();
 			Quantifier = Token.None;
 		}
 
-		public string[] Header => Columns.Select(c => c.Column.Name).ToArray();
+		public string[] Header
+		{
+			get
+			{
+				if (IsQuantifier)
+				{
+					return new string[] { Quantifier.ToString() };
+				}
+				else
+				{
+					return Columns.Select(c => c.Column.Name).ToArray();
+				}
+			}
+		}
 
 		public override string ToString()
 		{
-			if (IsFull)
+			if (Quantifier != Token.None)
+			{
+				return IsFull ?
+					$"{Quantifier.ToString()}(*)" :
+					$"{Quantifier.ToString()}({Columns[0].ToString()})";
+			}
+			else if (IsFull)
 			{
 				return "*";
-			}
-			else if (Quantifier != Token.None)
-			{
-				return $"{Quantifier.ToString()}({Columns[0].ToString()})";
 			}
 			else
 			{

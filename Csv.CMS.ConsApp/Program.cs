@@ -304,50 +304,10 @@ namespace Csv.CMS.ConsApp
 								con.WriteLine(" query parsed on {0} ms", sw.ElapsedMilliseconds);
 								con.WriteLine($"  {dbQuery}");
 
-								//to calculate times
-								sw.Restart();
-
-								var visualizer = DbVisualizer.Create(dbQuery);
-								var rowsEnumerable = visualizer.Execute();
-
-								sw.Stop();
-								var ellapsedExecuted = $"query executed on {sw.ElapsedMilliseconds} ms";
-
-								var rowCount = 0;
-
-								//header
-								sw.Restart();
-
-								var header = String.Join("|", dbQuery.Columns.Header);
-								con.WriteLine($"\r\n{header}");
-								con.WriteLine($"{new string('-', header.Length)}");
-
-								int pagerRows = 0;
-								var unstop = false;
-								var rows = rowsEnumerable.ToList();
-								sw.Stop();
-								//var ellapsedRetrievedStr = sw.ElapsedMilliseconds.ToString();
-
-								foreach (var record in rows)
-								{
-									rowCount++;
-									con.WriteLine($"{String.Join(",", record)}");
-
-									if (!unstop && pagerRows++ >= 32)
-									{
-										pagerRows = 0;
-										con.Write("press any key...");
-										var keyCode = con.ReadKey();
-										con.WriteLine();
-										if (keyCode.Key == ConsoleKey.Escape)
-										{
-											unstop = true;
-										}
-									}
-								}
+								var visualizer = DbVisualizer.Create(dbQuery,
+									DbVisualize.Paged | DbVisualize.UnderlineHeader | DbVisualize.Framed | DbVisualize.LineNumbers);
+								visualizer.Display();
 								visualizer.Dispose();
-								var ellapsedRetrieved = $" {rowCount} row(s) retrieved on {sw.ElapsedMilliseconds} ms";
-								con.WriteLine($"\r\n {ellapsedExecuted}\r\n{ellapsedRetrieved}");
 							}
 						}
 						catch (Exception ex)

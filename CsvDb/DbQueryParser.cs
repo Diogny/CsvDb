@@ -400,7 +400,15 @@ namespace CsvDb.Query
 					throw new ArgumentException($"expected ( after {CurrentToken.Token}");
 				}
 
-				columnSelectors.Add(ReadOperand($"cannot read quantifier {quantifier}"));
+				if (GetTokenIf(Token.Astherisk))
+				{
+					// COUNT(*)
+					columnSelectors.Add(new TokenItem(Token.Astherisk, "*", CurrentToken.Position));
+				}
+				else
+				{
+					columnSelectors.Add(ReadOperand($"cannot read quantifier {quantifier}"));
+				}
 
 				if (!GetTokenIf(Token.ClosePar))
 				{
@@ -464,8 +472,17 @@ namespace CsvDb.Query
 			}
 			else if (quantifier != Token.None)
 			{
-				colSelector = new DbQueryColumnSelector(quantifier,
-					new DbQueryColumnIdentifier(table, columnSelectors[0].Value));
+				if (quantifier == Token.COUNT)
+				{
+					// COUNT (*)
+					colSelector = new DbQueryColumnSelector(quantifier, table);
+				}
+				else
+				{
+					// AVG (column)  SUM (column)  where column:numeric
+					colSelector = new DbQueryColumnSelector(quantifier,
+						new DbQueryColumnIdentifier(table, columnSelectors[0].Value));
+				}
 			}
 			else
 			{
@@ -495,15 +512,21 @@ namespace CsvDb.Query
 					else
 					{
 						//look in all tables
-						var col = db.Tables
+						var colsFound = db.Tables
 							.SelectMany(t => t.Columns)
-							.FirstOrDefault(c => c.Name == tk.Value);
+							.Where(c => c.Name == tk.Value)
+							.ToList();
 
-						if (col == null)
+						if (colsFound.Count == 0)
 						{
-							throw new ArgumentException($"Cannot find {tk.Value} in any table of database.");
+							throw new ArgumentException($"Cannot resolve column {tk.Value} in any table");
 						}
-						columns.Add(new DbQueryColumnIdentifier(col));
+						else if (colsFound.Count > 1)
+						{
+							throw new ArgumentException($"cannot resolve column: {tk.Value} on multiple tables: {String.Join(", ", colsFound.Select(c => c.Name))}");
+						}
+						//get first one
+						columns.Add(new DbQueryColumnIdentifier(colsFound[0]));
 					}
 				}
 				colSelector = new DbQueryColumnSelector(columns);
