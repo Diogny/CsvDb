@@ -84,7 +84,7 @@ namespace Csv.CMS.ConsApp
 				con.WriteLine("	│ (D)isplay available database(s)              │                                             │");
 				con.WriteLine("	│ (M)ount database                             │ (K)ill/close database                       │");
 				con.WriteLine("	│ (S)earch Database                            │ (E)execute Queries                          │");
-				con.WriteLine("	│ Display (I)nformation of Table.Column        │ Display (T)ables Info                       │");
+				con.WriteLine("	│                                              │ Display (T)ables Info                       │");
 				con.WriteLine("	│ Display Index Tree (N)ode Structure          │ Display (I)ndex Tree Structure              │");
 				con.WriteLine("	│ (X)treme class                               │                                             │");
 				con.WriteLine("	├──────────────────────────────────────────────┴─────────────────────────────────────────────┤");
@@ -105,19 +105,28 @@ namespace Csv.CMS.ConsApp
 				//					r.route_type == 2
 				// route_id,route_short_name\t[routes]\t[agency_id],==,"NJT"\tAND\t[route_type],==,2
 
+				// SELECT * | column0,column1,...
+				//					|	a.agency_id, b.serice_id,...
+				//
+				//	FROM table [descriptor]
+				//		
+				//	WHERE [descriptor].column = constant AND|OR ...
+				//	SKIP number
+				//	LIMIT number
+				//
 			}
 
 			System.Reflection.Assembly assembly = null;
 
 			//con.TreatControlCAsInput = true;
 			bool end = false;
-			//displayHelp();
+			
 			while (!end)
 			{
 				con.Write(">");
 
-				while (con.KeyAvailable == false)
-					Thread.Sleep(250); // Loop until input is entered.
+				while (!con.KeyAvailable) // Loop until input is entered
+					Thread.Sleep(250);
 
 				ConsoleKeyInfo key = con.ReadKey();
 				con.WriteLine();
@@ -273,18 +282,7 @@ namespace Csv.CMS.ConsApp
 						//display tables
 						if (!IsObjectNull(db, " there's no database in use"))
 						{
-							foreach (var table in db.Tables)
-							{
-								var text = $"\r\n [{table.Name}]{(table.Multikey.IfTrue(" -m "))}{(table.Rows > 0).IfTrue($" {table.Rows} row(s)")}";
-								con.WriteLine(text.ToLower());
-								//show columns
-								foreach (var col in table.Columns)
-								{
-									text = $"   {col.Name}: {col.Type}" +
-									 $"  {(col.Key.IfTrue("-k"))}{(col.Indexed.IfTrue("-i"))}{(col.Unique.IfTrue("-u"))} {(col.PageCount > 0).IfTrue($" {col.PageCount} page(s)")}";
-									con.WriteLine(text.ToLower());
-								}
-							}
+							ShowAllTableInfo(db);
 						}
 						break;
 					case ConsoleKey.S:
@@ -331,6 +329,74 @@ namespace Csv.CMS.ConsApp
 				}
 			}
 			return true;
+		}
+
+		static void ShowAllTableInfo(CsvDb.CsvDb db)
+		{
+			var tablesInfo =
+				from table in db.Tables
+				select new
+				{
+					name = table.Name,
+					flags = table.Multikey.IfTrue("-m"),
+					rows = $"{table.Rows.ToString("##,#")} row(s)",
+					columnRows =
+						(from col in table.Columns
+						 select new List<KeyValuePair<string, string>>()
+							{
+								new KeyValuePair<string,string>("column", col.Name),
+								new KeyValuePair<string,string>("type",  col.Type),
+								new KeyValuePair<string,string>("flags", $"{(col.Key.IfTrue("-k"))}{(col.Indexed.IfTrue("-i"))}{(col.Unique.IfTrue("-u"))}"),
+								new KeyValuePair<string,string>("pages", col.PageCount.ToString())
+							}
+						).ToList()
+				};
+
+			//standarize all columns
+			var columnWidths = new int[4];
+			foreach (var t in tablesInfo)
+			{
+				//calculate column widths
+				foreach (var col in t.columnRows)
+				{
+					for (var i = 0; i < col.Count; i++)
+					{
+						columnWidths[i] = Math.Max(columnWidths[i], Math.Max(col[i].Key.Length, col[i].Value.Length));
+					}
+				}
+			}
+			//space column name
+			columnWidths[0] += 12;
+
+			//calculate with spaces and frames
+			var maxTableWidth = columnWidths.Sum((w) => w + 1 + 1 + 1) + 1;
+
+			//visualize
+			foreach (var t in tablesInfo)
+			{
+				//first line
+				con.WriteLine($"┌{new String('─', maxTableWidth - 2)}┐");
+				//table name
+				var text = $"{t.flags} {t.rows}";
+				con.WriteLine($"│{t.name}{(new string(' ', maxTableWidth - t.name.Length - text.Length - 2))}{text}│");
+				//columns
+				text = $"├{String.Join('┬', columnWidths.Select(w => new String('─', w + 2)))}┤";
+				con.WriteLine(text);
+				//header
+				con.WriteLine($"│{String.Join('│', t.columnRows[0].Select((k, ndx) => k.Key.PadRight(columnWidths[ndx] + 2)))}│");
+				//separator
+				con.WriteLine(text.Replace('┬', '┼'));
+				//rows with columns
+				foreach (var col in t.columnRows)
+				{
+					con.WriteLine($"│{String.Join('│', col.Select((k, ndx) => k.Value.PadRight(columnWidths[ndx] + 2)))}│");
+				}
+				//end line
+				con.WriteLine(text.Replace('┬', '┴').Replace('├', '└').Replace('┤', '┘'));
+				con.WriteLine();
+			}
+			//reference
+			con.WriteLine("ref:   -m MultiKey   -k Key   -i Indexed   -u Unique ");
 		}
 
 		static CsvDb.CsvDb OpenDatabase(string dbName = null, bool logTimes = true)

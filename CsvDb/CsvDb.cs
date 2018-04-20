@@ -69,7 +69,7 @@ namespace CsvDb
 
 		public static String SchemaSystemName => "__schema";
 
-		public static String SchemaSystemExtension => "sys";
+		public static String SchemaSystemExtension => "bin";
 
 		public static String SchemaJsonName => "__tables";
 
@@ -79,13 +79,20 @@ namespace CsvDb
 
 		public static String SchemaJsonFilename => $"{SchemaJsonName}.{SchemaJsonExtension}";
 
+		/// <summary>
+		/// [table name].data
+		/// </summary>
+		public static String SchemaTableDataExtension => "data";
+
+		public static String SchemaTableDefaultExtension => "csv";
+
 		protected internal String SchemaFilePath = String.Empty;
 
 		protected internal String SchemaJsonFilePath = String.Empty;
 
 		public static CsvDb CreateFromJson(string jsonfilepath, DbSchemaConfigEnum flags = DbSchemaConfigEnum.None)
 		{
-			//generate the __schema.sys file and create normal database
+			//generate the __schema.bin file and create normal database
 			var text = io.File.ReadAllText(jsonfilepath);
 
 			////Newtonsoft.Json.JsonConvert.DeserializeObject<CsvDbStructure>(text);
@@ -119,7 +126,7 @@ namespace CsvDb
 		{
 
 			// path\bin\
-			//		__schema.sys		// => old  __tables.json
+			//		__schema.bin		// => old  __tables.json
 			//		[table].csv
 			//		[table].pager
 			//		[table].[index].index

@@ -19,6 +19,10 @@
 .-and multipages
 2018/04/04 - 2018/04/05
 .-add Samples folder with binary (data-bin) and csv (data-full) databases
-2018/04/05 - 
+2018/04/05 - 2018/04/08
 .- add quantifiers to query execute engine
 .-add column formatting to visualizer
+2018/04/08 - 2018/04-19
+.-modify database table file extensions and visualization
+.-fix query parser bug and namings
+2018/04-19 - 

@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
-using System.Linq;
-using io = System.IO;
 using db = CsvDb;
 using consts = CsvDb.Consts;
 using System.Reflection;
@@ -11,7 +8,7 @@ using CsvDb;
 namespace Csv.CMS.ConsApp
 {
 
-	public class Visualizer
+	public sealed class Visualizer
 	{
 
 		public db.CsvDb Database { get; set; }
@@ -53,7 +50,7 @@ namespace Csv.CMS.ConsApp
 			var indexClassType = index.GetType();
 			//get non-public method
 			var mthd = indexClassType.GetMethod(nameof(DbColumn.IndexTree)//,
-																																			 //BindingFlags.Instance | BindingFlags.NonPublic
+																																		//BindingFlags.Instance | BindingFlags.NonPublic
 			);
 			//get the type of the index
 			var indexType = Type.GetType($"System.{index.Type}");
@@ -159,8 +156,8 @@ namespace Csv.CMS.ConsApp
 			//get type of index class instance
 			var indexClassType = index.GetType();
 			//get non-public method
-			var mthd = indexClassType.GetMethod(nameof(DbColumn.IndexItems)//,
-																																				//BindingFlags.Instance | BindingFlags.NonPublic
+			var mthd = indexClassType.GetMethod(nameof(DbColumn.IndexItems)
+			//  BindingFlags.Instance | BindingFlags.NonPublic
 			);
 			//get the type of the index
 			var indexType = Type.GetType($"System.{index.Type}");

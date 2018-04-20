@@ -181,7 +181,7 @@ namespace CsvDb
 				if (table.Generate)
 				{
 					//Bin writer
-					binWriter = new io.BinaryWriter(io.File.Create(io.Path.Combine(rootPath, $"bin\\{table.Name}.bin")));
+					binWriter = new io.BinaryWriter(io.File.Create(io.Path.Combine(rootPath, $"bin\\{table.Name}.{CsvDb.SchemaTableDataExtension}")));
 
 					//save column mask
 					table.RowMaskLength = Math.DivRem(table.Columns.Count, 8, out int remainder);
@@ -455,7 +455,7 @@ namespace CsvDb
 				else
 				{
 					//CSV text writer
-					csvwriter = new io.StreamWriter(io.File.Create(io.Path.Combine(rootPath, $"bin\\{table.Name}.csv")));
+					csvwriter = new io.StreamWriter(io.File.Create(io.Path.Combine(rootPath, $"bin\\{table.Name}.{CsvDb.SchemaTableDefaultExtension}")));
 
 					Console.WriteLine($"  creating temporary text index files.");
 					//create temporary files for csv pager, and all indexes

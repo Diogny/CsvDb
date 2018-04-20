@@ -37,8 +37,8 @@ Later I'll include the PHP classes used to read this schema.
 And an index data with all key and its value(s).
 
 	path\bin\
-		__tables.json
-		[table].csv
+		__schema.bin
+		[table].data or [table].csv
 		[table].pager
 		[table].[index].index
 		[table].[index].index.bin

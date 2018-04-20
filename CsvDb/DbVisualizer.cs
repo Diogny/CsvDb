@@ -239,7 +239,7 @@ namespace CsvDb
 				throw new ArgumentException("Query cannot be null or undefined");
 			}
 			//default to CSV
-			Extension = String.IsNullOrWhiteSpace(extension) ? "csv" : extension.Trim();
+			Extension = String.IsNullOrWhiteSpace(extension) ? CsvDb.SchemaTableDefaultExtension : extension.Trim();
 
 			//path to file
 			Path = io.Path.Combine(Query.Database.BinaryPath, $"{Query.FromTableIdentifier.Table.Name}.{Extension}");
@@ -286,7 +286,7 @@ namespace CsvDb
 		protected internal io.BinaryReader reader = null;
 
 		internal DbBinVisualizer(DbQuery query, DbVisualize options)
-			: base(query, "bin", options)
+			: base(query, $"{CsvDb.SchemaTableDataExtension}", options)
 		{
 			//open reader
 			reader = new io.BinaryReader(io.File.OpenRead(Path));
@@ -418,7 +418,7 @@ namespace CsvDb
 		}
 
 		internal DbCsvVisualizer(DbQuery query, DbVisualize options)
-			: base(query, "csv", options)
+			: base(query, $"{CsvDb.SchemaTableDefaultExtension}", options)
 		{
 			//open reader
 			reader = new io.StreamReader(Path);

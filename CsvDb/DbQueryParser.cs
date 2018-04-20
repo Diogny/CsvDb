@@ -13,10 +13,6 @@ namespace CsvDb.Query
 		int length;
 		char currentChar;
 
-		//static string identifierChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
-
-		//static string numberChars = "0123456789";
-
 		static List<string> keyWords = new List<string> {
 			"SELECT", "FROM", "WHERE", "SKIP", "LIMIT",
 			"AND", "OR", "NOT",
@@ -70,9 +66,6 @@ namespace CsvDb.Query
 			{
 				switch (ReadChar(recordStart: true))
 				{
-					case '.':
-						AddToken(Token.Dot);
-						break;
 					case ',':
 						AddToken(Token.Comma);
 						break;
@@ -153,9 +146,13 @@ namespace CsvDb.Query
 						}
 						AddToken(Token.String);
 						break;
+					case '.':
+						AddToken(Token.Dot);
+						break;
 					default:
 						if (char.IsDigit(currentChar))
 						{
+							// later allow -0.45  .98
 							//number
 							//charString.Append(currentChar);
 							while (char.IsDigit(PeekChar()))
@@ -290,16 +287,6 @@ namespace CsvDb.Query
 			var columnSelectors = new List<TokenItem>();
 			bool isFullColums = false;
 			Token quantifier = Token.None;
-
-			// SELECT * | column0,column1,...
-			//					|	a.agency_id, b.serice_id,...
-			//
-			//	FROM table [descriptor]
-			//		
-			//	WHERE [descriptor].column = constant AND|OR ...
-			//	SKIP number
-			//	LIMIT number
-			//
 
 			bool GetToken()
 			{
@@ -512,8 +499,8 @@ namespace CsvDb.Query
 					else
 					{
 						//look in all tables
-						var colsFound = db.Tables
-							.SelectMany(t => t.Columns)
+						var colsFound = tableCollection // db.Tables
+							.SelectMany(t => t.Table.Columns)
 							.Where(c => c.Name == tk.Value)
 							.ToList();
 
