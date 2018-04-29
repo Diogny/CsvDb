@@ -5,6 +5,9 @@ using System.Linq;
 
 namespace CsvDb
 {
+	/// <summary>
+	/// sql query validation contract
+	/// </summary>
 	public interface IQueryValidation
 	{
 		/// <summary>
@@ -51,31 +54,62 @@ namespace CsvDb
 
 	}
 
+	/// <summary>
+	/// column metadata contract
+	/// </summary>
 	public interface IColumnMeta
 	{
+		/// <summary>
+		/// table name of the column
+		/// </summary>
 		string TableName { get; }
 
+		/// <summary>
+		/// column index in table
+		/// </summary>
 		int Index { get; }
 
+		/// <summary>
+		/// string column type
+		/// </summary>
 		string Type { get; }
 	}
 
+	/// <summary>
+	/// column metadata class
+	/// </summary>
 	public sealed class ColumnMeta : IColumnMeta
 	{
+		/// <summary>
+		/// table name of the column
+		/// </summary>
 		public string TableName { get; set; }
 
+		/// <summary>
+		/// column index in table
+		/// </summary>
 		public int Index { get; set; }
 
+		/// <summary>
+		/// string column type
+		/// </summary>
 		public string Type { get; set; }
 	}
 
-
+	/// <summary>
+	/// represents a default sql query validator against a Csv database
+	/// </summary>
 	public class CsvDbDefaultValidator : IQueryValidation
 	{
+		/// <summary>
+		/// database
+		/// </summary>
 		public CsvDb Database { get; }
 
-		public IEnumerable<string> TableNames => throw new NotImplementedException();
-
+		/// <summary>
+		/// creates a default sql query validator for a Csv database
+		/// </summary>
+		/// <param name="db">database</param>
 		public CsvDbDefaultValidator(CsvDb db)
 		{
 			if ((Database = db) == null)
@@ -84,8 +118,24 @@ namespace CsvDb
 			}
 		}
 
+		/// <summary>
+		/// returns a collection of all table names
+		/// </summary>
+		public IEnumerable<string> TableNames => throw new NotImplementedException();
+
+		/// <summary>
+		/// returns true if the database has a table
+		/// </summary>
+		/// <param name="tableName">table name</param>
+		/// <returns></returns>
 		public bool HasTable(string tableName) => Database[tableName] != null;
 
+		/// <summary>
+		/// returns if database table has a column
+		/// </summary>
+		/// <param name="tableName">table name</param>
+		/// <param name="columnName">column name</param>
+		/// <returns></returns>
 		public bool TableHasColumn(string tableName, string columnName)
 		{
 			var table = Database[tableName];
@@ -96,6 +146,11 @@ namespace CsvDb
 			return table.Column(columnName) != null;
 		}
 
+		/// <summary>
+		/// returns a collection of all tables that contain a column
+		/// </summary>
+		/// <param name="column">column name</param>
+		/// <returns></returns>
 		public IEnumerable<string> TablesOf(string column)
 		{
 			foreach (var table in Database.Tables)
@@ -107,8 +162,19 @@ namespace CsvDb
 			}
 		}
 
+		/// <summary>
+		/// returns a collection a all column names in a table
+		/// </summary>
+		/// <param name="table">table name</param>
+		/// <returns></returns>
 		public IEnumerable<string> ColumnsOf(string table) => Database[table]?.Columns.Select(c => c.Name);
 
+		/// <summary>
+		/// returns the column metadata of a table column
+		/// </summary>
+		/// <param name="tableName">table name</param>
+		/// <param name="columnName">column name</param>
+		/// <returns></returns>
 		public IColumnMeta ColumnMetadata(string tableName, string columnName)
 		{
 			var column = Database.Index(tableName, columnName);

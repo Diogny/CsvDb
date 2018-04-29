@@ -25,6 +25,12 @@ namespace Csv.CMS.ConsApp
 			// con.WriteLine($"Hello {Configuration["Profile:MachineName"]}");
 			//  var left = Configuration.GetValue<int>("App:MainWindow:Left", 80);
 
+#if DEBUG
+			Console.WriteLine("Mode=Debug");
+#else
+    Console.WriteLine("Mode=Release"); 
+#endif
+
 			SqlQueryExecute();
 
 			con.WriteLine("\r\nPress any key to finish!");
@@ -299,8 +305,13 @@ namespace Csv.CMS.ConsApp
 								con.WriteLine(" query parsed on {0} ms", sw.ElapsedMilliseconds);
 								con.WriteLine($"  {dbQuery}");
 
-								var visualizer = DbVisualizer.Create(db, dbQuery,
-									DbVisualize.Paged | DbVisualize.UnderlineHeader | DbVisualize.Framed | DbVisualize.LineNumbers);
+								var visualizer = new DbVisualizer(
+									db,
+									dbQuery,
+									DbVisualize.Paged |
+										DbVisualize.UnderlineHeader |
+										DbVisualize.Framed |
+										DbVisualize.LineNumbers);
 								visualizer.Display();
 								visualizer.Dispose();
 							}
@@ -404,7 +415,7 @@ namespace Csv.CMS.ConsApp
 
 			if (string.IsNullOrWhiteSpace(dbName))
 			{
-				dbName = "data\\";
+				dbName = "data-bin\\";
 			}
 			string rootPath = $"{basePath}{dbName}";
 

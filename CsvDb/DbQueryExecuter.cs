@@ -11,19 +11,40 @@ namespace CsvDb
 	internal class DbQueryExecuter<T>
 		where T : IComparable<T>
 	{
+		/// <summary>
+		/// returns true if it's an expression
+		/// </summary>
 		public bool IsExpression => Expression != null;
 
+		/// <summary>
+		/// get the expression if any
+		/// </summary>
 		public DbQuery.Expression Expression { get; protected internal set; }
 
+		/// <summary>
+		/// gets the column in the expression if any
+		/// </summary>
 		public DbColumn Column { get; protected internal set; }
 
+		/// <summary>
+		/// gets the constant  in the expression if any
+		/// </summary>
 		public DbQuery.ConstantOperand Constant { get; protected internal set; }
 
+		/// <summary>
+		/// creates a database query executer
+		/// </summary>
+		/// <param name="column">column</param>
 		public DbQueryExecuter(DbColumn column)
 		{
 			Column = column;
 		}
 
+		/// <summary>
+		/// creates a database query executer
+		/// </summary>
+		/// <param name="expression">expression to execute</param>
+		/// <param name="db">database</param>
 		public DbQueryExecuter(DbQuery.Expression expression, CsvDb db)
 		{
 			Expression = expression;
@@ -52,7 +73,10 @@ namespace CsvDb
 			}
 		}
 
-		//return a collection of offsets to the record
+		/// <summary>
+		/// return a collection of offsets to the record
+		/// </summary>
+		/// <returns></returns>
 		public IEnumerable<int> Execute()
 		{
 			//fills Pages and return the amount of keys in this search
@@ -75,7 +99,7 @@ namespace CsvDb
 					var nodeTree = Column.IndexTree<T>();
 					int offset = -1;
 
-					if(Column.TypeEnum != Constant.Type)
+					if (Column.TypeEnum != Constant.Type)
 					{
 						//try to convert constant value to column type
 
@@ -85,7 +109,7 @@ namespace CsvDb
 
 					var value = Constant.Value();
 					var key = (T)Convert.ChangeType(value, valueType);
-					
+
 					if (nodeTree.Root == null)
 					{
 						//go to .bin file directly, it's ONE page of items

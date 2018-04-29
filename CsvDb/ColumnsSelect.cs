@@ -28,10 +28,19 @@ namespace CsvDb
 			/// </summary>
 			public string FunctionAlias { get; }
 
+			/// <summary>
+			/// true if SELECT function has an alias
+			/// </summary>
 			public bool HasFunctionAlias { get { return !String.IsNullOrWhiteSpace(FunctionAlias); } }
 
+			/// <summary>
+			/// true if it's a SELECT function (COUNT, SUM, AVG, MIN, MAX...)
+			/// </summary>
 			public bool IsFunction { get { return Function != TokenType.None; } }
 
+			/// <summary>
+			/// SELECT column header
+			/// </summary>
 			public string[] Header
 			{
 				get
@@ -62,7 +71,9 @@ namespace CsvDb
 			/// </summary>
 			public bool FullColumns { get; }
 
-
+			/// <summary>
+			/// returns a collection of all columns
+			/// </summary>
 			public IEnumerable<Column> AllColumns
 			{
 				get
@@ -81,6 +92,12 @@ namespace CsvDb
 				}
 			}
 
+			/// <summary>
+			/// creates a SELECT function
+			/// </summary>
+			/// <param name="function">COUNT, SUM, AVG, MIN, MAX</param>
+			/// <param name="column">function column name</param>
+			/// <param name="alias">function alias</param>
 			internal ColumnsSelect(TokenType function, Column column, string alias)
 			{
 				Function = function;
@@ -91,10 +108,19 @@ namespace CsvDb
 				Columns = new List<Column>();
 			}
 
+			/// <summary>
+			/// creates a SELECT * full column
+			/// </summary>
+			/// <param name="top">top value</param>
 			internal ColumnsSelect(int top)
 				: this(top, null)
 			{ }
 
+			/// <summary>
+			/// creates a SELECT column0, column1,...
+			/// </summary>
+			/// <param name="top">top value</param>
+			/// <param name="columnCollection">column collection</param>
 			internal ColumnsSelect(int top, IEnumerable<Column> columnCollection)
 			{
 				Top = (top <= 0) ? -1 : top;
@@ -108,6 +134,11 @@ namespace CsvDb
 				FunctionAlias = null;
 			}
 
+			/// <summary>
+			/// adds a column, for SELECT * only
+			/// </summary>
+			/// <param name="column">SELECT column</param>
+			/// <returns></returns>
 			internal bool Add(Column column)
 			{
 				if (FullColumns && column != null)

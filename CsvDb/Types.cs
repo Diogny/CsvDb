@@ -7,7 +7,7 @@ namespace CsvDb
 {
 	//it's saved as an Int32
 	//keep in same order in TokenType
-	public enum DbColumnTypeEnum : UInt32
+	public enum DbColumnType : UInt32
 	{
 		None = 0b000000000,
 		Byte = 0b000000010,  // 2
@@ -22,42 +22,63 @@ namespace CsvDb
 													 //Single = 0b10000000000,  // 1024
 	}
 
-	//
-	//public enum OperandCastEnum
-	//{
-	//	None,
-	//	Char,
-	//	String,
-	//	Byte,
-	//	Int16,
-	//	Int32,
-	//	Int64,
-	//	Float,
-	//	Double,
-	//	Decimal
-	//}
-
-	public enum DbSchemaConfigEnum : Int32
+	/// <summary>
+	/// database schema configuration type
+	/// </summary>
+	public enum DbSchemaConfigType : Int32
 	{
 		None = 0b00000000,
-		Csv = 0b000000001,  // 1
-		Binary = 0b000000010,  // 2
+		/// <summary>
+		/// text/csv schema (1)
+		/// </summary>
+		Csv = 0b000000001,
+		/// <summary>
+		/// binary schema (2)
+		/// </summary>
+		Binary = 0b000000010
 	}
 
-	public enum BTreePageTypeEnum
+	/// <summary>
+	/// binary indexer page tree type
+	/// </summary>
+	public enum BTreePageType
 	{
+		/// <summary>
+		/// a binary tree page structure
+		/// </summary>
 		Node,
+		/// <summary>
+		/// a leaf collection of items
+		/// </summary>
 		Collection
 	}
 
-	public enum OperandEnum
+	/// <summary>
+	/// expression operand type
+	/// </summary>
+	public enum OperandType
 	{
+		/// <summary>
+		/// error or undefined
+		/// </summary>
 		None,
+		/// <summary>
+		/// char/string operand
+		/// </summary>
 		String,
+		/// <summary>
+		/// any number operand
+		/// </summary>
 		Number,
+		/// <summary>
+		/// database table column operand
+		/// </summary>
 		Column
 	}
 
+	/// <summary>
+	/// token types
+	/// </summary>
 	public enum TokenType : int
 	{
 		None = 0,
@@ -103,7 +124,7 @@ namespace CsvDb
 		DELETE,
 		PERCENT,
 		CONCAT,
-		//keep in same order in OperandCastEnum, DbColumnTypeEnum
+		//keep in same order in DbColumnType
 		Byte,
 		Int16,
 		Int32,
@@ -118,26 +139,10 @@ namespace CsvDb
 		/// </summary>
 		Identifier,
 		/// <summary>
-		/// [table column]  agency_id
+		/// any number
 		/// </summary>
-		//Column,
-		/// <summary>
-		/// [table name] [table descriptor]   agency a
-		/// </summary>
-		//TableDescriptor,
-		/// <summary>
-		/// [table descriptor].[column name]    a.agency_id
-		/// </summary>
-		//ColumnIdentifier,
-		/// <summary>
-		/// "Byte", "Int16", "Int32", "String", "Double"
-		/// </summary>
-		//Cast,
-		//
 		Number,
-		//
-
-		// = <> > >= < <= 
+		//comparison operators  = <> > >= < <= 
 		Equal,
 		NotEqual,
 		Greater,
@@ -162,8 +167,12 @@ namespace CsvDb
 		SemiColon
 	}
 
+	/// <summary>
+	/// static class of constants
+	/// </summary>
 	public static class Consts
 	{
+		//
 		public const Int32 BTreePageNodeFlag = 0b00000001;
 
 		public const Int32 BTreePageItemsFlag = 0b00000010;
@@ -171,7 +180,6 @@ namespace CsvDb
 		public const Int32 BTreePageNodeItemsFlag = 0b00000011;
 
 		//
-
 		public const Int32 BTreeUniqueKeyValueFlag = 0b00000100;
 
 		public const Int32 IndexHeaderIsUnique = 0b00100000000;
@@ -180,8 +188,15 @@ namespace CsvDb
 
 		public const Int32 IndexHeaderIsLeaf = 0b10000000000;
 
+		/// <summary>
+		/// This sets the last keyword token. If TokenType changes, change THIS TOO!!!!!
+		/// </summary>
+		public const DbColumnType LastKeywordToken = DbColumnType.Int64;
 	}
 
+	/// <summary>
+	/// database generator struct
+	/// </summary>
 	struct IndexStruct
 	{
 		public DbColumn column;
@@ -191,6 +206,10 @@ namespace CsvDb
 		public io.StreamWriter writer;
 	}
 
+	/// <summary>
+	/// database generator class
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
 	public class DbKeyValues<T>
 	{
 		public T Key { get; set; }
@@ -198,6 +217,9 @@ namespace CsvDb
 		public List<int> Values { get; set; }
 	}
 
+	/// <summary>
+	/// testings
+	/// </summary>
 	public class DynamicEntity : DynamicObject
 	{
 		private IDictionary<string, object> _values;
@@ -231,7 +253,9 @@ namespace CsvDb
 			result = null;
 			return false;
 		}
+
 	}
+
 	/*
 var values = new Dictionary<string, object>();
 values.Add("Title", "Hello World!");

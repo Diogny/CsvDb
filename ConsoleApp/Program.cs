@@ -24,31 +24,31 @@ namespace ConsoleApp
 
 			var handledWait = false;
 
-			//JsonSchemas();
+			//string dbName = "data-bin";
+			////Create Db with binary table rows and indexes
+			////data
+			////data-light
+			////data-extra-light
+			////data-bin,			DbSchemaConfigEnum.Binary,  "bus_data-full.zip"
+			////data-full,		DbSchemaConfigEnum.Csv,		"bus_data-full.zip"
+			//GenerateInitialDbData(appConfig, dbName, DbSchemaConfigType.Binary, "bus_data.zip");
 
-			//Generators();
-
-			string dbName = "data-bin";
-			//Create Db with binary table rows and indexes
-			//data
-			//data-light
-			//data-extra-light
-			//data-bin,			DbSchemaConfigEnum.Binary,  "bus_data-full.zip"
-			//data-full,		DbSchemaConfigEnum.Csv,		"bus_data-full.zip"
-			GenerateInitialDbData(appConfig, dbName, DbSchemaConfigEnum.Binary, "bus_data.zip");
-
-			//compile indices
-			CompileDb(appConfig, dbName);
+			////compile indices
+			//CompileDb(appConfig, dbName);
 
 			//SqlQueryExecuteTests();
 
 			//handledWait = SqlQueryFinalParseTests();
+
+			//JsonSchemas();
 
 			//TreeTests();
 
 			//TestDynamic();
 
 			//CsvToBin();
+
+			ShowAllTablesAndColumns(appConfig);
 
 			if (!handledWait)
 			{
@@ -69,7 +69,7 @@ namespace ConsoleApp
 
 			if (string.IsNullOrWhiteSpace(dbName))
 			{
-				dbName = "data\\";
+				dbName = "data-bin\\";
 			}
 			string rootPath = $"{basePath}{dbName}";
 
@@ -107,7 +107,7 @@ namespace ConsoleApp
 		static void GenerateInitialDbData(
 			Config.ConfigSettings appConfig,
 			string dbname,
-			DbSchemaConfigEnum dbConfig,
+			DbSchemaConfigType dbConfig,
 			string zipfile
 		)
 		{
@@ -135,6 +135,22 @@ namespace ConsoleApp
 			gen.Compile();
 		}
 
+		static void ShowAllTablesAndColumns(Config.ConfigSettings appConfig)
+		{
+			var db = OpenDatabase(appConfig);
+
+			Console.WriteLine("switch (tableName)\r\n{");
+			foreach (var table in db.Tables)
+			{
+				Console.WriteLine($"\tcase \"{table.Name}\":");
+				Console.WriteLine($"\t\treturn new string[] {{ {String.Join(", ", table.Columns.Select(c => $"\"{c.Name}\""))} }}");
+				Console.WriteLine($"\t\t\t.Contains(columnName);");
+			}
+			Console.WriteLine("\tdefault:");
+			Console.WriteLine("\t\treturn false;");
+			Console.WriteLine("}");
+		}
+
 		static void SqlQueryExecuteTests(Config.ConfigSettings appConfig)
 		{
 			var sw = new System.Diagnostics.Stopwatch();
@@ -146,8 +162,8 @@ namespace ConsoleApp
 			Console.WriteLine($"\r\nDatabase: {db.Name}");
 			Console.WriteLine(">created on {0} ms", sw.ElapsedMilliseconds);
 
-			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
-									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5"
+			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> 'NJB' LIMIT 5"
+									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> 'NJB' LIMIT 5"
 									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id = 180"
 									//		180,NJB,74,,3,,
 				"SELECT * FROM trips WHERE route_id = 204 AND service_id = 5 AND trip_id = 52325"
@@ -169,9 +185,9 @@ namespace ConsoleApp
 			//to calculate times
 			sw.Restart();
 
-			var visualizer = DbVisualizer.Create(db, dbQuery, DbVisualize.None);
-			var rows = visualizer.Rows().ToList();
-			visualizer.Dispose();
+			var reader = DbRecordReader.Create(db, dbQuery);
+			var rows = reader.Rows().ToList();
+			reader.Dispose();
 
 			sw.Stop();
 			Console.WriteLine(">{rows.Count} row(s) retrieved on {0} ms", sw.ElapsedMilliseconds);
@@ -207,31 +223,26 @@ namespace ConsoleApp
 				"SELECT * FROM",
 				"SELECT * FROM none",
 				"SELECT * FROM routes WHERE ",
-				"SELECT * FROM routes WHERE SKIP 2 ",
-				"SELECT * FROM routes SKIP ",
+				"SELECT * FROM routes LIMIT ",
 				"SELECT * FROM routes WHERE route_id ",
 				"SELECT * FROM routes WHERE route_id > ",
-				"SELECT * FROM routes WHERE > 5 SKIP 2",
-				"SELECT * FROM routes WHERE route_id > SKIP 2",
-				//this one is because cookoo_i is not a table and tries to convert to number
-				"SELECT * FROM routes WHERE cookoo_i > 4 SKIP 2",
+				"SELECT * FROM routes WHERE > 5 LIMIT 2",
+				"SELECT * FROM routes WHERE route_id > LIMIT 2",
+				//this one is because cookoo_id is not a table
+				"SELECT * FROM routes WHERE cookoo_id > 4 LIMIT 2",
 
 				//
 				"SELECT * FROM routes",
-				"SELECT * FROM routes SKIP 2",
-				"SELECT * FROM routes SKIP 2 LIMIT 5",
+				"SELECT * FROM routes LIMIT 5",
 				"SELECT * FROM routes WHERE route_id >= 5",
-				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\"",
-				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2",
-				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 5",
+				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> 'NJB'",
+				"SELECT * FROM routes WHERE route_id >= 5 AND agency_id <> 'NJB' LIMIT 5",
 				//
 				"SELECT route_id, agency_id,route_type FROM routes",
-				"SELECT route_id, agency_id,route_type FROM routes SKIP 2",
-				"SELECT route_id, agency_id,route_type FROM routes SKIP 2 LIMIT 2",
+				"SELECT route_id, agency_id,route_type FROM routes LIMIT 2",
 				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5",
-				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\"",
-				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2",
-				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> \"NJB\" SKIP 2 LIMIT 2"
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> 'NJB'",
+				"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> 'NJB' LIMIT 2"
 			};
 
 			foreach (var query in queryCollection)
@@ -318,7 +329,7 @@ namespace ConsoleApp
 				var bufferWriter = new io.BinaryWriter(stream);
 
 				using (var writer = new io.BinaryWriter(io.File.Create(binPath)))
-				using (var reader = new io.StreamReader(csvPath))
+				//using (var reader = new io.StreamReader(csvPath))
 				{
 					//placeholder for row count
 					Int32 value = 0;
@@ -330,10 +341,10 @@ namespace ConsoleApp
 					//var buffer = new io.MemoryStream(5 * 1024);
 
 					var queryText = $"SELECT * FROM {table.Name}";
-					var visualizer = DbVisualizer.Create(db, DbQuery.Parse(queryText, new CsvDbDefaultValidator(db)), DbVisualize.None);
+					var reader = DbRecordReader.Create(db, DbQuery.Parse(queryText, new CsvDbDefaultValidator(db)));
 					int rowCount = 0;
 
-					foreach (var record in visualizer.Rows())
+					foreach (var record in reader.Rows())
 					{
 						rowCount++;
 
@@ -344,10 +355,10 @@ namespace ConsoleApp
 
 						stream.Position = 0;
 
-						for (var index = 0; index < visualizer.ColumnCount; index++)
+						for (var index = 0; index < reader.ColumnCount; index++)
 						{
 							string textValue = (string)record[index];
-							var colType = visualizer.ColumnTypes[index];
+							var colType = reader.ColumnTypes[index];
 
 							if (textValue == null)
 							{
@@ -358,10 +369,10 @@ namespace ConsoleApp
 							{
 								switch (colType)
 								{
-									case DbColumnTypeEnum.String:
+									case DbColumnType.String:
 										bufferWriter.Write(textValue);
 										break;
-									case DbColumnTypeEnum.Char:
+									case DbColumnType.Char:
 										char charValue = (char)0;
 										if (!Char.TryParse(textValue, out charValue))
 										{
@@ -370,7 +381,7 @@ namespace ConsoleApp
 										//write
 										bufferWriter.Write(charValue);
 										break;
-									case DbColumnTypeEnum.Byte:
+									case DbColumnType.Byte:
 										byte byteValue = 0;
 										if (!Byte.TryParse(textValue, out byteValue))
 										{
@@ -379,7 +390,7 @@ namespace ConsoleApp
 										//write
 										bufferWriter.Write(byteValue);
 										break;
-									case DbColumnTypeEnum.Int16:
+									case DbColumnType.Int16:
 										Int16 int16Value = 0;
 										if (!Int16.TryParse(textValue, out int16Value))
 										{
@@ -388,7 +399,7 @@ namespace ConsoleApp
 										//write
 										bufferWriter.Write(int16Value);
 										break;
-									case DbColumnTypeEnum.Int32:
+									case DbColumnType.Int32:
 										Int32 int32Value = 0;
 										if (!Int32.TryParse(textValue, out int32Value))
 										{
@@ -397,7 +408,7 @@ namespace ConsoleApp
 										//write
 										bufferWriter.Write(int32Value);
 										break;
-									case DbColumnTypeEnum.Float:
+									case DbColumnType.Float:
 										float floatValue = 0.0f;
 										if (!float.TryParse(textValue, out floatValue))
 										{
@@ -406,7 +417,7 @@ namespace ConsoleApp
 										//write
 										bufferWriter.Write(floatValue);
 										break;
-									case DbColumnTypeEnum.Double:
+									case DbColumnType.Double:
 										Double doubleValue = 0.0;
 										if (!Double.TryParse(textValue, out doubleValue))
 										{
@@ -415,7 +426,7 @@ namespace ConsoleApp
 										//write
 										bufferWriter.Write(doubleValue);
 										break;
-									case DbColumnTypeEnum.Decimal:
+									case DbColumnType.Decimal:
 										Decimal decimalValue = 0;
 										if (!Decimal.TryParse(textValue, out decimalValue))
 										{
@@ -449,6 +460,7 @@ namespace ConsoleApp
 					writer.Write(rowCount);
 
 					Console.WriteLine($"writen {rowCount} row(s)");
+					reader.Dispose();
 				}
 			}
 

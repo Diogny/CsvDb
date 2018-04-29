@@ -32,22 +32,49 @@ namespace CsvDb
 
 	public class CsvDb : IDisposable
 	{
+		/// <summary>
+		/// logging path
+		/// </summary>
 		public string LogPath { get; protected internal set; }
 
+		/// <summary>
+		/// binary files path
+		/// </summary>
 		public string BinaryPath { get; protected internal set; }
 
-		public DbSchemaConfigEnum Flags { get { return Schema == null ? DbSchemaConfigEnum.None : Schema.Flags; } }
+		/// <summary>
+		/// database header flags
+		/// </summary>
+		public DbSchemaConfigType Flags { get { return Schema == null ? DbSchemaConfigType.None : Schema.Flags; } }
 
-		public bool IsBinary { get { return (Flags & DbSchemaConfigEnum.Binary) != 0; } }
+		/// <summary>
+		/// true if it's a binary schema
+		/// </summary>
+		public bool IsBinary { get { return (Flags & DbSchemaConfigType.Binary) != 0; } }
 
-		public bool IsCsv { get { return (Flags & DbSchemaConfigEnum.Csv) != 0; } }
+		/// <summary>
+		/// true if it's a text/csv schema
+		/// </summary>
+		public bool IsCsv { get { return (Flags & DbSchemaConfigType.Csv) != 0; } }
 
+		/// <summary>
+		/// database name
+		/// </summary>
 		public string Name { get { return Schema?.Name; } }
 
+		/// <summary>
+		/// database schema page size
+		/// </summary>
 		public int PageSize { get { return Schema == null ? -1 : Schema.PageSize; } }
 
+		/// <summary>
+		/// read policy
+		/// </summary>
 		public DbIndexItemsPolicy ReadPolicy { get; set; }
 
+		/// <summary>
+		/// schema props
+		/// </summary>
 		internal DbSchemaConfig Schema;
 
 		/// <summary>
@@ -55,17 +82,12 @@ namespace CsvDb
 		/// </summary>
 		public IEnumerable<DbTable> Tables
 		{
-			//Tables
 			get { return Schema?._tables.Select(t => t.Value); }
-			//set
-			//{
-			//	if (Schema != null)
-			//	{
-			//		Schema.Tables = value;
-			//	}
-			//}
 		}
 
+		/// <summary>
+		/// true if schema or data modified
+		/// </summary>
 		public bool Modified { get; set; }
 
 		public static String SchemaSystemName => "__schema";
@@ -76,8 +98,14 @@ namespace CsvDb
 
 		public static String SchemaJsonExtension => "json";
 
+		/// <summary>
+		/// binary schema filename
+		/// </summary>
 		public static String SchemaSystemFilename => $"{SchemaSystemName}.{SchemaSystemExtension}";
 
+		/// <summary>
+		/// json schema filename
+		/// </summary>
 		public static String SchemaJsonFilename => $"{SchemaJsonName}.{SchemaJsonExtension}";
 
 		/// <summary>
@@ -85,13 +113,28 @@ namespace CsvDb
 		/// </summary>
 		public static String SchemaTableDataExtension => "data";
 
+		/// <summary>
+		/// [table name].csv
+		/// </summary>
 		public static String SchemaTableDefaultExtension => "csv";
 
+		/// <summary>
+		/// binary schema file path of opened database
+		/// </summary>
 		protected internal String SchemaFilePath = String.Empty;
 
+		/// <summary>
+		/// json schema file path of opened database
+		/// </summary>
 		protected internal String SchemaJsonFilePath = String.Empty;
 
-		public static CsvDb CreateFromJson(string jsonfilepath, DbSchemaConfigEnum flags = DbSchemaConfigEnum.None)
+		/// <summary>
+		/// Creates a Csv database schema from a json file
+		/// </summary>
+		/// <param name="jsonfilepath">json file path</param>
+		/// <param name="flags">creation schema flags</param>
+		/// <returns></returns>
+		public static CsvDb CreateFromJson(string jsonfilepath, DbSchemaConfigType flags = DbSchemaConfigType.None)
 		{
 			//generate the __schema.bin file and create normal database
 			var text = io.File.ReadAllText(jsonfilepath);
@@ -158,6 +201,11 @@ namespace CsvDb
 			Load();
 		}
 
+		/// <summary>
+		/// Export the database schema as json to disk
+		/// </summary>
+		/// <param name="jsonpath">json file path</param>
+		/// <returns></returns>
 		public bool ExportToJson(string jsonpath)
 		{
 			try
@@ -178,10 +226,9 @@ namespace CsvDb
 		}
 
 		/// <summary>
-		/// Re load the __tables.json structure of the Csv database
+		/// Re load the schema structure of the database from disk
 		/// </summary>
-		/// <param name="dif">for testings only, will be removed</param>
-		/// <returns></returns>
+		/// <returns>true if loaded successfully</returns>
 		public bool Load()
 		{
 			try
@@ -215,6 +262,10 @@ namespace CsvDb
 			}
 		}
 
+		/// <summary>
+		/// Saves the database to disk
+		/// </summary>
+		/// <returns></returns>
 		public bool Save()
 		{
 			try
@@ -235,13 +286,18 @@ namespace CsvDb
 		/// <summary>
 		/// Gets the table
 		/// </summary>
-		/// <param name="tableName">table's name</param>
+		/// <param name="tableName">table name</param>
 		/// <returns></returns>
 		public DbTable Table(string tableName)
 		{
 			return Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
 		}
 
+		/// <summary>
+		/// Get the table
+		/// </summary>
+		/// <param name="tableName">table name</param>
+		/// <returns></returns>
 		public DbTable this[string tableName] => Schema[tableName];
 
 		/// <summary>
@@ -271,10 +327,7 @@ namespace CsvDb
 			return index;
 		}
 
-		public override string ToString()
-		{
-			return $"{Name} ({Schema.Count}) table(s)";
-		}
+		public override string ToString() => $"{Name} ({Schema.Count}) table(s)";
 
 		public void Dispose()
 		{
@@ -286,35 +339,53 @@ namespace CsvDb
 		}
 	}
 
+	/// <summary>
+	/// schema configuration class
+	/// </summary>
 	internal class DbSchemaConfig
 	{
-		//binary structure of database, test speed
+		/// <summary>
+		/// Schema header flags
+		/// </summary>
+		public DbSchemaConfigType Flags { get; set; }
 
-		public DbSchemaConfigEnum Flags { get; set; }
-
+		/// <summary>
+		/// Schema version
+		/// </summary>
 		public String Version { get; set; }
 
 		//Major.Minor.Build.Revision	3.5.234.02
 		//[Newtonsoft.Json.JsonProperty(Required = Newtonsoft.Json.Required.Default)]
 		[Newtonsoft.Json.JsonIgnore]
+		[System.Xml.Serialization.XmlIgnore]
 		public System.Version VersionInfo => new System.Version(Version);
 
+		/// <summary>
+		/// Schema description
+		/// </summary>
 		public String Description { get; set; }
 
+		/// <summary>
+		/// Schema name
+		/// </summary>
 		public String Name { get; set; }
 
+		/// <summary>
+		/// Schema page size
+		/// </summary>
 		public int PageSize { get; set; }
-
-		//public List<DbTable> Tables { get; set; }
 
 		internal Dictionary<string, DbTable> _tables;
 
+		/// <summary>
+		/// Amount of tables in the schema
+		/// </summary>
 		public int Count => _tables == null ? 0 : _tables.Count;
 
 		/// <summary>
-		/// 
+		/// gets the table if exists, otherwise null
 		/// </summary>
-		/// <param name="tableName"></param>
+		/// <param name="tableName">table name</param>
 		/// <returns></returns>
 		public DbTable this[string tableName]
 		{
@@ -326,11 +397,16 @@ namespace CsvDb
 
 		public DbSchemaConfig() { }
 
+		/// <summary>
+		/// Loads a database schema
+		/// </summary>
+		/// <param name="reader">binary reader</param>
+		/// <returns></returns>
 		public static DbSchemaConfig Load(io.BinaryReader reader)
 		{
 			var schema = new DbSchemaConfig()
 			{
-				Flags = (DbSchemaConfigEnum)reader.ReadUInt32(),
+				Flags = (DbSchemaConfigType)reader.ReadUInt32(),
 				Version = reader.BinaryRead(),
 				Description = reader.BinaryRead(),
 				Name = reader.BinaryRead(),
@@ -381,6 +457,10 @@ namespace CsvDb
 			return schema;
 		}
 
+		/// <summary>
+		/// Saves the database schema
+		/// </summary>
+		/// <param name="writer">binary writer</param>
 		public void Save(io.BinaryWriter writer)
 		{
 			//flags
@@ -432,7 +512,9 @@ namespace CsvDb
 
 	}
 
-
+	/// <summary>
+	/// Represents a database table
+	/// </summary>
 	[Serializable]
 	public class DbTable
 	{
@@ -454,6 +536,7 @@ namespace CsvDb
 
 		//[Newtonsoft.Json.JsonProperty(Required = Newtonsoft.Json.Required.Default)]
 		[Newtonsoft.Json.JsonIgnore]
+		[System.Xml.Serialization.XmlIgnore]
 		protected internal CsvDb Database { get; set; }
 
 		/// <summary>
@@ -466,11 +549,12 @@ namespace CsvDb
 		/// </summary>
 		public int RowMaskLength { get; set; }
 
-		//[Newtonsoft.Json.JsonProperty(Required = Newtonsoft.Json.Required.Default)]
 		[Newtonsoft.Json.JsonIgnore]
-		public DbColumnTypeEnum[] ColumnTypes => Columns.Select(c => Enum.Parse<DbColumnTypeEnum>(c.Type)).ToArray();
+		[System.Xml.Serialization.XmlIgnore]
+		public DbColumnType[] ColumnTypes => Columns.Select(c => Enum.Parse<DbColumnType>(c.Type)).ToArray();
 
 		[Newtonsoft.Json.JsonIgnore]
+		[System.Xml.Serialization.XmlIgnore]
 		public Type Type
 		{
 			get
@@ -493,6 +577,9 @@ namespace CsvDb
 
 	}
 
+	/// <summary>
+	/// Represents a database table column
+	/// </summary>
 	[Serializable]
 	public class DbColumn
 	{
@@ -517,24 +604,21 @@ namespace CsvDb
 		/// <summary>
 		/// Returns the sum of item pages plus tree node pages
 		/// </summary>
+		[System.Xml.Serialization.XmlIgnore]
 		[Newtonsoft.Json.JsonIgnore]
 		public int PageCount { get { return ItemPages + NodePages; } }
 
+		[System.Xml.Serialization.XmlIgnore]
 		[Newtonsoft.Json.JsonIgnore]
-		public DbColumnTypeEnum TypeEnum
+		public DbColumnType TypeEnum
 		{
 			get
 			{
-				if (Enum.TryParse<DbColumnTypeEnum>(Type, out DbColumnTypeEnum type))
-				{
-					return type;
-				}
-				return DbColumnTypeEnum.None;
+				return (Enum.TryParse(Type, out DbColumnType type)) ? type : DbColumnType.None;
 			}
 		}
 
 		[System.Xml.Serialization.XmlIgnore]
-		//[ScriptIgnore]
 		[Newtonsoft.Json.JsonIgnore]
 		public DbTable Table { get; internal set; }
 
@@ -589,6 +673,9 @@ namespace CsvDb
 		public override string ToString() => $"[{Index}] {Name}: {Type}{(Key ? " [Key]" : "")}";
 	}
 
+	/// <summary>
+	/// Represents a database table pager
+	/// </summary>
 	[Serializable]
 	public class DbTablePager
 	{

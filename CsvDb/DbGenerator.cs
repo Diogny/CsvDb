@@ -317,49 +317,49 @@ namespace CsvDb
 								var throwException = false;
 								switch (colType)
 								{
-									case DbColumnTypeEnum.Char:
+									case DbColumnType.Char:
 										char charValue = (char)0;
 										throwException = !Char.TryParse(textValue, out charValue);
 										//write
 										bufferWriter.Write(charValue);
 										break;
-									case DbColumnTypeEnum.Byte:
+									case DbColumnType.Byte:
 										byte byteValue = 0;
 										throwException = !Byte.TryParse(textValue, out byteValue);
 										//write
 										bufferWriter.Write(byteValue);
 										break;
-									case DbColumnTypeEnum.Int16:
+									case DbColumnType.Int16:
 										Int16 int16Value = 0;
 										throwException = !Int16.TryParse(textValue, out int16Value);
 										//write
 										bufferWriter.Write(int16Value);
 										break;
-									case DbColumnTypeEnum.Int32:
+									case DbColumnType.Int32:
 										Int32 int32Value = 0;
 										throwException = !Int32.TryParse(textValue, out int32Value);
 										//write
 										bufferWriter.Write(int32Value);
 										break;
-									case DbColumnTypeEnum.Float:
+									case DbColumnType.Float:
 										float floatValue = 0.0f;
 										throwException = !float.TryParse(textValue, out floatValue);
 										//write
 										bufferWriter.Write(floatValue);
 										break;
-									case DbColumnTypeEnum.Double:
+									case DbColumnType.Double:
 										Double doubleValue = 0.0;
 										throwException = !Double.TryParse(textValue, out doubleValue);
 										//write
 										bufferWriter.Write(doubleValue);
 										break;
-									case DbColumnTypeEnum.Decimal:
+									case DbColumnType.Decimal:
 										Decimal decimalValue = 0;
 										throwException = !Decimal.TryParse(textValue, out decimalValue);
 										//write
 										bufferWriter.Write(decimalValue);
 										break;
-									case DbColumnTypeEnum.String:
+									case DbColumnType.String:
 										//write
 										bufferWriter.Write(textValue);
 										break;
@@ -1021,7 +1021,7 @@ namespace CsvDb
 			while (stack.Count > 0)
 			{
 				var item = stack.Pop();
-				if (item.Type == BTreePageTypeEnum.Collection)
+				if (item.Type == BTreePageType.Collection)
 				{
 					yield return item as BTreePageItems<T>;
 				}

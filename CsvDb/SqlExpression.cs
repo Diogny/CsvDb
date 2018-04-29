@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CsvDb
 {
@@ -21,8 +19,15 @@ namespace CsvDb
 		/// </summary>
 		public abstract class ExpressionBase
 		{
+			/// <summary>
+			/// gets the expression type
+			/// </summary>
 			public ExpressionEnum Type { get; }
 
+			/// <summary>
+			/// creates an expression base
+			/// </summary>
+			/// <param name="type">expression type</param>
 			internal ExpressionBase(ExpressionEnum type)
 			{
 				Type = type;
@@ -49,18 +54,30 @@ namespace CsvDb
 			/// </summary>
 			public Operand Right { get; }
 
+			/// <summary>
+			/// gets the database table column in the expression
+			/// </summary>
 			public Operand Column
 			{
 				get
 				{
-					return Left.GroupType == OperandEnum.Column ?
+					return Left.GroupType == OperandType.Column ?
 						Left :
 						Right;
 				}
 			}
 
-			public bool TwoColumns => Left.GroupType == OperandEnum.Column && Right.GroupType == OperandEnum.Column;
+			/// <summary>
+			/// returns true if left and right operands are table columns
+			/// </summary>
+			public bool TwoColumns => Left.GroupType == OperandType.Column && Right.GroupType == OperandType.Column;
 
+			/// <summary>
+			/// creates a WHERE expression
+			/// </summary>
+			/// <param name="left">left expression</param>
+			/// <param name="oper">operator</param>
+			/// <param name="right">right expression</param>
 			internal Expression(Operand left, TokenType oper, Operand right)
 				: base(ExpressionEnum.Expression)
 			{
@@ -79,12 +96,19 @@ namespace CsvDb
 		}
 
 		/// <summary>
-		/// AND, OR
+		/// AND, OR logical expression
 		/// </summary>
 		public class LogicalExpression : ExpressionBase
 		{
+			/// <summary>
+			/// logical type
+			/// </summary>
 			public TokenType Logical { get; }
 
+			/// <summary>
+			/// creates a logical expression AND, OR
+			/// </summary>
+			/// <param name="logical"></param>
 			internal LogicalExpression(TokenType logical)
 				: base(ExpressionEnum.Logical)
 			{
@@ -103,8 +127,15 @@ namespace CsvDb
 		/// </summary>
 		public class Operator
 		{
+			/// <summary>
+			/// operator type
+			/// </summary>
 			public TokenType Token { get; }
 
+			/// <summary>
+			/// creates an expression operator
+			/// </summary>
+			/// <param name="oper">operator type</param>
 			public Operator(TokenType oper)
 			{
 				switch (oper)
@@ -152,63 +183,116 @@ namespace CsvDb
 			//column name or Identifier, [table identifier].column name, 
 			//constant: String, Number
 
-			public DbColumnTypeEnum Cast { get; }
+			/// <summary>
+			/// operand cast if any (cast type)operand
+			/// </summary>
+			public DbColumnType Cast { get; }
 
+			/// <summary>
+			/// operand text
+			/// </summary>
 			public string Text { get; protected internal set; }
 
 			/// <summary>
 			/// Man group type of operand
 			/// </summary>
-			public OperandEnum GroupType { get; }
+			public OperandType GroupType { get; }
 
 			/// <summary>
 			/// Atomic type of operand
 			/// </summary>
-			public abstract DbColumnTypeEnum Type { get; }
+			public abstract DbColumnType Type { get; }
 
+			/// <summary>
+			/// true if operand is a database table column
+			/// </summary>
 			public abstract bool IsColumn { get; }
 
+			/// <summary>
+			/// gets the value of the operand
+			/// </summary>
+			/// <returns></returns>
 			public abstract object Value();
 
-			internal Operand(OperandEnum groupType, string text, DbColumnTypeEnum cast = DbColumnTypeEnum.None)
+			/// <summary>
+			/// creates an expression operand
+			/// </summary>
+			/// <param name="groupType">main group type</param>
+			/// <param name="text">text</param>
+			/// <param name="cast">cast, None if doesnt apply</param>
+			internal Operand(OperandType groupType, string text, DbColumnType cast = DbColumnType.None)
 			{
 				GroupType = groupType;
 				Cast = cast;
 				Text = text;
 			}
 
-			public override string ToString() => $"{(Cast != DbColumnTypeEnum.None ? $"({Cast})" : "")}{Text}";
+			public override string ToString() => $"{(Cast != DbColumnType.None ? $"({Cast})" : "")}{Text}";
 
 		}
 
+		/// <summary>
+		/// represents a expression constant operand
+		/// </summary>
 		public abstract class ConstantOperand : Operand
 		{
+			/// <summary>
+			/// returns false
+			/// </summary>
 			public override bool IsColumn => false;
 
-			internal ConstantOperand(OperandEnum groupType, string text, DbColumnTypeEnum cast = DbColumnTypeEnum.None)
+			/// <summary>
+			/// creates an expression constant operand
+			/// </summary>
+			/// <param name="groupType">main group type</param>
+			/// <param name="text">text</param>
+			/// <param name="cast">cast, None if doesnt apply</param>
+			internal ConstantOperand(OperandType groupType, string text, DbColumnType cast = DbColumnType.None)
 				: base(groupType, text, cast)
 			{ }
 		}
 
+		/// <summary>
+		/// represents a expression string operand
+		/// </summary>
 		public class StringOperand : ConstantOperand
 		{
-			public override DbColumnTypeEnum Type => DbColumnTypeEnum.String;
+			/// <summary>
+			/// an String constant operand
+			/// </summary>
+			public override DbColumnType Type => DbColumnType.String;
 
-			public StringOperand(string text, DbColumnTypeEnum cast = DbColumnTypeEnum.None)
-				: base(OperandEnum.String, text.UnwrapQuotes(), cast)
+			/// <summary>
+			/// creates an expression string oeprand
+			/// </summary>
+			/// <param name="text">text</param>
+			/// <param name="cast">cast, None if doesnt apply</param>
+			public StringOperand(string text, DbColumnType cast = DbColumnType.None)
+				: base(OperandType.String, text.UnwrapQuotes(), cast)
 			{ }
 
 			public override object Value() => Text;
 		}
 
+		/// <summary>
+		/// represents a expression numeric operand
+		/// </summary>
 		public class NumberOperand : ConstantOperand
 		{
-			Tuple<DbColumnTypeEnum, object> valueType = null;
+			Tuple<DbColumnType, object> valueType = null;
 
-			public override DbColumnTypeEnum Type => valueType.Item1;
+			/// <summary>
+			/// returns the type of the number
+			/// </summary>
+			public override DbColumnType Type => valueType.Item1;
 
-			public NumberOperand(string text, DbColumnTypeEnum cast = DbColumnTypeEnum.None)
-				: base(OperandEnum.Number, text, cast)
+			/// <summary>
+			/// creates an expression numeric operand
+			/// </summary>
+			/// <param name="text">text</param>
+			/// <param name="cast">cast, None if doesnt apply</param>
+			public NumberOperand(string text, DbColumnType cast = DbColumnType.None)
+				: base(OperandType.Number, text, cast)
 			{
 				if ((valueType = text.ToNumberType()) == null)
 				{
@@ -224,35 +308,45 @@ namespace CsvDb
 		/// </summary>
 		public class ColumnOperand : Operand
 		{
+			/// <summary>
+			/// gets the column operand
+			/// </summary>
 			public Column Column { get; }
 
+			/// <summary>
+			/// returns true
+			/// </summary>
 			public override bool IsColumn => true;
 
-			public override  DbColumnTypeEnum Type { get; }
+			/// <summary>
+			/// returns the table column type
+			/// </summary>
+			public override DbColumnType Type { get; }
 
-			public ColumnOperand(Column column, DbColumnTypeEnum cast = DbColumnTypeEnum.None)
-				: base(OperandEnum.Column, column == null ? String.Empty : column.Identifier(), cast)
+			/// <summary>
+			/// creates an expression column operand
+			/// </summary>
+			/// <param name="column">column</param>
+			/// <param name="cast">cast, None if doesnt apply</param>
+			public ColumnOperand(Column column, DbColumnType cast = DbColumnType.None)
+				: base(OperandType.Column, column == null ? String.Empty : column.Identifier(), cast)
 			{
 				if ((Column = column) == null)
 				{
 					throw new ArgumentException($"Column operand null or empty");
 				}
-				Type = Enum.Parse<DbColumnTypeEnum>(Column.Meta.Type);
+				Type = Enum.Parse<DbColumnType>(Column.Meta.Type);
 			}
 
+			/// <summary>
+			/// throws an exception, can't evaluate
+			/// </summary>
+			/// <returns></returns>
 			public override object Value()
 			{
 				throw new NotImplementedException("Cannot get value of table column operand");
 			}
 
-			//public ColumnOperand(string column, string identifier = null, DbColumnTypeEnum cast = DbColumnTypeEnum.None)
-			//	: base(OperandEnum.Column,
-			//			(String.IsNullOrWhiteSpace(identifier)) ? column : $"{identifier}.{column}",
-			//			cast)
-			//{
-			//	ColumnName = column;
-			//	ColumnAlias = identifier;
-			//}
 		}
 
 	}

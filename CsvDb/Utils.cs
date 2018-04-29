@@ -11,60 +11,84 @@ using System.IO;
 
 namespace CsvDb
 {
-
+	/// <summary>
+	/// static utils class
+	/// </summary>
 	public static class Utils
 	{
 		//https://msdn.microsoft.com/en-us/magazine/mt808499.aspx
 
-		public static bool IsNumeric(this DbColumnTypeEnum type)
+		/// <summary>
+		/// numeric mask
+		/// </summary>
+		internal static DbColumnType NumericMask =
+			DbColumnType.Byte |
+			DbColumnType.Int16 | DbColumnType.Int32 | DbColumnType.Int64 |
+			DbColumnType.Float | DbColumnType.Double | DbColumnType.Decimal;
+
+		/// <summary>
+		/// returns true if a database column type is numeric
+		/// </summary>
+		/// <param name="type">database column type</param>
+		/// <returns></returns>
+		public static bool IsNumeric(this DbColumnType type)
 		{
-			switch (type)
-			{
-				case DbColumnTypeEnum.Byte:
-				case DbColumnTypeEnum.Int16:
-				case DbColumnTypeEnum.Int32:
-				case DbColumnTypeEnum.Int64:
-				case DbColumnTypeEnum.Float:
-				case DbColumnTypeEnum.Double:
-				case DbColumnTypeEnum.Decimal:
-					return true;
-				default:
-					return false;
-			}
+			return (type & NumericMask) != 0;
 		}
 
-		public static bool CanCompareTo(this DbColumnTypeEnum type, DbColumnTypeEnum other)
+		/// <summary>
+		/// normalize or returns the conversion type for a type check comparison
+		/// </summary>
+		/// <param name="type">type</param>
+		/// <param name="other">other to compare</param>
+		/// <returns>needed type for successful comparison, otherwise None</returns>
+		public static DbColumnType Normalize(this DbColumnType type, DbColumnType other)
 		{
+			//if equals, return same
+			if (type == other)
+			{
+				return type;
+			}
+			//otherwise atomize
 			switch (type)
 			{
-				case DbColumnTypeEnum.String:
-					//Strings with Strings
-					return other == DbColumnTypeEnum.String;
-				case DbColumnTypeEnum.Char:
-					//Chars with Chars
-					return other == DbColumnTypeEnum.Char;
-				case DbColumnTypeEnum.Byte:
-				case DbColumnTypeEnum.Int16:
-				case DbColumnTypeEnum.Int32:
-				case DbColumnTypeEnum.Int64:
-					//Ints with Ints
-					return other == DbColumnTypeEnum.Byte ||
-						other == DbColumnTypeEnum.Int16 ||
-						other == DbColumnTypeEnum.Int32 ||
-						other == DbColumnTypeEnum.Int64;
-				case DbColumnTypeEnum.Float:
-				case DbColumnTypeEnum.Double:
-				case DbColumnTypeEnum.Decimal:
-					return other == DbColumnTypeEnum.Float ||
-						other == DbColumnTypeEnum.Double ||
-						other == DbColumnTypeEnum.Decimal;
-				default:
-				case DbColumnTypeEnum.None:
-					//one None, other doesn't matter
-					return false;
+				case DbColumnType.Byte:
+				case DbColumnType.Int16:
+				case DbColumnType.Int32:
+				case DbColumnType.Int64:
+					//cast to Int64 if differents
+					return (other == DbColumnType.Byte ||
+							other == DbColumnType.Int16 ||
+							other == DbColumnType.Int32 ||
+							other == DbColumnType.Int64) ? DbColumnType.Int64 : DbColumnType.None;
+				case DbColumnType.Float:
+				case DbColumnType.Double:
+				case DbColumnType.Decimal:
+					//cast to decimal if different
+					return (other == DbColumnType.Float ||
+						other == DbColumnType.Double ||
+						other == DbColumnType.Decimal) ? DbColumnType.Decimal : DbColumnType.None;
 			}
+			// if DbColumnType.String, DbColumnType.Char drives here then none for these two
+			return DbColumnType.None;
 		}
 
+		/// <summary>
+		/// returns true if two database column types can be safely compared
+		/// </summary>
+		/// <param name="type">type</param>
+		/// <param name="other">other to compare</param>
+		/// <returns></returns>
+		public static bool CanCompareTo(this DbColumnType type, DbColumnType other)
+		{
+			return type.Normalize(other) != DbColumnType.None;
+		}
+
+		/// <summary>
+		/// returns a text with the difference of two times
+		/// </summary>
+		/// <param name="span"></param>
+		/// <returns></returns>
 		public static string Difference(this TimeSpan span)
 		{
 			if (span.Seconds == 0)
@@ -105,12 +129,11 @@ namespace CsvDb
 		//	}
 		//}
 
-		public static object ToNumber(this string text)
-		{
-			var tuple = text.ToNumberType();
-			return tuple?.Item2;
-		}
-
+		/// <summary>
+		/// removes wrapping single quotes from an string text
+		/// </summary>
+		/// <param name="text">string text</param>
+		/// <returns>unwrapped string text</returns>
 		public static string UnwrapQuotes(this string text)
 		{
 			if (text != null && text[0] == '\'' && text[text.Length - 1] == '\'')
@@ -120,24 +143,45 @@ namespace CsvDb
 			return text;
 		}
 
-		public static Tuple<DbColumnTypeEnum, object> ToNumberType(this string text)
+		/// <summary>
+		/// converts a numeric text into its object number
+		/// </summary>
+		/// <param name="text">text</param>
+		/// <returns></returns>
+		public static object ToNumber(this string text)
+		{
+			var tuple = text.ToNumberType();
+			return tuple?.Item2;
+		}
+
+		/// <summary>
+		/// tries to convert a numeric text into its numeric object and type
+		/// </summary>
+		/// <param name="text">numeric text</param>
+		/// <returns></returns>
+		public static Tuple<DbColumnType, object> ToNumberType(this string text)
 		{
 			if (Int32.TryParse(text, out Int32 int32Value))
 			{
-				return new Tuple<DbColumnTypeEnum, object>(DbColumnTypeEnum.Int32, int32Value);
+				return new Tuple<DbColumnType, object>(DbColumnType.Int32, int32Value);
 			}
 			else if (Double.TryParse(text, out double doubleValue))
 			{
-				return new Tuple<DbColumnTypeEnum, object>(DbColumnTypeEnum.Double, doubleValue);
+				return new Tuple<DbColumnType, object>(DbColumnType.Double, doubleValue);
 			}
 			else if (Decimal.TryParse(text, out Decimal decimalValue))
 			{
-				return new Tuple<DbColumnTypeEnum, object>(DbColumnTypeEnum.Decimal, decimalValue);
+				return new Tuple<DbColumnType, object>(DbColumnType.Decimal, decimalValue);
 			}
 			return null;
 		}
 
-		public static DbColumnTypeEnum ToCast(this TokenType item)
+		/// <summary>
+		/// tries to convert a token type into its database column type
+		/// </summary>
+		/// <param name="item">token type</param>
+		/// <returns></returns>
+		public static DbColumnType ToCast(this TokenType item)
 		{
 			var itemValue = (int)item;
 			//base 
@@ -145,10 +189,9 @@ namespace CsvDb
 			//max 
 			var tokenEndValue = (int)TokenType.Int64;
 
-			return (itemValue >= tokenStartValue &&
-				itemValue <= tokenEndValue) ?
-				(DbColumnTypeEnum)(itemValue - tokenStartValue + 1) :
-				DbColumnTypeEnum.None;
+			return (itemValue >= tokenStartValue && itemValue <= tokenEndValue) ?
+				(DbColumnType)(itemValue - tokenStartValue + 1) :
+				DbColumnType.None;
 		}
 
 
@@ -195,35 +238,35 @@ namespace CsvDb
 			}
 		}
 
-		public static object LoadKey(this DbColumnTypeEnum keyType, io.BinaryReader reader)
+		public static object LoadKey(this DbColumnType keyType, io.BinaryReader reader)
 		{
 			switch (keyType)
 			{
-				case DbColumnTypeEnum.Char:
+				case DbColumnType.Char:
 					//
 					return reader.ReadChar();
-				case DbColumnTypeEnum.Byte:
+				case DbColumnType.Byte:
 					//
 					return reader.ReadByte();
-				case DbColumnTypeEnum.Int16:
+				case DbColumnType.Int16:
 					//
 					return reader.ReadInt16();
-				case DbColumnTypeEnum.Int32:
+				case DbColumnType.Int32:
 					//
 					return reader.ReadInt32();
-				case DbColumnTypeEnum.Int64:
+				case DbColumnType.Int64:
 					//
 					return reader.ReadInt64();
-				case DbColumnTypeEnum.Float:
+				case DbColumnType.Float:
 					//
 					return reader.ReadSingle();
-				case DbColumnTypeEnum.Double:
+				case DbColumnType.Double:
 					//
 					return reader.ReadDouble();
-				case DbColumnTypeEnum.Decimal:
+				case DbColumnType.Decimal:
 					//
 					return reader.ReadDecimal();
-				case DbColumnTypeEnum.String:
+				case DbColumnType.String:
 					//
 					var length = reader.ReadByte();
 					var chars = reader.ReadChars(length);
@@ -238,39 +281,39 @@ namespace CsvDb
 			var typeName = key.GetType().Name;
 			switch (typeName)
 			{
-				case nameof(DbColumnTypeEnum.Char):
+				case nameof(DbColumnType.Char):
 					char valueChar = Convert.ToChar(key);
 					writer.Write(valueChar);
 					break;
-				case nameof(DbColumnTypeEnum.Byte):
+				case nameof(DbColumnType.Byte):
 					byte valueByte = Convert.ToByte(key); //.ChangeType(key, TypeCode.Byte);
 					writer.Write(valueByte);
 					break;
-				case nameof(DbColumnTypeEnum.Int16):
+				case nameof(DbColumnType.Int16):
 					var valueInt16 = Convert.ToInt16(key);
 					writer.Write(valueInt16);
 					break;
-				case nameof(DbColumnTypeEnum.Int32):
+				case nameof(DbColumnType.Int32):
 					var valueInt32 = Convert.ToInt32(key);
 					writer.Write(valueInt32);
 					break;
-				case nameof(DbColumnTypeEnum.Int64):
+				case nameof(DbColumnType.Int64):
 					var valueInt64 = Convert.ToInt64(key);
 					writer.Write(valueInt64);
 					break;
-				case nameof(DbColumnTypeEnum.Float):
+				case nameof(DbColumnType.Float):
 					var valueFloat = Convert.ToSingle(key);
 					writer.Write(valueFloat);
 					break;
-				case nameof(DbColumnTypeEnum.Double):
+				case nameof(DbColumnType.Double):
 					var valueDouble = Convert.ToDouble(key);
 					writer.Write(valueDouble);
 					break;
-				case nameof(DbColumnTypeEnum.Decimal):
+				case nameof(DbColumnType.Decimal):
 					var valueDecimal = Convert.ToDecimal(key);
 					writer.Write(valueDecimal);
 					break;
-				case nameof(DbColumnTypeEnum.String):
+				case nameof(DbColumnType.String):
 					var valueString = Convert.ToString(key);
 					//byte length
 					byte length = (byte)valueString.Length;
@@ -398,6 +441,11 @@ namespace CsvDb
 		//	return results;
 		//}
 
+		/// <summary>
+		/// testings
+		/// </summary>
+		/// <param name="db"></param>
+		/// <returns></returns>
 		public static Assembly CreateDbClasses(CsvDb db)
 		{
 			try

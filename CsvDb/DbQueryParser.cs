@@ -7,20 +7,31 @@ namespace CsvDb
 {
 	public partial class DbQuery
 	{
-
+		/// <summary>
+		/// JOIN start keywords
+		/// </summary>
 		internal static List<TokenType> JoinStarts = new List<TokenType>()
 		{
 			TokenType.INNER, TokenType.LEFT, TokenType.RIGHT, TokenType.FULL, TokenType.CROSS
 		};
 
+		/// <summary>
+		/// SELECT functions
+		/// </summary>
 		internal static List<TokenType> SelectFunctions = new List<TokenType>()
 		{
 			TokenType.COUNT, TokenType.AVG, TokenType.SUM,
 			TokenType.MIN, TokenType.MAX
 		};
 
+		/// <summary>
+		/// known sql keywords for the scope of this app
+		/// </summary>
 		internal static List<string> KeyWords;
 
+		/// <summary>
+		/// collection of casting types
+		/// </summary>
 		internal static List<TokenType> CastingTypes = new List<TokenType> {
 			//numeric
 			TokenType.Byte, TokenType.Int16, TokenType.Int32, TokenType.Int64, TokenType.Float,
@@ -29,6 +40,9 @@ namespace CsvDb
 			TokenType.Char, TokenType.String
 		};
 
+		/// <summary>
+		/// collection of expression operators
+		/// </summary>
 		internal static List<TokenType> OperatorList = new List<TokenType>()
 		{
 			TokenType.Equal, TokenType.NotEqual,
@@ -36,6 +50,11 @@ namespace CsvDb
 			TokenType.Less, TokenType.LessOrEqual
 		};
 
+		/// <summary>
+		/// parse sql query text into tokens
+		/// </summary>
+		/// <param name="query">sql query text</param>
+		/// <returns></returns>
 		internal static IEnumerable<TokenItem> ParseTokens(string query)
 		{
 			if (String.IsNullOrWhiteSpace(query))
@@ -254,11 +273,23 @@ namespace CsvDb
 			}
 		}
 
+		/// <summary>
+		/// static initialization
+		/// </summary>
 		static DbQuery()
 		{
-			KeyWords = Enumerable.Range(1, (int)TokenType.Decimal).Select(i => ((TokenType)i).ToString()).ToList();
+			KeyWords =
+				Enumerable
+					.Range(1, (int)Consts.LastKeywordToken)
+					.Select(i => ((TokenType)i).ToString()).ToList();
 		}
 
+		/// <summary>
+		/// parse an sql query text
+		/// </summary>
+		/// <param name="query">sql query text</param>
+		/// <param name="validator">sql query validator against a database</param>
+		/// <returns></returns>
 		public static DbQuery Parse(string query, IQueryValidation validator)
 		{
 			if (validator == null)
@@ -279,6 +310,11 @@ namespace CsvDb
 			var columnCollection = new List<Column>();
 
 			var queue = new Queue<TokenItem>(ParseTokens(query));
+
+#if DEBUG
+			Console.WriteLine("Query tokens:");
+			Console.WriteLine($"  {String.Join($"{Environment.NewLine}  ", queue)}{Environment.NewLine}");
+#endif
 
 			bool EndOfStream = queue.Count == 0;
 
@@ -374,12 +410,12 @@ namespace CsvDb
 					throw new ArgumentException("operand expected");
 				}
 
-				DbColumnTypeEnum casting = DbColumnTypeEnum.None;
+				DbColumnType casting = DbColumnType.None;
 				//try to read cast
 				if (readCasting && (CurrentToken.Token == TokenType.OpenPar))
 				{
 					if (!GetTokenIfContains(CastingTypes) ||
-						(casting = CurrentToken.Token.ToCast()) == DbColumnTypeEnum.None)
+						(casting = CurrentToken.Token.ToCast()) == DbColumnType.None)
 					{
 						throw new ArgumentException($"invalid casting type: {CurrentToken.Value}");
 					}
@@ -702,8 +738,8 @@ namespace CsvDb
 				var right = ReadOperand(readCasting: false);
 
 				//operands must be of type column with different table identifiers
-				if (left.GroupType != OperandEnum.Column ||
-					right.GroupType != OperandEnum.Column ||
+				if (left.GroupType != OperandType.Column ||
+					right.GroupType != OperandType.Column ||
 					((ColumnOperand)left).Column.TableAlias == ((ColumnOperand)right).Column.TableAlias)
 				{
 					throw new ArgumentException("JOIN query expression table identifiers cannot be the same");
@@ -810,58 +846,6 @@ namespace CsvDb
 			}
 
 			return new DbQuery(columnSelect, tableCollection, join, where, limitValue);
-		}
-
-		public class TokenItem
-		{
-			public TokenType Token { get; internal set; }
-
-			public String Value { get; internal set; }
-
-			public int Position { get; internal set; }
-
-			/// <summary>
-			/// Number, String, Identifier
-			/// </summary>
-			public bool IsIdentifier
-			{
-				get
-				{
-					return Token == TokenType.Number || Token == TokenType.String || Token == TokenType.Identifier;
-				}
-			}
-
-			public bool IsOperator
-			{
-				get
-				{
-					return Token == TokenType.Equal || Token == TokenType.NotEqual ||
-						Token == TokenType.Less || Token == TokenType.LessOrEqual ||
-						Token == TokenType.Greater || Token == TokenType.GreaterOrEqual;
-				}
-			}
-
-			public bool IsLogical
-			{
-				get
-				{
-					return Token == TokenType.AND || Token == TokenType.OR;
-				}
-			}
-
-			internal TokenItem(TokenType token, int position)
-				: this(token, null, position)
-			{ }
-
-			internal TokenItem(TokenType token, string value, int position)
-			{
-				Token = token;
-				Value = value;
-				Position = position;
-			}
-
-			public override string ToString() => $"({Token}) {Value} @{Position}";
-
 		}
 
 	}

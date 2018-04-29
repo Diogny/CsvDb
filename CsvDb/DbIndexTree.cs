@@ -26,7 +26,7 @@ namespace CsvDb
 
 		public bool IsLeaf { get; protected internal set; }
 
-		public DbColumnTypeEnum KeyType { get; protected internal set; }
+		public DbColumnType KeyType { get; protected internal set; }
 
 		io.BinaryReader reader = null;
 
@@ -55,7 +55,7 @@ namespace CsvDb
 				IsLeaf = (Header.Flags & Consts.IndexHeaderIsLeaf) != 0;
 
 				byte keyTypeValue = (byte)Header.Flags;
-				KeyType = (DbColumnTypeEnum)keyTypeValue;
+				KeyType = (DbColumnType)keyTypeValue;
 
 				//amount of tree node pages
 				Index.NodePages = 0;
@@ -582,7 +582,7 @@ namespace CsvDb
 
 		public override MetaIndexType Type => MetaIndexType.Node;
 
-		internal PageIndexNode(int flags, int number, io.BinaryReader reader, DbColumnTypeEnum keyType)
+		internal PageIndexNode(int flags, int number, io.BinaryReader reader, DbColumnType keyType)
 			: base(flags, number)
 		{
 			//read info

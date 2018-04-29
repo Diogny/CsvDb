@@ -65,7 +65,7 @@ SELECT route_id, agency_id,route_short_name,route_type FROM routes
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-SELECT * FROM routes WHERE route_id = 1 AND agency_id = "NJB"
+SELECT * FROM routes WHERE route_id = 1 AND agency_id = 'NJB'
   --error [agency_id] not indexed
 
 SELECT * FROM routes WHERE route_id = 1 AND route_id = 2
@@ -354,6 +354,33 @@ SUM
  displayed 1 row(s)
 
 
+SELECT SUM(trip_id) FROM trips
+------------------------------------------------------------
+
+SUM
+─────────
+472704378
+ displayed 1 row(s)
+
+
+SELECT COUNT(trip_id) FROM trips
+------------------------------------------------------------
+
+COUNT
+─────
+30747
+ displayed 1 row(s)
+
+
+SELECT COUNT(stop_id) FROM stop_times
+------------------------------------------------------------
+
+COUNT
+───────
+1642266
+ displayed 1 row(s)
+
+
 SELECT AVG(route_id) FROM routes
 ------------------------------------------------------------
 
@@ -362,4 +389,4 @@ AVG
 128
  displayed 1 row(s)
 
-
+ 

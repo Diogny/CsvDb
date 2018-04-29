@@ -13,24 +13,51 @@ namespace CsvDb
 	public abstract class BTreePageBase<T>
 		where T : IComparable<T>
 	{
+		/// <summary>
+		/// gets the parent of the this page
+		/// </summary>
 		public BTreePageBase<T> Parent { get; set; }
 
+		/// <summary>
+		/// returns true if the page is the main root
+		/// </summary>
 		public bool IsRoot { get { return Parent == null; } }
 
+		/// <summary>
+		/// returns true if this page is an ending leaf
+		/// </summary>
 		public abstract bool IsLeaf { get; }
 
-		public abstract bool HasRoot { get; }
+		/// <summary>
+		/// returns true if this page is sealed
+		/// </summary>
+		public bool Sealed { get; }
 
-		public bool Sealed { get; protected internal set; }
-
+		/// <summary>
+		/// returns then index of this page
+		/// </summary>
 		public int Index { get; set; }
 
-		public abstract BTreePageTypeEnum Type { get; }
+		/// <summary>
+		/// gets the page type
+		/// </summary>
+		public abstract BTreePageType Type { get; }
 
+		/// <summary>
+		/// returns a buffered representation of the page
+		/// </summary>
+		/// <returns></returns>
 		public abstract byte[] ToBuffer();
 
+		/// <summary>
+		/// gets the children count
+		/// </summary>
 		public abstract int ChildrenCount { get; }
 
+		/// <summary>
+		/// creates a base page class
+		/// </summary>
+		/// <param name="isSealed">true if sealed</param>
 		public BTreePageBase(bool isSealed)
 		{
 			Sealed = isSealed;
@@ -45,14 +72,29 @@ namespace CsvDb
 	public class BTreePageNode<T> : BTreePageBase<T>
 		where T : IComparable<T>
 	{
+		/// <summary>
+		/// gets the left page node
+		/// </summary>
 		public BTreePageBase<T> Left { get; set; }
 
+		/// <summary>
+		/// gets the right page node
+		/// </summary>
 		public BTreePageBase<T> Right { get; set; }
 
+		/// <summary>
+		/// returns true if this tree page node is an ending leaf
+		/// </summary>
 		public override bool IsLeaf => Left == null && Right == null;
 
-		public override BTreePageTypeEnum Type => BTreePageTypeEnum.Node;
+		/// <summary>
+		/// tree page node
+		/// </summary>
+		public override BTreePageType Type => BTreePageType.Node;
 
+		/// <summary>
+		/// gets the children count of this page
+		/// </summary>
 		public override int ChildrenCount
 		{
 			get
@@ -72,13 +114,14 @@ namespace CsvDb
 
 		public KeyValuePair<T, List<int>> Root { get; set; }
 
-		public override bool HasRoot { get { return true; } }
-
+		/// <summary>
+		/// creates a tree page node
+		/// </summary>
+		/// <param name="root">root</param>
 		public BTreePageNode(KeyValuePair<T, List<int>> root)
 			: base(true)
 		{
 			Root = root;
-			Sealed = true;
 		}
 
 		/// <summary>
@@ -145,14 +188,21 @@ namespace CsvDb
 	public class BTreePageItems<T> : BTreePageBase<T>
 		where T : IComparable<T>
 	{
-		public override bool HasRoot { get { return true; } }
-
+		/// <summary>
+		/// always a leaf => true
+		/// </summary>
 		public override bool IsLeaf => true;
 
+		/// <summary>
+		/// always => 1
+		/// </summary>
 		public override int ChildrenCount => 1;
 
-		public override BTreePageTypeEnum Type => BTreePageTypeEnum.Collection;
-		
+		/// <summary>
+		/// tree page items
+		/// </summary>
+		public override BTreePageType Type => BTreePageType.Collection;
+
 		/// <summary>
 		/// Offset 0-based of the start of this page in the index of items stream
 		/// </summary>
@@ -163,6 +213,10 @@ namespace CsvDb
 		/// </summary>
 		public List<KeyValuePair<T, List<int>>> Items { get; set; }
 
+		/// <summary>
+		/// creates a tree page collection of items
+		/// </summary>
+		/// <param name="items">collection of items</param>
 		public BTreePageItems(IEnumerable<KeyValuePair<T, List<int>>> items = null)
 			: base(false)
 		{
@@ -173,6 +227,11 @@ namespace CsvDb
 			}
 		}
 
+		/// <summary>
+		/// adds a new item to the collection of items
+		/// </summary>
+		/// <param name="item">new item</param>
+		/// <returns></returns>
 		public bool Add(KeyValuePair<T, List<int>> item)
 		{
 			Func<bool> fn = () =>
@@ -184,16 +243,20 @@ namespace CsvDb
 			return Sealed ? false : fn();
 		}
 
+		/// <summary>
+		/// gets a buffered representation of this tree page items collection
+		/// </summary>
+		/// <returns></returns>
 		public override byte[] ToBuffer()
 		{
 			var stream = new io.MemoryStream();
 			var writer = new io.BinaryWriter(stream);
 
 			//flags
-			Int32 valueInt32 = Consts.BTreePageItemsFlag;  
+			Int32 valueInt32 = Consts.BTreePageItemsFlag;
 
 			var uniqueKeyValue = Items.All(i => i.Value.Count == 1);
-			var uniqueFlag = uniqueKeyValue ? Consts.BTreeUniqueKeyValueFlag : 0; 
+			var uniqueFlag = uniqueKeyValue ? Consts.BTreeUniqueKeyValueFlag : 0;
 			valueInt32 |= uniqueFlag;
 			//
 			writer.Write(valueInt32);

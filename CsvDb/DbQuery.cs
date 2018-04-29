@@ -39,7 +39,12 @@ namespace CsvDb
 		{
 			get
 			{
-				foreach (var table in From.Append(Join.Table))
+				IEnumerable<Table> collection = From;
+				if (Join != null)
+				{
+					collection = collection.Append(Join.Table);
+				}
+				foreach (var table in collection)
 				{
 					yield return table;
 				}
@@ -110,10 +115,13 @@ namespace CsvDb
 			return String.Join(' ', items);
 		}
 
+		/// <summary>
+		/// alias contract
+		/// </summary>
 		public interface IAlias
 		{
 			/// <summary>
-			/// Gets the alias
+			/// Gets the AS alias
 			/// </summary>
 			String Alias { get; }
 
@@ -123,19 +131,42 @@ namespace CsvDb
 			bool HasAlias { get; }
 		}
 
+		/// <summary>
+		/// name contract
+		/// </summary>
 		public interface IName
 		{
+			/// <summary>
+			/// name
+			/// </summary>
 			String Name { get; }
 		}
 
+		/// <summary>
+		/// Represents a named alias object
+		/// </summary>
 		public abstract class NamedAlias : IAlias, IName
 		{
+			/// <summary>
+			/// AS alias
+			/// </summary>
 			public string Alias { get; }
 
+			/// <summary>
+			/// true if has an alias
+			/// </summary>
 			public bool HasAlias => Alias != null;
 
+			/// <summary>
+			/// name
+			/// </summary>
 			public string Name { get; }
 
+			/// <summary>
+			/// Creates a named alias object
+			/// </summary>
+			/// <param name="name">name</param>
+			/// <param name="alias">AS alias</param>
 			public NamedAlias(string name, string alias)
 			{
 				if (String.IsNullOrWhiteSpace(name))
@@ -176,7 +207,7 @@ namespace CsvDb
 			/// </summary>
 			public string TableAlias { get; }
 
-			public bool HasTableAlias { get { return !String.IsNullOrWhiteSpace(TableAlias); } }
+			public bool HasTableAlias => TableAlias != null;
 
 			/// <summary>
 			/// Gets the column index in the table
@@ -204,6 +235,95 @@ namespace CsvDb
 			public string Identifier() => $"{(HasTableAlias ? $"{TableAlias}." : String.Empty)}{Name}";
 
 			public override string ToString() => $"{(HasTableAlias ? $"{TableAlias}." : String.Empty)}{base.ToString()}";
+		}
+
+		/// <summary>
+		/// Parsed Sql query single token
+		/// </summary>
+		public class TokenItem
+		{
+			/// <summary>
+			/// token
+			/// </summary>
+			public TokenType Token { get; }
+
+			/// <summary>
+			/// value or text of the token
+			/// </summary>
+			public String Value { get; }
+
+			/// <summary>
+			/// starting position of the token
+			/// </summary>
+			public int Position { get; }
+
+			/// <summary>
+			/// length of the value or text of the token
+			/// </summary>
+			public int Length => Value.Length;
+
+			/// <summary>
+			/// Number, String, Identifier
+			/// </summary>
+			public bool IsIdentifier
+			{
+				get
+				{
+					return Token == TokenType.Number || Token == TokenType.String || Token == TokenType.Identifier;
+				}
+			}
+
+			/// <summary>
+			/// operator
+			/// </summary>
+			public bool IsOperator
+			{
+				get
+				{
+					return Token == TokenType.Equal || Token == TokenType.NotEqual ||
+						Token == TokenType.Less || Token == TokenType.LessOrEqual ||
+						Token == TokenType.Greater || Token == TokenType.GreaterOrEqual;
+				}
+			}
+
+			/// <summary>
+			/// logical AND, OR
+			/// </summary>
+			public bool IsLogical
+			{
+				get
+				{
+					return Token == TokenType.AND || Token == TokenType.OR;
+				}
+			}
+
+			/// <summary>
+			/// creates a token item
+			/// </summary>
+			/// <param name="token">token</param>
+			/// <param name="position">start position</param>
+			internal TokenItem(TokenType token, int position)
+				: this(token, null, position)
+			{ }
+
+			/// <summary>
+			/// creates a token item
+			/// </summary>
+			/// <param name="token">token</param>
+			/// <param name="value">text</param>
+			/// <param name="position">start position</param>
+			internal TokenItem(TokenType token, string value, int position)
+			{
+				Token = token;
+				Value = value;
+				if ((Position = position) < 0)
+				{
+					throw new ArgumentException("Invalid token item");
+				}
+			}
+
+			public override string ToString() => $"({Token}) {Value} @{Position}";
+
 		}
 
 	}

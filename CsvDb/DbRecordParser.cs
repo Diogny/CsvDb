@@ -4,6 +4,9 @@ using System.Text;
 
 namespace CsvDb
 {
+	/// <summary>
+	/// Database csv record parser. Used on DbGenerator.cs
+	/// </summary>
 	public class DbRecordParser
 	{
 		public DbTable Table { get; set; }

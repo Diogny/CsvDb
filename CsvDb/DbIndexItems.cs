@@ -20,7 +20,7 @@ namespace CsvDb
 
 		public Int32 PageCount { get; protected internal set; }
 
-		public DbColumnTypeEnum KeyType { get; protected internal set; }
+		public DbColumnType KeyType { get; protected internal set; }
 
 		public string PathToItems { get; protected internal set; }
 
@@ -68,7 +68,7 @@ namespace CsvDb
 				PageCount = reader.ReadInt32();
 
 				Int32 keyTypeValue = reader.ReadInt32();
-				KeyType = (DbColumnTypeEnum)keyTypeValue;
+				KeyType = (DbColumnType)keyTypeValue;
 
 				//read all pages main info
 				for (var pi = 0; pi < PageCount; pi++)
@@ -257,7 +257,7 @@ namespace CsvDb
 						var ii = 0;
 						KeyValuePair<T, List<int>> pair;
 
-						if (Parent.KeyType == DbColumnTypeEnum.String)
+						if (Parent.KeyType == DbColumnType.String)
 						{
 							var keyLengths = new byte[ItemsCount];
 							reader.Read(keyLengths, 0, ItemsCount);
