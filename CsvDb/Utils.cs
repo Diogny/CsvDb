@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using io = System.IO;
-using CsvDb.Query;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -34,6 +33,38 @@ namespace CsvDb
 			}
 		}
 
+		public static bool CanCompareTo(this DbColumnTypeEnum type, DbColumnTypeEnum other)
+		{
+			switch (type)
+			{
+				case DbColumnTypeEnum.String:
+					//Strings with Strings
+					return other == DbColumnTypeEnum.String;
+				case DbColumnTypeEnum.Char:
+					//Chars with Chars
+					return other == DbColumnTypeEnum.Char;
+				case DbColumnTypeEnum.Byte:
+				case DbColumnTypeEnum.Int16:
+				case DbColumnTypeEnum.Int32:
+				case DbColumnTypeEnum.Int64:
+					//Ints with Ints
+					return other == DbColumnTypeEnum.Byte ||
+						other == DbColumnTypeEnum.Int16 ||
+						other == DbColumnTypeEnum.Int32 ||
+						other == DbColumnTypeEnum.Int64;
+				case DbColumnTypeEnum.Float:
+				case DbColumnTypeEnum.Double:
+				case DbColumnTypeEnum.Decimal:
+					return other == DbColumnTypeEnum.Float ||
+						other == DbColumnTypeEnum.Double ||
+						other == DbColumnTypeEnum.Decimal;
+				default:
+				case DbColumnTypeEnum.None:
+					//one None, other doesn't matter
+					return false;
+			}
+		}
+
 		public static string Difference(this TimeSpan span)
 		{
 			if (span.Seconds == 0)
@@ -54,25 +85,72 @@ namespace CsvDb
 			}
 		}
 
-		public static IEnumerable<DbQueryExpressionItem> Flatten(
-			this List<DbQueryExpressionBase> list)
+		//public static IEnumerable<DbQueryExpressionItem> Flatten(
+		//	this List<DbQueryExpressionBase> list)
+		//{
+		//	foreach (var item in list)
+		//	{
+		//		switch (item.Type)
+		//		{
+		//			case DbQueryExpressionItemType.Logical:
+		//				yield return item;
+		//				break;
+		//			case DbQueryExpressionItemType.Expression:
+		//				var expr = item as DbQueryExpression;
+		//				yield return expr.Left;
+		//				yield return expr.Operator;
+		//				yield return expr.Right;
+		//				break;
+		//		}
+		//	}
+		//}
+
+		public static object ToNumber(this string text)
 		{
-			foreach (var item in list)
-			{
-				switch (item.Type)
-				{
-					case DbQueryExpressionItemType.Logical:
-						yield return item;
-						break;
-					case DbQueryExpressionItemType.Expression:
-						var expr = item as DbQueryExpression;
-						yield return expr.Left;
-						yield return expr.Operator;
-						yield return expr.Right;
-						break;
-				}
-			}
+			var tuple = text.ToNumberType();
+			return tuple?.Item2;
 		}
+
+		public static string UnwrapQuotes(this string text)
+		{
+			if (text != null && text[0] == '\'' && text[text.Length - 1] == '\'')
+			{
+				return text.Substring(1, text.Length - 2);
+			}
+			return text;
+		}
+
+		public static Tuple<DbColumnTypeEnum, object> ToNumberType(this string text)
+		{
+			if (Int32.TryParse(text, out Int32 int32Value))
+			{
+				return new Tuple<DbColumnTypeEnum, object>(DbColumnTypeEnum.Int32, int32Value);
+			}
+			else if (Double.TryParse(text, out double doubleValue))
+			{
+				return new Tuple<DbColumnTypeEnum, object>(DbColumnTypeEnum.Double, doubleValue);
+			}
+			else if (Decimal.TryParse(text, out Decimal decimalValue))
+			{
+				return new Tuple<DbColumnTypeEnum, object>(DbColumnTypeEnum.Decimal, decimalValue);
+			}
+			return null;
+		}
+
+		public static DbColumnTypeEnum ToCast(this TokenType item)
+		{
+			var itemValue = (int)item;
+			//base 
+			var tokenStartValue = (int)TokenType.Byte;
+			//max 
+			var tokenEndValue = (int)TokenType.Int64;
+
+			return (itemValue >= tokenStartValue &&
+				itemValue <= tokenEndValue) ?
+				(DbColumnTypeEnum)(itemValue - tokenStartValue + 1) :
+				DbColumnTypeEnum.None;
+		}
+
 
 		//any of these chars should be wrapped by ""
 		//	"	,	line-break

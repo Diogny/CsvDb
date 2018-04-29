@@ -7,6 +7,10 @@ using System.Linq;
 
 namespace CsvDb
 {
+	/// <summary>
+	/// Database table column node tree handler
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
 	public class DbIndexTree<T>
 		where T : IComparable<T>
 	{
@@ -28,21 +32,17 @@ namespace CsvDb
 
 		public PageIndexNodeBase<T> Root { get; protected internal set; }
 
-		public DbIndexTree(CsvDb db, string tableName, string columnName)
+		public DbIndexTree(DbColumn index)
 		{
-			if ((db) == null)
+			if ((Index = index) == null)
 			{
-				throw new ArgumentException("Database is undefined");
-			}
-			Index = db.Index(tableName, columnName);
-			if (Index == null)
-			{
-				throw new ArgumentException($"Column [{columnName}] does not exists in table [{tableName}].");
+				throw new ArgumentException($"Column indexer cannot be null or error");
 			}
 			//load structure
-			var pathTree = io.Path.Combine(db.BinaryPath, $"{Index.Indexer}");
 			try
 			{
+				var pathTree = io.Path.Combine(Index.Table.Database.BinaryPath, $"{Index.Indexer}");
+
 				reader = new io.BinaryReader(io.File.OpenRead(pathTree));
 
 				var headerBuffer = new byte[PageIndexTreeHeader.Size];
@@ -65,11 +65,15 @@ namespace CsvDb
 					Root = ReadTreePageStructure(0);
 				}
 			}
-			catch (Exception ex)
+			catch
 			{
-				throw new ArgumentException($"Could not find indexer [{tableName}].{columnName} in database");
+				throw new ArgumentException($"Error processing column indexer {Index.Table.Name}.{Index.Name}");
 			}
 		}
+
+		public DbIndexTree(CsvDb db, string tableName, string columnName)
+			: this(db?.Index(tableName, columnName))
+		{ }
 
 		//later avoid recursive
 		PageIndexNodeBase<T> ReadTreePageStructure(int parent)
@@ -121,7 +125,7 @@ namespace CsvDb
 					case MetaIndexType.Items:
 						var itemsPage = root as PageIndexItems<T>;
 						foreach (var ofs in Index.IndexItems<T>()
-							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.Less))
+							.FindByOper(itemsPage.Offset, key, TokenType.Less))
 						{
 							yield return ofs;
 						}
@@ -185,7 +189,7 @@ namespace CsvDb
 					case MetaIndexType.Items:
 						var itemsPage = root as PageIndexItems<T>;
 						foreach (var ofs in Index.IndexItems<T>()
-							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.LessOrEqual))
+							.FindByOper(itemsPage.Offset, key, TokenType.LessOrEqual))
 						{
 							yield return ofs;
 						}
@@ -253,7 +257,7 @@ namespace CsvDb
 					case MetaIndexType.Items:
 						var itemsPage = root as PageIndexItems<T>;
 						foreach (var ofs in Index.IndexItems<T>()
-							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.Greater))
+							.FindByOper(itemsPage.Offset, key, TokenType.Greater))
 						{
 							yield return ofs;
 						}
@@ -319,7 +323,7 @@ namespace CsvDb
 					case MetaIndexType.Items:
 						var itemsPage = root as PageIndexItems<T>;
 						foreach (var ofs in Index.IndexItems<T>()
-							.FindByOper(itemsPage.Offset, key, Query.DbQueryConditionOper.GreaterOrEqual))
+							.FindByOper(itemsPage.Offset, key, TokenType.GreaterOrEqual))
 						{
 							yield return ofs;
 						}

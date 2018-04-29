@@ -1,5 +1,4 @@
 ﻿using CsvDb;
-using CsvDb.Query;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
@@ -120,7 +119,7 @@ namespace Csv.CMS.ConsApp
 
 			//con.TreatControlCAsInput = true;
 			bool end = false;
-			
+
 			while (!end)
 			{
 				con.Write(">");
@@ -208,9 +207,8 @@ namespace Csv.CMS.ConsApp
 								{
 									try
 									{
-										var parser = new DbQueryParser();
 										sw.Restart();
-										var dbQuery = parser.Parse(db, query);
+										var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db));
 										sw.Stop();
 										con.WriteLine("    query parsed on {0} ms", sw.ElapsedMilliseconds);
 										con.WriteLine($"     {dbQuery}");
@@ -295,14 +293,13 @@ namespace Csv.CMS.ConsApp
 								con.WriteLine();
 								//con.WriteLine($" processing: {query}");
 
-								var parser = new DbQueryParser();
-								sw.Start();
-								var dbQuery = parser.Parse(db, query);
+								sw.Restart();
+								var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db));
 								sw.Stop();
 								con.WriteLine(" query parsed on {0} ms", sw.ElapsedMilliseconds);
 								con.WriteLine($"  {dbQuery}");
 
-								var visualizer = DbVisualizer.Create(dbQuery,
+								var visualizer = DbVisualizer.Create(db, dbQuery,
 									DbVisualize.Paged | DbVisualize.UnderlineHeader | DbVisualize.Framed | DbVisualize.LineNumbers);
 								visualizer.Display();
 								visualizer.Dispose();
@@ -310,7 +307,7 @@ namespace Csv.CMS.ConsApp
 						}
 						catch (Exception ex)
 						{
-							con.WriteLine($"error: {ex.Message}");
+							con.WriteLine($"error: {(ex.InnerException == null ? ex.Message : ex.InnerException.Message)}");
 						}
 						break;
 					case ConsoleKey.Q:

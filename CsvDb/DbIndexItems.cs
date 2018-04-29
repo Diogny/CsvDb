@@ -6,6 +6,10 @@ using io = System.IO;
 
 namespace CsvDb
 {
+	/// <summary>
+	/// Database table column collection of items handler
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
 	public class DbIndexItems<T>
 			where T : IComparable<T>
 	{
@@ -147,7 +151,7 @@ namespace CsvDb
 		/// <param name="key">key to compare</param>
 		/// <param name="oper">comparison operator</param>
 		/// <returns></returns>
-		public IEnumerable<int> FindByOper(int offset, T key, Query.DbQueryConditionOper oper)
+		public IEnumerable<int> FindByOper(int offset, T key, TokenType oper)
 		{
 			if (!Hash.TryGetValue(offset, out MetaItemsPage<T> page))
 			{
@@ -158,24 +162,26 @@ namespace CsvDb
 				IEnumerable<int> collection = Enumerable.Empty<int>();
 				switch (oper)
 				{
-					case Query.DbQueryConditionOper.Equal:
+					case TokenType.Equal:
 						collection = page.Items.Where(i => i.Key.Equals(key)).SelectMany(i => i.Value);
 						break;
-					case Query.DbQueryConditionOper.NotEqual:
+					case TokenType.NotEqual:
 						collection = page.Items.Where(i => i.Key.CompareTo(key) != 0).SelectMany(i => i.Value);
 						break;
-					case Query.DbQueryConditionOper.Less:
+					case TokenType.Less:
 						collection = page.Items.Where(i => i.Key.CompareTo(key) < 0).SelectMany(i => i.Value);
 						break;
-					case Query.DbQueryConditionOper.LessOrEqual:
+					case TokenType.LessOrEqual:
 						collection = page.Items.Where(i => i.Key.CompareTo(key) <= 0).SelectMany(i => i.Value);
 						break;
-					case Query.DbQueryConditionOper.Greater:
+					case TokenType.Greater:
 						collection = page.Items.Where(i => i.Key.CompareTo(key) > 0).SelectMany(i => i.Value);
 						break;
-					case Query.DbQueryConditionOper.GreaterOrEqual:
+					case TokenType.GreaterOrEqual:
 						collection = page.Items.Where(i => i.Key.CompareTo(key) >= 0).SelectMany(i => i.Value);
 						break;
+					default:
+						throw new ArgumentException($"invalid operator: {oper}");
 				}
 				foreach (var ofs in collection)
 				{

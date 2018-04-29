@@ -4,7 +4,6 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
-using CsvDb.Query;
 using io = System.IO;
 
 namespace ConsoleApp
@@ -158,8 +157,7 @@ namespace ConsoleApp
 			Console.WriteLine($"\r\nIn query: {query}");
 
 			sw.Restart();
-			var parser = new DbQueryParser();
-			var dbQuery = parser.Parse(db, query); // old one: CsvDb.CsvDbQuery.Parse(db, query);
+			var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db)); // old one: CsvDb.CsvDbQuery.Parse(db, query);
 
 			sw.Stop();
 			Console.WriteLine(">parsed on {0} ms", sw.ElapsedMilliseconds);
@@ -171,7 +169,7 @@ namespace ConsoleApp
 			//to calculate times
 			sw.Restart();
 
-			var visualizer = DbVisualizer.Create(dbQuery, DbVisualize.None);
+			var visualizer = DbVisualizer.Create(db, dbQuery, DbVisualize.None);
 			var rows = visualizer.Rows().ToList();
 			visualizer.Dispose();
 
@@ -244,8 +242,7 @@ namespace ConsoleApp
 
 					Console.WriteLine($"\r\n>{query}");
 
-					var parser = new DbQueryParser();
-					var queryDb = parser.Parse(db, query);
+					var queryDb = DbQuery.Parse(query, new CsvDbDefaultValidator(db));
 
 					var outQuery = queryDb.ToString();
 
@@ -332,10 +329,11 @@ namespace ConsoleApp
 
 					//var buffer = new io.MemoryStream(5 * 1024);
 
-					var vis = DbVisualizer.Create(new DbQueryParser().Parse(db, $"SELECT * FROM {table.Name}"), DbVisualize.None);
+					var queryText = $"SELECT * FROM {table.Name}";
+					var visualizer = DbVisualizer.Create(db, DbQuery.Parse(queryText, new CsvDbDefaultValidator(db)), DbVisualize.None);
 					int rowCount = 0;
 
-					foreach (var record in vis.Rows())
+					foreach (var record in visualizer.Rows())
 					{
 						rowCount++;
 
@@ -346,10 +344,10 @@ namespace ConsoleApp
 
 						stream.Position = 0;
 
-						for (var index = 0; index < vis.ColumnCount; index++)
+						for (var index = 0; index < visualizer.ColumnCount; index++)
 						{
 							string textValue = (string)record[index];
-							var colType = vis.ColumnTypes[index];
+							var colType = visualizer.ColumnTypes[index];
 
 							if (textValue == null)
 							{

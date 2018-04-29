@@ -53,16 +53,17 @@ namespace CsvDb
 		/// <summary>
 		/// Reference to tables
 		/// </summary>
-		public List<DbTable> Tables
+		public IEnumerable<DbTable> Tables
 		{
-			get { return Schema?.Tables; }
-			set
-			{
-				if (Schema != null)
-				{
-					Schema.Tables = value;
-				}
-			}
+			//Tables
+			get { return Schema?._tables.Select(t => t.Value); }
+			//set
+			//{
+			//	if (Schema != null)
+			//	{
+			//		Schema.Tables = value;
+			//	}
+			//}
 		}
 
 		public bool Modified { get; set; }
@@ -190,7 +191,7 @@ namespace CsvDb
 				reader.Dispose();
 
 				//link
-				Tables.ForEach(table =>
+				foreach (var table in Tables)
 				{
 					table.Database = this;
 					table.Columns.ForEach(column =>
@@ -203,7 +204,7 @@ namespace CsvDb
 						}
 						column.Table = table;
 					});
-				});
+				};
 
 				return true;
 			}
@@ -241,6 +242,8 @@ namespace CsvDb
 			return Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
 		}
 
+		public DbTable this[string tableName] => Schema[tableName];
+
 		/// <summary>
 		/// Gets the table column
 		/// </summary>
@@ -270,7 +273,7 @@ namespace CsvDb
 
 		public override string ToString()
 		{
-			return $"{Name} ({Tables?.Count}) table(s)";
+			return $"{Name} ({Schema.Count}) table(s)";
 		}
 
 		public void Dispose()
@@ -302,7 +305,24 @@ namespace CsvDb
 
 		public int PageSize { get; set; }
 
-		public List<DbTable> Tables { get; set; }
+		//public List<DbTable> Tables { get; set; }
+
+		internal Dictionary<string, DbTable> _tables;
+
+		public int Count => _tables == null ? 0 : _tables.Count;
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="tableName"></param>
+		/// <returns></returns>
+		public DbTable this[string tableName]
+		{
+			get
+			{
+				return _tables.TryGetValue(tableName, out DbTable table) ? table : null;
+			}
+		}
 
 		public DbSchemaConfig() { }
 
@@ -316,7 +336,8 @@ namespace CsvDb
 				Name = reader.BinaryRead(),
 
 				PageSize = reader.ReadInt32(),
-				Tables = new List<DbTable>()
+				_tables = new Dictionary<string, DbTable>()
+				//Tables = new List<DbTable>()
 			};
 
 			//tables
@@ -354,7 +375,8 @@ namespace CsvDb
 					};
 					table.Columns.Add(col);
 				}
-				schema.Tables.Add(table);
+				//schema.Tables.Add(table);
+				schema._tables.Add(table.Name, table);
 			}
 			return schema;
 		}
@@ -372,10 +394,10 @@ namespace CsvDb
 			writer.Write(PageSize);
 
 			//tables
-			int pageCount = Tables.Count;
+			int pageCount = _tables.Count; // Tables.Count;
 			writer.Write(pageCount);
 
-			foreach (var table in Tables)
+			foreach (var table in _tables.Select(t => t.Value)) // Tables
 			{
 				table.Name.BinarySave(writer);
 				table.FileName.BinarySave(writer);

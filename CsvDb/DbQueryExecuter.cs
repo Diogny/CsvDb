@@ -1,5 +1,4 @@
-﻿using CsvDb.Query;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -14,37 +13,36 @@ namespace CsvDb
 	{
 		public bool IsExpression => Expression != null;
 
-		public DbQueryExpression Expression { get; protected internal set; }
-
-		public DbQueryTableColumnOperand Table { get; protected internal set; }
+		public DbQuery.Expression Expression { get; protected internal set; }
 
 		public DbColumn Column { get; protected internal set; }
 
-		public DbQueryConstantOperand Constant { get; protected internal set; }
+		public DbQuery.ConstantOperand Constant { get; protected internal set; }
 
 		public DbQueryExecuter(DbColumn column)
 		{
 			Column = column;
 		}
 
-		public DbQueryExecuter(DbQueryExpression expression)
+		public DbQueryExecuter(DbQuery.Expression expression, CsvDb db)
 		{
 			Expression = expression;
 
 			//Action<CsvDbQueryOperand, CsvDbQueryOperand> Assign = (table, constant) =>
-			void Assign(DbQueryOperand table, DbQueryOperand constant)
+			void Assign(DbQuery.Operand column, DbQuery.Operand constant)
 			{
-				Table = table as DbQueryTableColumnOperand;
-				Column = Table.Column;
-				Constant = constant as DbQueryConstantOperand;
+				//Table = table as DbQuery.ColumnOperand;
+				var col = column as DbQuery.ColumnOperand;
+				Column = db.Index(col.Column.Meta.TableName, column.Text);
+				Constant = constant as DbQuery.ConstantOperand;
 			}
 
 			//get table and constant values
-			if (expression.Left.IsTableColumn)
+			if (expression.Left.IsColumn)
 			{
 				Assign(expression.Left, expression.Right);
 			}
-			else if (expression.Right.IsTableColumn)
+			else if (expression.Right.IsColumn)
 			{
 				Assign(expression.Right, expression.Left);
 			}
@@ -60,66 +58,85 @@ namespace CsvDb
 			//fills Pages and return the amount of keys in this search
 			if (IsExpression)
 			{
-				var nodeTree = Table.Column.IndexTree<T>();
-				int offset = -1;
-
-				var value = Constant.Value();
-				Type valueType = Type.GetType($"System.{Constant.OperandType}");
-
-				var key = (T)Convert.ChangeType(value, valueType);
-
 				var collection = Enumerable.Empty<int>();
 
-				if (nodeTree.Root == null)
+				if (!Column.Indexed)
 				{
-					//go to .bin file directly, it's ONE page of items
-					collection = Table.Column.IndexItems<T>()
-						.FindByOper(DbGenerator.ItemsPageStart, key, Expression.Operator.OperatorType);
+					//slow way -column is not indexed, have to read records one by one and compare column value
+
+
+					//every expression should have a collection of records already retrieved so visualization
+					//  have it already to display
+					throw new ArgumentException($"column {Column.Name} must be indexed to be used in query expression");
 				}
 				else
 				{
-					//this's for tree node page structure
-					switch (Expression.Operator.Name)
-					{
-						case "=":
-							var baseNode = nodeTree.FindKey(key) as PageIndexNodeBase<T>;
-							if (baseNode == null)
-							{
-								throw new ArgumentException($"Index corrupted");
-							}
+					//fast way -column is indexed
+					var nodeTree = Column.IndexTree<T>();
+					int offset = -1;
 
-							switch (baseNode.Type)
-							{
-								case MetaIndexType.Node:
-									var nodePage = baseNode as PageIndexNode<T>;
-									if (nodePage != null && nodePage.Values != null)
-									{
-										collection = nodePage.Values;
-									}
-									break;
-								case MetaIndexType.Items:
-									offset = ((PageIndexItems<T>)baseNode).Offset;
-									DbKeyValues<T> item = Table.Column.IndexItems<T>().Find(offset, key);
-									if (item != null && item.Values != null)
-									{
-										collection = item.Values;
-									}
-									break;
-							}
-							break;
-						case "<":
-							collection = nodeTree.FindLessThanKey(key);
-							break;
-						case "<=":
-							collection = nodeTree.FindLessOrEqualThanKey(key);
-							break;
-						case ">":
-							collection = nodeTree.FindGreaterThanKey(key);
-							break;
-						case ">=":
-							collection = nodeTree.FindGreaterOrEqualThanKey(key);
-							break;
-							//throw new ArgumentException($"Operator: {Expression.Operator.Name} not implemented yet!");
+					if(Column.TypeEnum != Constant.Type)
+					{
+						//try to convert constant value to column type
+
+					}
+
+					Type valueType = Type.GetType($"System.{Constant.Type}");
+
+					var value = Constant.Value();
+					var key = (T)Convert.ChangeType(value, valueType);
+					
+					if (nodeTree.Root == null)
+					{
+						//go to .bin file directly, it's ONE page of items
+						collection = Column.IndexItems<T>()
+							.FindByOper(DbGenerator.ItemsPageStart, key, Expression.Operator.Token);
+					}
+					else
+					{
+						//this's for tree node page structure
+						switch (Expression.Operator.Token)
+						{
+							case TokenType.Equal: // "="
+								var baseNode = nodeTree.FindKey(key) as PageIndexNodeBase<T>;
+								if (baseNode == null)
+								{
+									throw new ArgumentException($"Index corrupted");
+								}
+
+								switch (baseNode.Type)
+								{
+									case MetaIndexType.Node:
+										var nodePage = baseNode as PageIndexNode<T>;
+										if (nodePage != null && nodePage.Values != null)
+										{
+											collection = nodePage.Values;
+										}
+										break;
+									case MetaIndexType.Items:
+										offset = ((PageIndexItems<T>)baseNode).Offset;
+										DbKeyValues<T> item = Column.IndexItems<T>().Find(offset, key);
+										if (item != null && item.Values != null)
+										{
+											collection = item.Values;
+										}
+										break;
+								}
+								break;
+							case TokenType.Less: // "<"
+								collection = nodeTree.FindLessThanKey(key);
+								break;
+							case TokenType.LessOrEqual: // "<="
+								collection = nodeTree.FindLessOrEqualThanKey(key);
+								break;
+							case TokenType.Greater: // ">"
+								collection = nodeTree.FindGreaterThanKey(key);
+								break;
+							case TokenType.GreaterOrEqual:  //">="
+								collection = nodeTree.FindGreaterOrEqualThanKey(key);
+								break;
+								//throw new ArgumentException($"Operator: {Expression.Operator.Name} not implemented yet!");
+						}
 					}
 				}
 				//

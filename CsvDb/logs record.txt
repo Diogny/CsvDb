@@ -25,4 +25,9 @@
 2018/04/08 - 2018/04-19
 .-modify database table file extensions and visualization
 .-fix query parser bug and namings
-2018/04-19 - 
+2018/04-19 - 2018/04/28
+.-add space to query display and fix timings
+.-make sql query parsing inependent
+.-improve sql query syntax
+.-fix SELECT function result and LIMIT
+2018/04/28 -

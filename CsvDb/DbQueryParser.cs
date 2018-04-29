@@ -3,120 +3,156 @@ using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 
-namespace CsvDb.Query
+namespace CsvDb
 {
-	public class DbQueryParser
+	public partial class DbQuery
 	{
-		int index;
-		int startOfToken;
-		char[] queryBuffer;
-		int length;
-		char currentChar;
 
-		static List<string> keyWords = new List<string> {
-			"SELECT", "FROM", "WHERE", "SKIP", "LIMIT",
-			"AND", "OR", "NOT",
-			"JOIN", "INNER", "LEFT", "RIGHT", "OUTER", "FULL", "CROSS",
-			"ON", "IS", "NULL", "EXISTS",
-			"COUNT", "AVG", "SUM" };
+		internal static List<TokenType> JoinStarts = new List<TokenType>()
+		{
+			TokenType.INNER, TokenType.LEFT, TokenType.RIGHT, TokenType.FULL, TokenType.CROSS
+		};
 
-		static List<string> castingTypes = new List<string> {
+		internal static List<TokenType> SelectFunctions = new List<TokenType>()
+		{
+			TokenType.COUNT, TokenType.AVG, TokenType.SUM,
+			TokenType.MIN, TokenType.MAX
+		};
+
+		internal static List<string> KeyWords;
+
+		internal static List<TokenType> CastingTypes = new List<TokenType> {
 			//numeric
-			"Byte", "Int16", "Int32", "Int64", "Single", "Double", "Decimal",
+			TokenType.Byte, TokenType.Int16, TokenType.Int32, TokenType.Int64, TokenType.Float,
+			TokenType.Double, TokenType.Decimal,
 			//char/string
-			"Char", "String"
+			TokenType.Char, TokenType.String
 		};
 
-		bool CanRead { get { return index < length; } }
-
-		internal static List<Token> JoinStarts = new List<Token>()
+		internal static List<TokenType> OperatorList = new List<TokenType>()
 		{
-			Token.INNER, Token.LEFT, Token.RIGHT, Token.FULL, Token.CROSS
+			TokenType.Equal, TokenType.NotEqual,
+			TokenType.Greater, TokenType.GreaterOrEqual,
+			TokenType.Less, TokenType.LessOrEqual
 		};
 
-		internal static List<Token> SelectQuantifiers = new List<Token>()
-		{
-			Token.COUNT, Token.AVG, Token.SUM
-		};
-
-		StringBuilder charString = new StringBuilder();
-
-		List<TokenItem> list = new List<TokenItem>();
-
-		void Reset()
-		{
-			index = 0;
-			currentChar = (char)0;
-			startOfToken = -1;
-			charString.Length = 0;
-			list.Clear();
-		}
-
-		internal IEnumerable<TokenItem> ParseTokens(string query)
+		internal static IEnumerable<TokenItem> ParseTokens(string query)
 		{
 			if (String.IsNullOrWhiteSpace(query))
 			{
 				throw new ArgumentException("Invalid query");
 			}
 
-			queryBuffer = query.ToCharArray();
-			length = queryBuffer.Length;
+			int index = 0;
+			int startOfToken;
+			char currentChar = (char)0;
+			startOfToken = -1;
 
-			while (CanRead)
+			char[] queryBuffer = query.ToCharArray();
+			int length = queryBuffer.Length;
+			var charString = new StringBuilder();
+
+			bool CanRead() => index < length;
+
+			char PeekChar() { return ReadChar(peek: true, append: false); }
+
+			TokenItem AddToken(TokenType token, String text = null, bool readNext = false)
+			{
+				if (readNext)
+				{
+					ReadChar();
+				}
+				if (text == null)
+				{
+					text = charString.ToString();
+				}
+				var tk = new TokenItem(token, text, startOfToken);
+				//list.Add(tk);
+				charString.Length = 0;
+				startOfToken = -1;
+				//
+				return tk;
+			}
+
+			char ReadChar(bool recordStart = false, bool skipCanRead = false, bool peek = false, bool append = true)
+			{
+				if (skipCanRead || CanRead())
+				{
+					if (recordStart)
+					{
+						startOfToken = index;
+					}
+					currentChar = queryBuffer[index];
+					if (!peek)
+					{
+						index++;
+					}
+					if (append)
+					{
+						charString.Append(currentChar);
+					}
+
+					return currentChar;
+				}
+				return (char)0;
+				//throw new ArgumentException("Buffer overflow");
+			}
+
+			while (CanRead())
 			{
 				switch (ReadChar(recordStart: true))
 				{
 					case ',':
-						AddToken(Token.Comma);
+						yield return AddToken(TokenType.Comma);
 						break;
 					case ';':
-						AddToken(Token.SemiColon);
+						yield return AddToken(TokenType.SemiColon);
 						break;
 					case '*':
-						AddToken(Token.Astherisk);
+						yield return AddToken(TokenType.Astherisk);
 						break;
 					case '(':
-						AddToken(Token.OpenPar);
+						yield return AddToken(TokenType.OpenPar);
 						break;
 					case ')':
-						AddToken(Token.ClosePar);
+						yield return AddToken(TokenType.ClosePar);
 						break;
 					case '=':
-						AddToken(Token.Equal);
+						yield return AddToken(TokenType.Equal);
 						break;
 					case '<':
 						switch (PeekChar())
 						{
 							case '=':  // <=
-								AddToken(Token.LessOrEqual, text: null, readNext: true);
+								yield return AddToken(TokenType.LessOrEqual, text: null, readNext: true);
 								break;
 							case '>':   // <>
-								AddToken(Token.NotEqual, text: null, readNext: true);
+								yield return AddToken(TokenType.NotEqual, text: null, readNext: true);
 								break;
 							default:   // <
-								AddToken(Token.Less);
+								yield return AddToken(TokenType.Less);
 								break;
 						}
 						break;
 					case '>':
 						if (PeekChar() == '=')
 						{
-							AddToken(Token.GreaterOrEqual, text: null, readNext: true);   // >=
+							yield return AddToken(TokenType.GreaterOrEqual, text: null, readNext: true);   // >=
 						}
 						else
 						{
-							AddToken(Token.Greater);   // >
+							yield return AddToken(TokenType.Greater);   // >
 						}
 						break;
-					case '"':
+					case '\'':
 						//string
 						bool endOfString = false;
 						bool endOfStream = false;
 
-						while (!(endOfStream = !CanRead) && !endOfString)
+						while (!(endOfStream = !CanRead()) && !endOfString)
 						{
 							//read as many as possible
-							while (!(endOfStream = !CanRead) && ReadChar(skipCanRead: true, append: false) != '"')
+							while (!(endOfStream = !CanRead()) && ReadChar(skipCanRead: true, append: false) != '\'')
 							{
 								charString.Append(currentChar);
 							}
@@ -127,7 +163,7 @@ namespace CsvDb.Query
 							//we got a " store it
 							charString.Append(currentChar);
 
-							if (PeekChar() == '"')
+							if (PeekChar() == '\'')
 							{
 								//store "" and continue
 								ReadChar();
@@ -136,7 +172,7 @@ namespace CsvDb.Query
 							else
 							{
 								//end of string reached, test for last "
-								if (charString[charString.Length - 1] != '"')
+								if (charString[charString.Length - 1] != '\'')
 								{
 									throw new ArgumentException($"End of stream reached while reading string identifier");
 								}
@@ -144,10 +180,10 @@ namespace CsvDb.Query
 								//charString.Append("\"");
 							}
 						}
-						AddToken(Token.String);
+						yield return AddToken(TokenType.String);
 						break;
 					case '.':
-						AddToken(Token.Dot);
+						yield return AddToken(TokenType.Dot);
 						break;
 					default:
 						if (char.IsDigit(currentChar))
@@ -168,7 +204,7 @@ namespace CsvDb.Query
 									charString.Append(ReadChar(append: false));
 								}
 							}
-							AddToken(Token.Number);
+							yield return AddToken(TokenType.Number);
 						}
 						else if ((int)currentChar <= 32)
 						{
@@ -177,6 +213,7 @@ namespace CsvDb.Query
 						}
 						else
 						{
+							//starts with Letter or _
 							bool isIdentifier = char.IsLetter(currentChar) || currentChar == '_';
 							if (isIdentifier)
 							{
@@ -185,7 +222,8 @@ namespace CsvDb.Query
 								{
 									//charString.Append(currentChar);
 									var peek = PeekChar();
-									if ((isIdentifier = char.IsLetter(peek) || peek == '_'))
+									//continue if Letter, Number or _
+									if ((isIdentifier = char.IsLetterOrDigit(peek) || peek == '_'))
 									{
 										ReadChar();
 									}
@@ -193,21 +231,16 @@ namespace CsvDb.Query
 								//
 								var str = charString.ToString();
 
-								var ndx = keyWords.IndexOf(str);
+								var ndx = KeyWords.IndexOf(str);
 								if (ndx >= 0)
 								{
 									//key word
-									AddToken((Token)(ndx + 1), text: str);
-								}
-								else if ((ndx = castingTypes.IndexOf(str)) >= 0)
-								{
-									//cast type
-									AddToken(Token.CastType, text: str);
+									yield return AddToken((TokenType)(ndx + 1), text: str);
 								}
 								else
 								{
 									//an identifier
-									AddToken(Token.Identifier, text: str);
+									yield return AddToken(TokenType.Identifier, text: str);
 								}
 								//if (Enum.TryParse<Token>(str, out Token result))
 							}
@@ -219,74 +252,35 @@ namespace CsvDb.Query
 						break;
 				}
 			}
-			return list;
 		}
 
-		TokenItem AddToken(Token token, String text = null, bool readNext = false)
+		static DbQuery()
 		{
-			if (readNext)
-			{
-				ReadChar();
-			}
-			if (text == null)
-			{
-				text = charString.ToString();
-			}
-			var tk = new TokenItem(token, text, startOfToken);
-			list.Add(tk);
-			charString.Length = 0;
-			startOfToken = -1;
-			//
-			return tk;
+			KeyWords = Enumerable.Range(1, (int)TokenType.Decimal).Select(i => ((TokenType)i).ToString()).ToList();
 		}
 
-		char ReadChar(bool recordStart = false, bool skipCanRead = false, bool peek = false, bool append = true)
+		public static DbQuery Parse(string query, IQueryValidation validator)
 		{
-			if (skipCanRead || CanRead)
+			if (validator == null)
 			{
-				if (recordStart)
-				{
-					startOfToken = index;
-				}
-				currentChar = queryBuffer[index];
-				if (!peek)
-				{
-					index++;
-				}
-				if (append)
-				{
-					charString.Append(currentChar);
-				}
-
-				return currentChar;
+				throw new ArgumentException("No query database validator provided");
 			}
-			return (char)0;
-			//throw new ArgumentException("Buffer overflow");
-		}
 
-		char PeekChar() { return ReadChar(peek: true, append: false); }
+			int top = -1;
+			ColumnsSelect columnSelect = null;
+			var tableCollection = new List<Table>();
+			SqlJoin join = null;
+			var where = new List<ExpressionBase>();
+			int limitValue = -1;
 
-		public DbQuery Parse(CsvDb db, string query)
-		{
-			Reset();
 			TokenItem PreviousToken = default(TokenItem);
 			TokenItem CurrentToken = default(TokenItem);
 			var peekedToken = default(TokenItem);
+			var columnCollection = new List<Column>();
 
 			var queue = new Queue<TokenItem>(ParseTokens(query));
 
-			DbTable table = null;
-			var tableCollection = new List<DbQueryTableIdentifier>();
-			//
-			DbQueryColumnSelector colSelector = null;
-			var where = new List<DbQueryExpressionBase>();
-			int skipValue = -1;
-			int limitValue = -1;
-			DbQueryTableIdentifier tableIdentifier = null;
 			bool EndOfStream = queue.Count == 0;
-			var columnSelectors = new List<TokenItem>();
-			bool isFullColums = false;
-			Token quantifier = Token.None;
 
 			bool GetToken()
 			{
@@ -311,7 +305,7 @@ namespace CsvDb.Query
 				return false;
 			}
 
-			bool GetTokenIf(Token token)
+			bool GetTokenIf(TokenType token)
 			{
 				if (!EndOfStream && queue.TryPeek(out peekedToken) && peekedToken.Token == token)
 				{
@@ -321,7 +315,7 @@ namespace CsvDb.Query
 				return false;
 			};
 
-			bool GetTokenIfContains(List<Token> tokens)
+			bool GetTokenIfContains(List<TokenType> tokens)
 			{
 				if (!EndOfStream && queue.TryPeek(out peekedToken) && tokens.Contains(peekedToken.Token))
 				{
@@ -331,91 +325,207 @@ namespace CsvDb.Query
 				return false;
 			}
 
-			//Func<string, TokenStruct> ReadIdentifier = (errmsg) =>
-			TokenItem ReadOperand(string errmsg, bool realDotIdentifier = false)
+			Column ReadColumnName()
 			{
-				if (!GetToken() || !CurrentToken.IsIdentifier ||
-					//this ensures it must be an identifier
-					(realDotIdentifier && CurrentToken.Token != Token.Identifier))
+				Column selectColumn = null;
+				//read operand [(i).](column)
+				if (GetTokenIf(TokenType.Identifier))
 				{
-					throw new ArgumentException(errmsg);
-				}
-				var identifier = CurrentToken.Value;
-				var position = CurrentToken.Position;
-				TokenItem newToken = null;
+					var tableAlias = CurrentToken.Value;
+					String columnName = null;
+					String columnAlias = null;
 
-				//try to peek a dot . after identifier
-				if (CurrentToken.Token == Token.Identifier && GetTokenIf(Token.Dot))
-				{
-					//read column identifier
-					if (!GetToken() || !CurrentToken.IsIdentifier)
+					if (GetTokenIf(TokenType.Dot))
 					{
-						throw new ArgumentException("missing column name after table name identifier");
+						if (!GetToken())
+						{
+							throw new ArgumentException($"column name expected");
+						}
+						columnName = CurrentToken.Value;
 					}
-					newToken = new TokenItemIdentifier(CurrentToken.Value, position, identifier);
-				}
-				else if (realDotIdentifier)
-				{
-					throw new ArgumentException(errmsg);
+					else
+					{
+						columnName = tableAlias;
+						tableAlias = null;
+					}
+					//alias
+					if (GetTokenIf(TokenType.AS))
+					{
+						if (!GetTokenIf(TokenType.Identifier))
+						{
+							throw new ArgumentException($"Column alias name expected after AS: {CurrentToken.Value}");
+						}
+						columnAlias = CurrentToken.Value;
+					}
+					selectColumn = new Column(columnName, tableAlias, columnAlias);
 				}
 				else
 				{
-					newToken = new TokenItem(CurrentToken.Token, identifier, position);
+					throw new ArgumentException($"quantifier column expected");
 				}
-				return newToken;
+				return selectColumn;
+			}
+
+			Operand ReadOperand(bool readCasting = true)
+			{
+				//can be a column, string, number
+				if (!GetToken())
+				{
+					throw new ArgumentException("operand expected");
+				}
+
+				DbColumnTypeEnum casting = DbColumnTypeEnum.None;
+				//try to read cast
+				if (readCasting && (CurrentToken.Token == TokenType.OpenPar))
+				{
+					if (!GetTokenIfContains(CastingTypes) ||
+						(casting = CurrentToken.Token.ToCast()) == DbColumnTypeEnum.None)
+					{
+						throw new ArgumentException($"invalid casting type: {CurrentToken.Value}");
+					}
+					if (!GetTokenIf(TokenType.ClosePar))
+					{
+						throw new ArgumentException("close parenthesis expected after casting type");
+					}
+					//read next
+					if (!GetToken())
+					{
+						throw new ArgumentException($"operand expected after casting ({casting})");
+					}
+				}
+
+				//read operand
+				switch (CurrentToken.Token)
+				{
+					case TokenType.Identifier:
+						var columnName = CurrentToken.Value;
+						String columnIdentifier = null;
+
+						if (GetTokenIf(TokenType.Dot))
+						{
+							if (!GetToken())
+							{
+								throw new ArgumentException($"column name expected");
+							}
+							columnIdentifier = columnName;
+							columnName = CurrentToken.Value;
+						}
+
+						Column col = null;
+						//try to find column in known tables
+						if (columnIdentifier != null)
+						{
+							//find in table by its alias
+							var aliasTable = tableCollection.FirstOrDefault(t => t.Alias == columnIdentifier);
+							if (aliasTable == null)
+							{
+								throw new ArgumentException($"cannot find column: {columnName}");
+							}
+							col = new Column(columnName, aliasTable.Name);
+						}
+						else
+						{
+							//find the only first in all known tables
+							var tables = tableCollection.Where(t => validator.TableHasColumn(t.Name, columnName)).ToList();
+							if (tables.Count != 1)
+							{
+								throw new ArgumentException($"column: {columnName} could not be found in database or cannot resolve multiple tables");
+							}
+							//tableName = tables[0].Name;
+							col = new Column(columnName, validator.ColumnMetadata(tables[0].Name, columnName));
+						}
+						return new ColumnOperand(col, casting);
+					case TokenType.String:
+						return new StringOperand(CurrentToken.Value, casting);
+					case TokenType.Number:
+						return new NumberOperand(CurrentToken.Value, casting);
+					default:
+						throw new ArgumentException("Operand expected");
+				}
 			}
 
 			#region SELECT
 
-			if (!GetTokenIf(Token.SELECT))
+			if (!GetTokenIf(TokenType.SELECT))
 			{
 				throw new ArgumentException("SELECT expected");
 			}
 
-			//read column selector: comma separated or *
-			if (GetTokenIf(Token.Astherisk))
+			//see if it's a function
+			if (GetTokenIfContains(SelectFunctions))
 			{
-				isFullColums = true;
-				columnSelectors.Add(CurrentToken);
-			}
-			else if (GetTokenIfContains(SelectQuantifiers))
-			{
-				quantifier = CurrentToken.Token;
+				var function = CurrentToken.Token;
 
-				if (!GetTokenIf(Token.OpenPar))
+				if (!GetTokenIf(TokenType.OpenPar))
 				{
-					throw new ArgumentException($"expected ( after {CurrentToken.Token}");
+					throw new ArgumentException($"expected ( after FUNCTION {CurrentToken.Token}");
 				}
 
-				if (GetTokenIf(Token.Astherisk))
-				{
-					// COUNT(*)
-					columnSelectors.Add(new TokenItem(Token.Astherisk, "*", CurrentToken.Position));
-				}
-				else
-				{
-					columnSelectors.Add(ReadOperand($"cannot read quantifier {quantifier}"));
-				}
+				// COUNT([(i).](column))
+				var functionColumn = ReadColumnName();
 
-				if (!GetTokenIf(Token.ClosePar))
+				if (!GetTokenIf(TokenType.ClosePar))
 				{
 					throw new ArgumentException($"expected ) closing {CurrentToken.Token}");
 				}
+
+				//alias
+				String functionColumnAlias = null;
+				if (GetTokenIf(TokenType.AS))
+				{
+					if (!GetTokenIf(TokenType.Identifier))
+					{
+						throw new ArgumentException($"");
+					}
+					functionColumnAlias = CurrentToken.Value;
+				}
+				columnSelect = new ColumnsSelect(function, functionColumn, functionColumnAlias);
 			}
 			else
 			{
-				//mut have at least one column identifier
-				if (PeekToken() && peekedToken.Token != Token.Identifier)
+				//preceded by TOP if any
+				//TOP integer PERCENT
+				if (GetTokenIf(TokenType.TOP))
 				{
-					throw new ArgumentException("table column name(s) expected");
+					if (!GetTokenIf(TokenType.Number))
+					{
+						throw new ArgumentException($"Number expected after TOP");
+					}
+					//test for integer
+					if (!int.TryParse(CurrentToken.Value, out top) || top <= 0)
+					{
+						throw new ArgumentException($"TOP [positive integer greater than 0] expected: {CurrentToken.Value}");
+					}
+					//PERCENT
+					if (GetTokenIf(TokenType.PERCENT))
+					{
+						//save if for later
+					}
 				}
-				//read first
-				columnSelectors.Add(ReadOperand("cannot read column name"));
 
-				while (GetTokenIf(Token.Comma))
+				//read columns
+				//read column selector: comma separated or *
+				if (GetTokenIf(TokenType.Astherisk))
 				{
-					//next
-					columnSelectors.Add(ReadOperand("cannot read column name"));
+					columnSelect = new ColumnsSelect(top);
+				}
+				else
+				{
+					//mut have at least one column identifier
+					if (PeekToken() && peekedToken.Token != TokenType.Identifier)
+					{
+						throw new ArgumentException("table column name(s) expected");
+					}
+
+					//read first
+					columnCollection.Add(ReadColumnName());
+
+					while (GetTokenIf(TokenType.Comma))
+					{
+						//next
+						columnCollection.Add(ReadColumnName());
+					}
+					columnSelect = new ColumnsSelect(top, columnCollection);
 				}
 			}
 
@@ -423,161 +533,155 @@ namespace CsvDb.Query
 
 			#region FROM
 
-			if (!GetTokenIf(Token.FROM))
+			if (!GetTokenIf(TokenType.FROM))
 			{
 				throw new ArgumentException("FROM expected");
 			}
 
-			//read identifier: table name
-			if (!GetTokenIf(Token.Identifier))
+			do
 			{
-				throw new ArgumentException("table name identifier after FROM expected");
-			}
-
-			//check -table name
-			table = db.Table(CurrentToken.Value);
-			if (table == null)
-			{
-				throw new ArgumentException($"Cannot find table [{CurrentToken.Value}] in database.");
-			}
-
-			//there can be a table identifier before the WHERE and after table name
-			if (GetTokenIf(Token.Identifier))
-			{
-				//create it so WHERE can handle it
-				tableIdentifier = new DbQueryTableIdentifier(table, CurrentToken.Value);
-			}
-			else
-			{
-				tableIdentifier = new DbQueryTableIdentifier(table);
-			}
-			tableCollection.Add(tableIdentifier);
-
-			if (isFullColums) //(columnSelectors[0].Token == Token.Astherisk)
-			{
-				colSelector = new DbQueryColumnSelector(table);
-			}
-			else if (quantifier != Token.None)
-			{
-				if (quantifier == Token.COUNT)
+				//read identifier: table name
+				if (!GetTokenIf(TokenType.Identifier))
 				{
-					// COUNT (*)
-					colSelector = new DbQueryColumnSelector(quantifier, table);
+					throw new ArgumentException("table name identifier after FROM expected");
 				}
-				else
-				{
-					// AVG (column)  SUM (column)  where column:numeric
-					colSelector = new DbQueryColumnSelector(quantifier,
-						new DbQueryColumnIdentifier(table, columnSelectors[0].Value));
-				}
-			}
-			else
-			{
-				var columns = new List<DbQueryColumnIdentifier>();
 
-				//unresolved column identifiers can exists for more complex queries
-				//	later add unresolved features
-				foreach (var tk in columnSelectors)
+				var tableName = CurrentToken.Value;
+				String tableAlias = null;
+
+				//var pos = CurrentToken.Position;
+				// [table name] AS [alias]
+				if (GetTokenIf(TokenType.AS))
 				{
-					if (tk.Token == Token.ColumnIdentifier)
+					//create it so WHERE can handle it
+					//tableIdentifier = new DbQueryTableIdentifier(table, CurrentToken.Value);
+					if (!GetTokenIf(TokenType.Identifier))
 					{
-						var tkIdent = (TokenItemIdentifier)tk;
+						throw new ArgumentException($"Table alias expected after AS");
+					}
+					tableAlias = CurrentToken.Value;
+				}
+				//tableIdentifier = new DbQueryTableIdentifier(table);
+				var table = new Table(tableName, tableAlias);
 
-						//look only inside the table of the identifier
-						var tble = tableCollection
-							.Where(t => t.HasIdentifier)
-							.FirstOrDefault(t => t.Identifier == tkIdent.Identifier);
+				if (!validator.HasTable(table.Name))
+				{
+					throw new ArgumentException($"Invalid table name: {table.Name}");
+				}
 
-						var col = tble?.Table.Columns.FirstOrDefault(cl => cl.Name == tkIdent.Value);
-						if (col == null)
+				tableCollection.Add(table);
+			}
+			while (GetTokenIf(TokenType.Comma));
+
+			if (columnSelect.FullColumns)
+			{
+				//fill SELECT * with all columns in FROM if applies
+				foreach (var col in tableCollection
+					.SelectMany(
+						table => validator.ColumnsOf(table.Name),
+						(table, col) => new Column(col, validator.ColumnMetadata(table.Name, col))))
+				{
+					columnSelect.Add(col);
+				}
+			}
+			else
+			{
+				//check all SELECT columns
+				foreach (var col in columnSelect.AllColumns)
+				{
+					string tableName = null;
+
+					if (col.HasTableAlias)
+					{
+						//find it in table collection
+						var table = tableCollection.FirstOrDefault(t => t.HasAlias && col.TableAlias == t.Alias);
+						if (table == null)
 						{
-							throw new ArgumentException($"invalid column identifier: {tkIdent.Value}");
+							throw new ArgumentException($"column alias undefined {col}");
 						}
-						//add column with identifier
-						columns.Add(new DbQueryColumnIdentifier(col, tkIdent.Identifier));
+						tableName = table.Name;
+						if (!validator.TableHasColumn(tableName, col.Name))
+						{
+							throw new ArgumentException($"column: {col.Name} could not be found in table {tableName}");
+						}
 					}
 					else
 					{
-						//look in all tables
-						var colsFound = tableCollection // db.Tables
-							.SelectMany(t => t.Table.Columns)
-							.Where(c => c.Name == tk.Value)
-							.ToList();
-
-						if (colsFound.Count == 0)
+						//brute force search
+						var tables = tableCollection.Where(t => validator.TableHasColumn(t.Name, col.Name)).ToList();
+						if (tables.Count != 1)
 						{
-							throw new ArgumentException($"Cannot resolve column {tk.Value} in any table");
+							throw new ArgumentException($"column: {col.Name} could not be found in database or cannot resolve multiple tables");
 						}
-						else if (colsFound.Count > 1)
-						{
-							throw new ArgumentException($"cannot resolve column: {tk.Value} on multiple tables: {String.Join(", ", colsFound.Select(c => c.Name))}");
-						}
-						//get first one
-						columns.Add(new DbQueryColumnIdentifier(colsFound[0]));
+						tableName = tables[0].Name;
 					}
+					//link column to table, and find its index
+					col.Meta = validator.ColumnMetadata(tableName, col.Name);
 				}
-				colSelector = new DbQueryColumnSelector(columns);
 			}
 
 			#endregion
 
 			#region JOIN
 
-			SqlJoin sqlJoin = null;
 			if (GetTokenIfContains(JoinStarts))
 			{
 				//FROM table must has identifier, should be only one here
-				if (tableCollection.Any(t => !t.HasIdentifier))
-				{
-					//throw new ArgumentException("JOIN queries FROM table must have identifier");
-				}
 
-				Token JoinCommand = CurrentToken.Token;
-				DbQueryExpression JoinExpression = null;
-				DbQueryTableIdentifier joinTable = null;
+				TokenType JoinCommand = CurrentToken.Token;
+				Expression JoinExpression = null;
+				Table joinTable = null;
 
-				if (CurrentToken.Token == Token.LEFT || CurrentToken.Token == Token.RIGHT ||
-					CurrentToken.Token == Token.FULL)
+				if (CurrentToken.Token == TokenType.LEFT || CurrentToken.Token == TokenType.RIGHT ||
+					CurrentToken.Token == TokenType.FULL)
 				{
 					//LEFT OUTER JOIN
 					//RIGHT OUTER JOIN
 					//FULL OUTER JOIN
-					if (!GetTokenIf(Token.OUTER))
+					if (!GetTokenIf(TokenType.OUTER))
 					{
 						throw new ArgumentException($"OUTER expected after {CurrentToken.Token}");
 					}
 				}
-				else if (!(CurrentToken.Token == Token.INNER || CurrentToken.Token == Token.CROSS))
+				else if (!(CurrentToken.Token == TokenType.INNER || CurrentToken.Token == TokenType.CROSS))
 				{
 					//INNER JOIN
 					//CROSS JOIN
 					throw new ArgumentException($"invalid JOIN keyword {CurrentToken.Token}");
 				}
 
-				if (!GetTokenIf(Token.JOIN))
+				if (!GetTokenIf(TokenType.JOIN))
 				{
 					throw new ArgumentException($"JOIN expected after {CurrentToken.Token}");
 				}
 
 				//read table name
-				if (!GetTokenIf(Token.Identifier))
+				if (!GetTokenIf(TokenType.Identifier))
 				{
 					throw new ArgumentException("table name identifier after FROM expected");
 				}
 				//check -table name
-				table = db.Table(CurrentToken.Value);
-				if (table == null)
-				{
-					throw new ArgumentException($"Cannot find table [{CurrentToken.Value}] in database.");
-				}
+				var tableName = CurrentToken.Value;
+				String tableAlias = null;
+
 				// + identifier
-				if (GetTokenIf(Token.Identifier))
+				if (GetTokenIf(TokenType.AS))
 				{
-					tableCollection.Add(joinTable = new DbQueryTableIdentifier(table, CurrentToken.Value));
+					if (!GetTokenIf(TokenType.Identifier))
+					{
+						throw new ArgumentException($"Table alias expected after AS");
+					}
+					tableAlias = CurrentToken.Value;
+				}
+				joinTable = new Table(tableName, tableAlias);
+
+				if (!validator.HasTable(joinTable.Name))
+				{
+					throw new ArgumentException($"Invalid table name: {joinTable.Name}");
 				}
 
 				//read ON
-				if (!GetTokenIf(Token.ON))
+				if (!GetTokenIf(TokenType.ON))
 				{
 					throw new ArgumentException($"ON expected in JOIN query");
 				}
@@ -585,7 +689,7 @@ namespace CsvDb.Query
 				//read expression
 				//left & right operand must be from different tables
 				//read left
-				var left = ReadOperand("left operand of JOIN expression expected", realDotIdentifier: true);
+				var left = ReadOperand(readCasting: false);
 
 				//read operator
 				if (!GetToken() || !CurrentToken.IsOperator)
@@ -595,27 +699,35 @@ namespace CsvDb.Query
 				var oper = CurrentToken;
 
 				//read right
-				var right = ReadOperand("right operand of JOIN expression expected", realDotIdentifier: true);
+				var right = ReadOperand(readCasting: false);
 
-				if (((TokenItemIdentifier)left).Identifier == ((TokenItemIdentifier)right).Identifier)
+				//operands must be of type column with different table identifiers
+				if (left.GroupType != OperandEnum.Column ||
+					right.GroupType != OperandEnum.Column ||
+					((ColumnOperand)left).Column.TableAlias == ((ColumnOperand)right).Column.TableAlias)
 				{
 					throw new ArgumentException("JOIN query expression table identifiers cannot be the same");
 				}
 
-				JoinExpression = new DbQueryExpression(
-					tableCollection,
+				JoinExpression = new Expression(
 					left,
-					oper.Value,
+					oper.Token,
 					right
 				);
-				sqlJoin = new SqlJoin(JoinCommand, joinTable, JoinExpression);
+				join = new SqlJoin(JoinCommand, joinTable, JoinExpression);
+
+				//validate JOIN column tables
+
+
+
+
 			}
 
 			#endregion
 
 			#region WHERE if any
 
-			if (GetTokenIf(Token.WHERE))
+			if (GetTokenIf(TokenType.WHERE))
 			{
 				//read expressions [column] > number  separated by AND|OR
 				// [number | string | identifier] [oper] [number | string | identifier] [AND | OR]
@@ -627,7 +739,7 @@ namespace CsvDb.Query
 					if (identifierExpected)
 					{
 						//read left
-						var left = ReadOperand("left operand of WHERE expression expected");
+						var left = ReadOperand();
 
 						//read operator
 						if (!GetToken() || !CurrentToken.IsOperator)
@@ -637,12 +749,12 @@ namespace CsvDb.Query
 						var oper = CurrentToken;
 
 						//read right
-						var right = ReadOperand("right operand of WHERE expression expected");
+						var right = ReadOperand();
 
-						where.Add(new DbQueryExpression(
-							tableCollection,
+						where.Add(new Expression(
+							//tableCollection,
 							left,
-							oper.Value,
+							oper.Token,
 							right
 						));
 						identifierExpected = false;
@@ -655,7 +767,7 @@ namespace CsvDb.Query
 							//consume it
 							GetToken();
 
-							where.Add(new DbQueryLogical(CurrentToken.Value));
+							where.Add(new LogicalExpression(CurrentToken.Token));
 
 							//next must be an identifier
 							identifierExpected = true;
@@ -676,26 +788,14 @@ namespace CsvDb.Query
 
 			#endregion
 
-			#region SKIP & LIMIT
-
-			//read SKIP integer if any
-			if (GetTokenIf(Token.SKIP))
-			{
-				//read integer
-				if (!GetToken() ||
-					CurrentToken.Token != Token.Number ||
-					!int.TryParse(CurrentToken.Value, out skipValue))
-				{
-					throw new ArgumentException("Integer number after SKIP expected");
-				}
-			}
+			#region LIMIT
 
 			//read LIMIT integer if any
-			if (GetTokenIf(Token.LIMIT))
+			if (GetTokenIf(TokenType.LIMIT))
 			{
 				//read integer
 				if (!GetToken() ||
-					CurrentToken.Token != Token.Number ||
+					CurrentToken.Token != TokenType.Number ||
 					!int.TryParse(CurrentToken.Value, out limitValue))
 				{
 					throw new ArgumentException("Integer number after LIMIT expected");
@@ -704,135 +804,65 @@ namespace CsvDb.Query
 
 			#endregion
 
-			//should be end of stream
-			if (GetToken())
+			if (GetToken() && CurrentToken.Token != TokenType.SemiColon)
 			{
-				throw new ArgumentException("End of Db Query reached and extra tokens remaings");
+				throw new ArgumentException($"Unexpected: {CurrentToken.Value} @ {CurrentToken.Position}");
 			}
 
-			return new DbQuery(db, query, colSelector, tableIdentifier, tableCollection,
-				sqlJoin, where, skipValue, limitValue);
+			return new DbQuery(columnSelect, tableCollection, join, where, limitValue);
+		}
+
+		public class TokenItem
+		{
+			public TokenType Token { get; internal set; }
+
+			public String Value { get; internal set; }
+
+			public int Position { get; internal set; }
+
+			/// <summary>
+			/// Number, String, Identifier
+			/// </summary>
+			public bool IsIdentifier
+			{
+				get
+				{
+					return Token == TokenType.Number || Token == TokenType.String || Token == TokenType.Identifier;
+				}
+			}
+
+			public bool IsOperator
+			{
+				get
+				{
+					return Token == TokenType.Equal || Token == TokenType.NotEqual ||
+						Token == TokenType.Less || Token == TokenType.LessOrEqual ||
+						Token == TokenType.Greater || Token == TokenType.GreaterOrEqual;
+				}
+			}
+
+			public bool IsLogical
+			{
+				get
+				{
+					return Token == TokenType.AND || Token == TokenType.OR;
+				}
+			}
+
+			internal TokenItem(TokenType token, int position)
+				: this(token, null, position)
+			{ }
+
+			internal TokenItem(TokenType token, string value, int position)
+			{
+				Token = token;
+				Value = value;
+				Position = position;
+			}
+
+			public override string ToString() => $"({Token}) {Value} @{Position}";
+
 		}
 
 	}
-
-	public enum Token
-	{
-		None,
-		SELECT,
-		FROM,
-		WHERE,
-		SKIP,
-		LIMIT,
-		AND,
-		OR,
-		NOT,
-		JOIN,
-		INNER,
-		LEFT,
-		RIGHT,
-		OUTER,
-		FULL,
-		CROSS,
-		ON,
-		IS,
-		NULL,
-		EXISTS,
-		COUNT,
-		AVG,
-		SUM,
-		//table column, variable, descriptor
-		Identifier,
-		//[identifier as table name].[column name]
-		ColumnIdentifier,
-		//"Byte", "Int16", "Int32", "String", "Double"
-		CastType,
-		//
-		Number,
-		//
-		String,
-		// = > >= < <= <>
-		Equal,
-		NotEqual,
-		Greater,
-		GreaterOrEqual,
-		Less,
-		LessOrEqual,
-		// (
-		OpenPar,
-		// )
-		ClosePar,
-		// .
-		Dot,
-		// *
-		Astherisk,
-		// ,
-		Comma,
-		// ;  it's the end of an SQL query
-		SemiColon
-	}
-
-	public class TokenItem
-	{
-		public Token Token { get; internal set; }
-		public String Value { get; internal set; }
-		public int Position { get; internal set; }
-
-		public virtual bool HasIdentifier => false;
-
-		/// <summary>
-		/// Number, String, Identifier
-		/// </summary>
-		public bool IsIdentifier
-		{
-			get
-			{
-				return Token == Token.Number || Token == Token.String || Token == Token.Identifier;
-			}
-		}
-
-		public bool IsOperator
-		{
-			get
-			{
-				return Token == Token.Equal || Token == Token.NotEqual ||
-					Token == Token.Less || Token == Token.LessOrEqual ||
-					Token == Token.Greater || Token == Token.GreaterOrEqual;
-			}
-		}
-
-		public bool IsLogical
-		{
-			get
-			{
-				return Token == Token.AND || Token == Token.OR;
-			}
-		}
-
-		internal TokenItem(Token token, string value, int position)
-		{
-			Token = token;
-			Value = value;
-			Position = position;
-		}
-
-		public override string ToString() => $"({Token}) {Value}";
-	}
-
-	public class TokenItemIdentifier : TokenItem
-	{
-		public override bool HasIdentifier => true;
-
-		public string Identifier { get; internal set; }
-
-		internal TokenItemIdentifier(string value, int position, string identifier) :
-			base(Token.ColumnIdentifier, value, position)
-		{
-			Identifier = identifier;
-		}
-
-		public override string ToString() => $"({Token}) {Identifier}.{Value}";
-	}
-
-
 }
