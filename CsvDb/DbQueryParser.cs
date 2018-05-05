@@ -623,7 +623,7 @@ namespace CsvDb
 			else
 			{
 				//check all SELECT columns
-				foreach (var col in columnSelect.AllColumns)
+				foreach (var col in columnSelect.Columns)
 				{
 					string tableName = null;
 
@@ -845,7 +845,7 @@ namespace CsvDb
 				throw new ArgumentException($"Unexpected: {CurrentToken.Value} @ {CurrentToken.Position}");
 			}
 
-			return new DbQuery(columnSelect, tableCollection, join, where, limitValue);
+			return new DbQuery(columnSelect, tableCollection, join, new ColumnsWhere(where), limitValue);
 		}
 
 	}

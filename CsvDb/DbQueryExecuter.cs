@@ -122,29 +122,30 @@ namespace CsvDb
 						switch (Expression.Operator.Token)
 						{
 							case TokenType.Equal: // "="
+																		//find page with key
 								var baseNode = nodeTree.FindKey(key) as PageIndexNodeBase<T>;
-								if (baseNode == null)
+								if (baseNode != null)
 								{
-									throw new ArgumentException($"Index corrupted");
-								}
-
-								switch (baseNode.Type)
-								{
-									case MetaIndexType.Node:
-										var nodePage = baseNode as PageIndexNode<T>;
-										if (nodePage != null && nodePage.Values != null)
-										{
-											collection = nodePage.Values;
-										}
-										break;
-									case MetaIndexType.Items:
-										offset = ((PageIndexItems<T>)baseNode).Offset;
-										DbKeyValues<T> item = Column.IndexItems<T>().Find(offset, key);
-										if (item != null && item.Values != null)
-										{
-											collection = item.Values;
-										}
-										break;
+									switch (baseNode.Type)
+									{
+										case MetaIndexType.Node:
+											//it's in a tree node page
+											var nodePage = baseNode as PageIndexNode<T>;
+											if (nodePage != null && nodePage.Values != null)
+											{
+												collection = nodePage.Values;
+											}
+											break;
+										case MetaIndexType.Items:
+											//it's in a items page 
+											offset = ((PageIndexItems<T>)baseNode).Offset;
+											DbKeyValues<T> item = Column.IndexItems<T>().Find(offset, key);
+											if (item != null && item.Values != null)
+											{
+												collection = item.Values;
+											}
+											break;
+									}
 								}
 								break;
 							case TokenType.Less: // "<"
@@ -176,11 +177,15 @@ namespace CsvDb
 				if (treeReader.Root == null)
 				{
 					//itemspage has only one page, no tree root
-					foreach (var cvsOfs in Column.IndexItems<T>()
-						.Pages[0].Items.SelectMany(i => i.Value))
+					var page = Column.IndexItems<T>().Pages.FirstOrDefault();
+					if (page != null)
 					{
-						yield return cvsOfs;
+						foreach (var cvsOfs in page.Items.SelectMany(i => i.Value))
+						{
+							yield return cvsOfs;
+						}
 					}
+
 				}
 				else
 				{
@@ -273,4 +278,5 @@ namespace CsvDb
 		//	}
 		//}
 	}
+
 }

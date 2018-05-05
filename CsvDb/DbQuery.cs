@@ -30,7 +30,7 @@ namespace CsvDb
 		/// <summary>
 		/// WHERE expr0 AND|OR exper1 ...
 		/// </summary>
-		public List<ExpressionBase> Where { get; }
+		public ColumnsWhere Where { get; }
 
 		/// <summary>
 		/// Enumerate all tables used in the query
@@ -68,7 +68,7 @@ namespace CsvDb
 			ColumnsSelect columns,
 			IEnumerable<Table> from,
 			SqlJoin join,
-			IEnumerable<ExpressionBase> where,
+			ColumnsWhere where,
 			int limit = -1)
 		{
 			if ((Columns = columns) == null)
@@ -79,8 +79,8 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"FROM tables cannot be empty or null");
 			}
-			//ensure never null
-			Where = (where == null) ? new List<ExpressionBase>() : new List<ExpressionBase>(where);
+
+			Where = where;
 
 			Join = join;
 			Limit = limit <= 0 ? -1 : limit;
@@ -101,11 +101,7 @@ namespace CsvDb
 				items.Add(Join.ToString());
 			}
 
-			if (Where.Count > 0)
-			{
-				items.Add("WHERE");
-				items.Add(String.Join(' ', Where));
-			}
+			items.Add(Where.ToString());
 
 			if (Limit > 0)
 			{
@@ -326,5 +322,48 @@ namespace CsvDb
 
 		}
 
+		public class ColumnsWhere
+		{
+			//it's a tree, fix later
+			public List<ExpressionBase> Where { get; }
+
+			public IEnumerable<Column> Columns
+			{
+				get
+				{
+					foreach (var item in Where)
+					{
+						if (item.Type == ExpressionEnum.Expression)
+						{
+							var expr = item as Expression;
+							if (expr.Left.IsColumn)
+							{
+								yield return (expr.Left as ColumnOperand).Column;
+							}
+							if (expr.Right.IsColumn)
+							{
+								yield return (expr.Right as ColumnOperand).Column;
+							}
+						}
+					}
+				}
+			}
+
+			public ColumnsWhere(IEnumerable<ExpressionBase> where)
+			{
+				//ensure never null
+				Where = (where == null) ? new List<ExpressionBase>() : new List<ExpressionBase>(where);
+			}
+
+			public override string ToString()
+			{
+				if (Where.Count > 0)
+				{
+					return $"WHERE {String.Join(' ', Where)}";
+				}
+				return string.Empty;
+			}
+
+		}
 	}
 }

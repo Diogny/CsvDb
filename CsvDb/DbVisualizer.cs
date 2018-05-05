@@ -74,6 +74,10 @@ namespace CsvDb
 			reader = DbRecordReader.Create(db, query);
 
 			Options = options;
+
+
+			//for testing only
+			var handler = new DbQueryHandler(db, query);
 		}
 
 		/// <summary>

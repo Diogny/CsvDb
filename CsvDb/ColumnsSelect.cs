@@ -21,7 +21,7 @@ namespace CsvDb
 			/// <summary>
 			/// COUNT (column name)
 			/// </summary>
-			public Column Column { get; }
+			public Column Column { get { return Columns[0]; } }
 
 			/// <summary>
 			/// COUNT (column name) AS alias
@@ -72,27 +72,6 @@ namespace CsvDb
 			public bool FullColumns { get; }
 
 			/// <summary>
-			/// returns a collection of all columns
-			/// </summary>
-			public IEnumerable<Column> AllColumns
-			{
-				get
-				{
-					if (IsFunction)
-					{
-						yield return Column;
-					}
-					else
-					{
-						foreach (var col in Columns)
-						{
-							yield return col;
-						}
-					}
-				}
-			}
-
-			/// <summary>
 			/// creates a SELECT function
 			/// </summary>
 			/// <param name="function">COUNT, SUM, AVG, MIN, MAX</param>
@@ -101,11 +80,10 @@ namespace CsvDb
 			internal ColumnsSelect(TokenType function, Column column, string alias)
 			{
 				Function = function;
-				Column = column;
 				FunctionAlias = alias;
+				Columns = new List<Column>() { column };
 				//
 				FullColumns = false;
-				Columns = new List<Column>();
 			}
 
 			/// <summary>

@@ -143,7 +143,7 @@ namespace ConsoleApp
 			foreach (var table in db.Tables)
 			{
 				Console.WriteLine($"\tcase \"{table.Name}\":");
-				Console.WriteLine($"\t\treturn new string[] {{ {String.Join(", ", table.Columns.Select(c => $"\"{c.Name}\""))} }}");
+				Console.WriteLine($"\t\treturn new KeyValuePair<string, string>[] {{ {String.Join(", ", table.Columns.Select(c => $"new KeyValuePair<string, string>(\"{c.Name}\", \"{c.Type}\")"))} }}");
 				Console.WriteLine($"\t\t\t.Contains(columnName);");
 			}
 			Console.WriteLine("\tdefault:");

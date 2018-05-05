@@ -75,6 +75,8 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"Cannot handle more than one table on from yet!!!!!!!!!");
 			}
+
+			//this's a restriction, later must handle columns in different tables
 			if ((Table = db.Table(query.From[0].Name)) == null)
 			{
 				throw new ArgumentException($"Cannot find table in database");
@@ -94,7 +96,7 @@ namespace CsvDb
 			ColumnCount = Table.Columns.Count;
 
 			//index translator to real visualized columns
-			IndexTranslator = Query.Columns.AllColumns.Select(c => c.Meta.Index).ToArray();
+			IndexTranslator = Query.Columns.Columns.Select(c => c.Meta.Index).ToArray();
 
 			RowCount = 0;
 		}
@@ -112,7 +114,7 @@ namespace CsvDb
 				yield return Query.Columns.Header;
 
 				//cast and apply function to collection of values
-				var column = Query.Columns.AllColumns.First();
+				var column = Query.Columns.Columns.First();
 				var valueType = ColumnTypes[column.Meta.Index];
 
 				if (Query.Columns.Function == TokenType.COUNT)
@@ -258,7 +260,7 @@ namespace CsvDb
 
 			var executerClassType = typeof(DbQueryExecuter<>);
 
-			if (Query.Where.Count == 0)
+			if (Query.Where.Where.Count == 0)
 			{
 				//find key column
 				var table = Database.Table(Query.From[0].Name);
@@ -283,7 +285,7 @@ namespace CsvDb
 			}
 			else
 			{
-				foreach (var item in Query.Where)
+				foreach (var item in Query.Where.Where)
 				{
 					switch (item.Type)
 					{
@@ -463,7 +465,7 @@ namespace CsvDb
 		int charIndex = 0;
 		StringBuilder sb = new StringBuilder();
 
-	  io.StreamReader reader = null;
+		io.StreamReader reader = null;
 
 		internal DbCsvRecordReader(CsvDb db, DbQuery query)
 		: base(db, query, $"{CsvDb.SchemaTableDefaultExtension}")

@@ -14,30 +14,27 @@ namespace CsvDb
 			where T : IComparable<T>
 	{
 
-		public CsvDb Database { get; protected internal set; }
+		public CsvDb Database { get; }
 
-		public DbColumn Index { get; protected internal set; }
+		public DbColumn Index { get; }
 
-		public Int32 PageCount { get; protected internal set; }
+		public Int32 PageCount { get; }
 
-		public DbColumnType KeyType { get; protected internal set; }
+		public DbColumnType KeyType { get; }
 
-		public string PathToItems { get; protected internal set; }
+		public string PathToItems { get; }
 
 		//implement a cache of pages
 
 		io.BinaryReader reader = null;
 
-		public List<MetaItemsPage<T>> Pages { get; protected internal set; }
+		public IEnumerable<MetaItemsPage<T>> Pages { get { return Hash.Values; } }
 
 		public Dictionary<int, MetaItemsPage<T>> Hash { get; protected internal set; }
 
 		public MetaItemsPage<T> this[int offset] => Hash.TryGetValue(offset, out MetaItemsPage<T> page) ? page : null;
 
-		public bool ValidPage(int offset)
-		{
-			return Pages.Any(p => p.Offset == offset);
-		}
+		public bool ValidPage(int offset) => this[offset] != null;
 
 		public DbIndexItems(CsvDb db, string tableName, string columnName)
 		{
@@ -50,6 +47,7 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"Column [{columnName}] does not exists in table [{tableName}].");
 			}
+
 			//load structure
 			PathToItems = io.Path.Combine(Database.BinaryPath, $"{Index.Indexer}.bin");
 			if (!io.File.Exists(PathToItems))
@@ -57,14 +55,12 @@ namespace CsvDb
 				throw new ArgumentException($"Could not find indexer in database");
 			}
 
-			Pages = new List<MetaItemsPage<T>>();
 			Hash = new Dictionary<int, MetaItemsPage<T>>();
 
 			//read main structure of item pages
 			using (reader = new io.BinaryReader(io.File.OpenRead(PathToItems)))
 			{
 				//Header
-
 				PageCount = reader.ReadInt32();
 
 				Int32 keyTypeValue = reader.ReadInt32();
@@ -109,15 +105,12 @@ namespace CsvDb
 						Number = pi
 					};
 
-					//add page to collection of pages
-					Pages.Add(page);
-
 					//add to hash dictionary for fast retrieval
 					Hash.Add(page.Offset, page);
 				}
 			}
 			//update item page count
-			Index.ItemPages = Pages.Count;
+			Index.ItemPages = Hash.Count;
 		}
 
 		/// <summary>
@@ -128,7 +121,9 @@ namespace CsvDb
 		/// <returns></returns>
 		public DbKeyValues<T> Find(int offset, T key)
 		{
-			if (!Hash.TryGetValue(offset, out MetaItemsPage<T> page))
+			MetaItemsPage<T> page = this[offset];
+
+			if (page == null)
 			{
 				return null;
 			}
@@ -153,7 +148,8 @@ namespace CsvDb
 		/// <returns></returns>
 		public IEnumerable<int> FindByOper(int offset, T key, TokenType oper)
 		{
-			if (!Hash.TryGetValue(offset, out MetaItemsPage<T> page))
+			MetaItemsPage<T> page = this[offset];
+			if (page == null)
 			{
 				yield break;
 			}
@@ -192,7 +188,8 @@ namespace CsvDb
 
 		public IEnumerable<int> All(int offset)
 		{
-			if (!Hash.TryGetValue(offset, out MetaItemsPage<T> page))
+			MetaItemsPage<T> page = this[offset];
+			if (page == null)
 			{
 				yield break;
 			}
@@ -286,8 +283,7 @@ namespace CsvDb
 								list.Add(pair);
 							}
 						}
-
-
+						
 						//values
 						if (UniqueKeyValue)
 						{

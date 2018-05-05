@@ -32,4 +32,6 @@
 .-fix SELECT function result and LIMIT
 2018/04/28 - 2018/04/29
 .-commenting, cleaning up, dedicated database record reader apart from database visualizer
-2018/04/30 - 
+2018/04/30 - 2018/05/05
+.-cleaning and prep up, ColumnsWhere
+2018/05/05 - real sql query parser, prep up real engine

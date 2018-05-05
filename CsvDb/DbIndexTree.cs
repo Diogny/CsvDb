@@ -16,21 +16,21 @@ namespace CsvDb
 	{
 		public CsvDb Database { get { return Index.Table.Database; } }
 
-		public DbColumn Index { get; protected internal set; }
+		public DbColumn Index { get; }
 
-		public PageIndexTreeHeader Header { get; protected internal set; }
+		public PageIndexTreeHeader Header { get; }
 
-		public bool IsUnique { get; protected internal set; }
+		public bool IsUnique { get; }
 
-		public bool IsKey { get; protected internal set; }
+		public bool IsKey { get; }
 
-		public bool IsLeaf { get; protected internal set; }
+		public bool IsLeaf { get; }
 
-		public DbColumnType KeyType { get; protected internal set; }
+		public DbColumnType KeyType { get; }
 
 		io.BinaryReader reader = null;
 
-		public PageIndexNodeBase<T> Root { get; protected internal set; }
+		public PageIndexNodeBase<T> Root { get; }
 
 		public DbIndexTree(DbColumn index)
 		{
