@@ -50,6 +50,12 @@ namespace CsvDb
 			TokenType.Less, TokenType.LessOrEqual
 		};
 
+		internal static List<TokenType> LogicalOperators = new List<TokenType>()
+		{
+			 TokenType.AND,
+				TokenType.OR
+		};
+
 		/// <summary>
 		/// parse sql query text into tokens
 		/// </summary>
@@ -137,7 +143,14 @@ namespace CsvDb
 						yield return AddToken(TokenType.ClosePar);
 						break;
 					case '=':
-						yield return AddToken(TokenType.Equal);
+						if (PeekChar() == '=')
+						{
+							yield return AddToken(TokenType.Equal, text: null, readNext: true);
+						}
+						else
+						{
+							yield return AddToken(TokenType.Assign);
+						}
 						break;
 					case '<':
 						switch (PeekChar())
@@ -301,22 +314,34 @@ namespace CsvDb
 			ColumnsSelect columnSelect = null;
 			var tableCollection = new List<Table>();
 			SqlJoin join = null;
-			var where = new List<ExpressionBase>();
-			int limitValue = -1;
+			ExpressionOperator where = null;
 
 			TokenItem PreviousToken = default(TokenItem);
 			TokenItem CurrentToken = default(TokenItem);
 			var peekedToken = default(TokenItem);
 			var columnCollection = new List<Column>();
+			Table joinTable = null;
 
 			var queue = new Queue<TokenItem>(ParseTokens(query));
 
-#if DEBUG
-			Console.WriteLine("Query tokens:");
-			Console.WriteLine($"  {String.Join($"{Environment.NewLine}  ", queue)}{Environment.NewLine}");
-#endif
+//#if DEBUG
+//			Console.WriteLine("Query tokens:");
+//			Console.WriteLine($"  {String.Join($"{Environment.NewLine}  ", queue)}{Environment.NewLine}");
+//#endif
 
 			bool EndOfStream = queue.Count == 0;
+
+			IEnumerable<Table> AllTables()
+			{
+				foreach (var t in tableCollection)
+				{
+					yield return t;
+				}
+				if (joinTable != null)
+				{
+					yield return joinTable;
+				}
+			}
 
 			bool GetToken()
 			{
@@ -361,7 +386,7 @@ namespace CsvDb
 				return false;
 			}
 
-			Column ReadColumnName()
+			Column ReadColumnName(bool readAS = true)
 			{
 				Column selectColumn = null;
 				//read operand [(i).](column)
@@ -385,7 +410,7 @@ namespace CsvDb
 						tableAlias = null;
 					}
 					//alias
-					if (GetTokenIf(TokenType.AS))
+					if (readAS && GetTokenIf(TokenType.AS))
 					{
 						if (!GetTokenIf(TokenType.Identifier))
 						{
@@ -395,50 +420,38 @@ namespace CsvDb
 					}
 					selectColumn = new Column(columnName, tableAlias, columnAlias);
 				}
-				else
-				{
-					throw new ArgumentException($"quantifier column expected");
-				}
+
 				return selectColumn;
 			}
 
-			Operand ReadOperand(bool readCasting = true)
+			ExpressionOperand ReadOperand(DbColumnType casting)
 			{
-				//can be a column, string, number
-				if (!GetToken())
+				if (!PeekToken())
 				{
-					throw new ArgumentException("operand expected");
+					return null;
 				}
 
-				DbColumnType casting = DbColumnType.None;
-				//try to read cast
-				if (readCasting && (CurrentToken.Token == TokenType.OpenPar))
+				switch (peekedToken.Token)
 				{
-					if (!GetTokenIfContains(CastingTypes) ||
-						(casting = CurrentToken.Token.ToCast()) == DbColumnType.None)
-					{
-						throw new ArgumentException($"invalid casting type: {CurrentToken.Value}");
-					}
-					if (!GetTokenIf(TokenType.ClosePar))
-					{
-						throw new ArgumentException("close parenthesis expected after casting type");
-					}
-					//read next
-					if (!GetToken())
-					{
-						throw new ArgumentException($"operand expected after casting ({casting})");
-					}
-				}
+					case TokenType.String:
+						GetToken();
+						return new StringOperand(CurrentToken.Value);
 
-				//read operand
-				switch (CurrentToken.Token)
-				{
+					case TokenType.Number:
+						GetToken();
+						return new NumberOperand(CurrentToken.Value, casting);
+
 					case TokenType.Identifier:
+						//get column name
+						GetToken();
 						var columnName = CurrentToken.Value;
+						var position = CurrentToken.Position;
+
 						String columnIdentifier = null;
 
 						if (GetTokenIf(TokenType.Dot))
 						{
+							//tablealias.colummname
 							if (!GetToken())
 							{
 								throw new ArgumentException($"column name expected");
@@ -452,17 +465,18 @@ namespace CsvDb
 						if (columnIdentifier != null)
 						{
 							//find in table by its alias
-							var aliasTable = tableCollection.FirstOrDefault(t => t.Alias == columnIdentifier);
+							var aliasTable = AllTables().FirstOrDefault(t => t.Alias == columnIdentifier);
 							if (aliasTable == null)
 							{
 								throw new ArgumentException($"cannot find column: {columnName}");
 							}
-							col = new Column(columnName, aliasTable.Name);
+							col = new Column(columnName, aliasTable.Alias);
+							col.Meta = validator.ColumnMetadata(aliasTable.Name, col.Name);
 						}
 						else
 						{
 							//find the only first in all known tables
-							var tables = tableCollection.Where(t => validator.TableHasColumn(t.Name, columnName)).ToList();
+							var tables = AllTables().Where(t => validator.TableHasColumn(t.Name, columnName)).ToList();
 							if (tables.Count != 1)
 							{
 								throw new ArgumentException($"column: {columnName} could not be found in database or cannot resolve multiple tables");
@@ -470,13 +484,173 @@ namespace CsvDb
 							//tableName = tables[0].Name;
 							col = new Column(columnName, validator.ColumnMetadata(tables[0].Name, columnName));
 						}
+
 						return new ColumnOperand(col, casting);
-					case TokenType.String:
-						return new StringOperand(CurrentToken.Value, casting);
-					case TokenType.Number:
-						return new NumberOperand(CurrentToken.Value, casting);
 					default:
-						throw new ArgumentException("Operand expected");
+						return null;
+				}
+			}
+
+			ExpressionOperator ReadExpression()
+			{
+				//https://stackoverflow.com/questions/3422673/evaluating-a-math-expression-given-in-string-form
+
+				var stack = new Stack<ExpressionItem>();
+				var operStack = new Stack<TokenType>();
+
+				ExpressionItem BuildTree()
+				{
+					//get higher precedence operator from operator stack
+					var oper = operStack.Pop();
+
+					//get left and right expressions
+					var right = stack.Pop();
+					var left = stack.Pop();
+
+					//create new expression
+					var expr = ExpressionOperator.Create(left, oper, right);
+
+					//push onto expression stack
+					stack.Push(expr);
+
+					return expr;
+				}
+
+				var end = false;
+				while (!end)
+				{
+					if (!(end = !PeekToken()))
+					{
+						var currOper = peekedToken.Token;
+						switch (currOper)
+						{
+							case TokenType.String:
+							case TokenType.Number:
+							case TokenType.Identifier:
+								//if on top of stack there's a casting oper, apply it
+								DbColumnType casting = DbColumnType.None;
+								if (stack.Count > 0 && stack.Peek().ExpressionType == ExpressionItemType.Casting)
+								{
+									casting = (stack.Pop() as CastingExpression).Type;
+								}
+								//read operand and apply casting if any
+								stack.Push(ReadOperand(casting));
+								break;
+							case TokenType.OpenPar:
+								//consume the open parenthesis (
+								GetToken();
+								//try ahead if it's a casting operator
+								var currToken = CurrentToken.Token;
+
+								//try to get ahead a casting type
+								if (PeekToken() && (casting = peekedToken.Token.ToCast()).IsCasting())
+								{
+									//consume the casting type
+									GetToken();
+
+									if (!GetTokenIf(TokenType.ClosePar))
+									{
+										throw new ArgumentException("close parenthesis expected after casting type");
+									}
+									//store new casting expression
+									stack.Push(new CastingExpression(casting));
+								}
+								else
+								{
+									operStack.Push(currToken);
+								}
+								break;
+							case TokenType.ClosePar: //  )
+								GetToken();
+								while (operStack.Count > 0 && operStack.Peek() != TokenType.OpenPar)
+								{
+									BuildTree();
+								}
+								//discard close parenthesis ) operator
+								operStack.Pop();
+								break;
+							default:
+								//operator
+								// AND  OR  == <>  >  >=  <  <=
+								if (currOper == TokenType.AND || currOper == TokenType.OR ||
+									currOper == TokenType.Equal || currOper == TokenType.NotEqual ||
+									currOper == TokenType.Greater || currOper == TokenType.GreaterOrEqual ||
+									currOper == TokenType.Less || currOper == TokenType.LessOrEqual)
+								{
+									GetToken();
+
+									var thisOper = CurrentToken.Token;
+
+									//build tree of all operator on stack with higher precedence than current
+									while (operStack.Count > 0 &&
+										Precedence(operStack.Peek()) < Precedence(thisOper))
+									{
+										BuildTree();
+									}
+									//
+									operStack.Push(thisOper);
+								}
+								else
+								{
+									throw new ArgumentException($"operator expected, and we got: {currOper}");
+								}
+								break;
+						}
+					}
+				}
+
+				//resolve left operator
+				while (operStack.Count > 0)
+				{
+					BuildTree();
+				}
+
+				if (stack.Count == 0)
+				{
+					return null;
+				}
+				var item = stack.Pop();
+				if (item.ExpressionType != ExpressionItemType.Operator)
+				{
+					throw new ArgumentException("operator expected on expression");
+				}
+				return item as ExpressionOperator;
+			}
+
+			int Precedence(TokenType token)
+			{
+				switch (token)
+				{
+					//case TokenType.NOT: // ~ BITWISE NOT
+					//	return 1;
+					case TokenType.Astherisk: // *  / %(modulus)
+						return 2;
+					case TokenType.Plus:  // + - sign
+					case TokenType.Minus: // + addition, concatenation    -substraction
+						return 3;  //          bitwise & AND, | OR |
+					case TokenType.Equal: //comparison operators
+					case TokenType.NotEqual:
+					case TokenType.Greater:
+					case TokenType.GreaterOrEqual:
+					case TokenType.Less:
+					case TokenType.LessOrEqual:
+						return 4;
+					case TokenType.NOT:
+						return 5;
+					case TokenType.AND:
+						return 6;
+					case TokenType.BETWEEN: //ALL, ANY, BETWEEN, IN, LIKE, OR, SOME
+					case TokenType.IN:
+					case TokenType.LIKE:
+					case TokenType.OR:
+						return 7;
+					case TokenType.Assign:
+						return 8;
+					case TokenType.OpenPar:
+						//highest
+						return 16;
+					default:
+						return 0;
 				}
 			}
 
@@ -498,7 +672,7 @@ namespace CsvDb
 				}
 
 				// COUNT([(i).](column))
-				var functionColumn = ReadColumnName();
+				var functionColumn = ReadColumnName(readAS: false);
 
 				if (!GetTokenIf(TokenType.ClosePar))
 				{
@@ -665,8 +839,7 @@ namespace CsvDb
 				//FROM table must has identifier, should be only one here
 
 				TokenType JoinCommand = CurrentToken.Token;
-				Expression JoinExpression = null;
-				Table joinTable = null;
+				ComparisonOperator JoinExpression = null;
 
 				if (CurrentToken.Token == TokenType.LEFT || CurrentToken.Token == TokenType.RIGHT ||
 					CurrentToken.Token == TokenType.FULL)
@@ -725,27 +898,27 @@ namespace CsvDb
 				//read expression
 				//left & right operand must be from different tables
 				//read left
-				var left = ReadOperand(readCasting: false);
+				var left = ReadOperand(DbColumnType.None);
 
 				//read operator
-				if (!GetToken() || !CurrentToken.IsOperator)
+				if (!GetToken() || !CurrentToken.Token.IsOperator())
 				{
 					throw new ArgumentException("operator of JOIN expression expected");
 				}
 				var oper = CurrentToken;
 
 				//read right
-				var right = ReadOperand(readCasting: false);
+				var right = ReadOperand(DbColumnType.None);
 
 				//operands must be of type column with different table identifiers
-				if (left.GroupType != OperandType.Column ||
-					right.GroupType != OperandType.Column ||
+				if (!left.IsColumn ||
+					!right.IsColumn ||
 					((ColumnOperand)left).Column.TableAlias == ((ColumnOperand)right).Column.TableAlias)
 				{
 					throw new ArgumentException("JOIN query expression table identifiers cannot be the same");
 				}
 
-				JoinExpression = new Expression(
+				JoinExpression = new ComparisonOperator(
 					left,
 					oper.Token,
 					right
@@ -765,76 +938,9 @@ namespace CsvDb
 
 			if (GetTokenIf(TokenType.WHERE))
 			{
-				//read expressions [column] > number  separated by AND|OR
-				// [number | string | identifier] [oper] [number | string | identifier] [AND | OR]
-
-				bool endOfWhere = false;
-				bool identifierExpected = true;
-				while (!endOfWhere)
-				{
-					if (identifierExpected)
-					{
-						//read left
-						var left = ReadOperand();
-
-						//read operator
-						if (!GetToken() || !CurrentToken.IsOperator)
-						{
-							throw new ArgumentException("operator of WHERE expression expected");
-						}
-						var oper = CurrentToken;
-
-						//read right
-						var right = ReadOperand();
-
-						where.Add(new Expression(
-							//tableCollection,
-							left,
-							oper.Token,
-							right
-						));
-						identifierExpected = false;
-					}
-					else
-					{
-						//end of where if not a logical
-						if (PeekToken() && peekedToken.IsLogical)
-						{
-							//consume it
-							GetToken();
-
-							where.Add(new LogicalExpression(CurrentToken.Token));
-
-							//next must be an identifier
-							identifierExpected = true;
-						}
-						else
-						{
-							endOfWhere = true;
-						}
-
-					}
-				}
-				//a WHERE empty is invalid
-				if (where.Count == 0)
+				if ((where = ReadExpression()) == null)
 				{
 					throw new ArgumentException("WHERE expression(s) expected");
-				}
-			}
-
-			#endregion
-
-			#region LIMIT
-
-			//read LIMIT integer if any
-			if (GetTokenIf(TokenType.LIMIT))
-			{
-				//read integer
-				if (!GetToken() ||
-					CurrentToken.Token != TokenType.Number ||
-					!int.TryParse(CurrentToken.Value, out limitValue))
-				{
-					throw new ArgumentException("Integer number after LIMIT expected");
 				}
 			}
 
@@ -845,7 +951,7 @@ namespace CsvDb
 				throw new ArgumentException($"Unexpected: {CurrentToken.Value} @ {CurrentToken.Position}");
 			}
 
-			return new DbQuery(columnSelect, tableCollection, join, new ColumnsWhere(where), limitValue);
+			return new DbQuery(columnSelect, tableCollection, join, new ColumnsWhere(where));
 		}
 
 	}

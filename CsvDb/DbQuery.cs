@@ -15,7 +15,7 @@ namespace CsvDb
 		/// <summary>
 		/// SELECT column0, column1,...
 		/// </summary>
-		public ColumnsSelect Columns { get; }
+		public ColumnsSelect Select { get; }
 
 		/// <summary>
 		/// FROM [table name] AS [alias], [table name] AS [alias], ...
@@ -52,26 +52,20 @@ namespace CsvDb
 		}
 
 		/// <summary>
-		/// -1 is not selected
-		/// </summary>
-		public int Limit { get; protected internal set; }
-
-		/// <summary>
 		/// Creates an SQL query
 		/// </summary>
-		/// <param name="columns">column SELECT</param>
+		/// <param name="select">column SELECT</param>
 		/// <param name="from">FROM tables</param>
 		/// <param name="join">JOIN statement</param>
 		/// <param name="where">WHERE expressions</param>
 		/// <param name="limit">query LIMIT</param>
 		internal DbQuery(
-			ColumnsSelect columns,
+			ColumnsSelect select,
 			IEnumerable<Table> from,
 			SqlJoin join,
-			ColumnsWhere where,
-			int limit = -1)
+			ColumnsWhere where)
 		{
-			if ((Columns = columns) == null)
+			if ((Select = select) == null)
 			{
 				throw new ArgumentException($"SELECT columns cannot be empty or null");
 			}
@@ -79,11 +73,8 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"FROM tables cannot be empty or null");
 			}
-
 			Where = where;
-
 			Join = join;
-			Limit = limit <= 0 ? -1 : limit;
 		}
 
 		public override string ToString()
@@ -91,7 +82,7 @@ namespace CsvDb
 			var items = new List<string>
 			{
 				"SELECT",
-				Columns.ToString(),
+				Select.ToString(),
 				"FROM",
 				String.Join(", ", From)
 			};
@@ -102,11 +93,6 @@ namespace CsvDb
 			}
 
 			items.Add(Where.ToString());
-
-			if (Limit > 0)
-			{
-				items.Add($"LIMIT {Limit}");
-			}
 
 			return String.Join(' ', items);
 		}
@@ -205,10 +191,28 @@ namespace CsvDb
 
 			public bool HasTableAlias => TableAlias != null;
 
+			IColumnMeta _meta;
 			/// <summary>
 			/// Gets the column index in the table
 			/// </summary>
-			public IColumnMeta Meta { get; internal set; }
+			public IColumnMeta Meta
+			{
+				get { return _meta; }
+				internal set
+				{
+					if ((_meta = value) != null)
+					{
+						//set new hash value
+						Hash = $"{_meta.TableName}.{Name}";
+					} else
+					{
+						//this will be an error if executed
+						Hash = null;
+					}
+				}
+			}
+
+			public string Hash { get; private set; }
 
 			/// <summary>
 			/// Creates an SQL Query column with/without an alias
@@ -220,6 +224,7 @@ namespace CsvDb
 				: base(name, alias)
 			{
 				TableAlias = String.IsNullOrWhiteSpace(tableAlias) ? null : tableAlias.Trim();
+				Meta = null;
 			}
 
 			public Column(string name, IColumnMeta meta)
@@ -259,41 +264,6 @@ namespace CsvDb
 			public int Length => Value.Length;
 
 			/// <summary>
-			/// Number, String, Identifier
-			/// </summary>
-			public bool IsIdentifier
-			{
-				get
-				{
-					return Token == TokenType.Number || Token == TokenType.String || Token == TokenType.Identifier;
-				}
-			}
-
-			/// <summary>
-			/// operator
-			/// </summary>
-			public bool IsOperator
-			{
-				get
-				{
-					return Token == TokenType.Equal || Token == TokenType.NotEqual ||
-						Token == TokenType.Less || Token == TokenType.LessOrEqual ||
-						Token == TokenType.Greater || Token == TokenType.GreaterOrEqual;
-				}
-			}
-
-			/// <summary>
-			/// logical AND, OR
-			/// </summary>
-			public bool IsLogical
-			{
-				get
-				{
-					return Token == TokenType.AND || Token == TokenType.OR;
-				}
-			}
-
-			/// <summary>
 			/// creates a token item
 			/// </summary>
 			/// <param name="token">token</param>
@@ -312,58 +282,36 @@ namespace CsvDb
 			{
 				Token = token;
 				Value = value;
-				if ((Position = position) < 0)
-				{
-					throw new ArgumentException("Invalid token item");
-				}
+				Position = position;
 			}
 
 			public override string ToString() => $"({Token}) {Value} @{Position}";
 
+			public static TokenItem Empty() { return new TokenItem(TokenType.None, null, -1); }
 		}
 
 		public class ColumnsWhere
 		{
-			//it's a tree, fix later
-			public List<ExpressionBase> Where { get; }
+			public ExpressionItem Root { get; }
 
-			public IEnumerable<Column> Columns
-			{
-				get
-				{
-					foreach (var item in Where)
-					{
-						if (item.Type == ExpressionEnum.Expression)
-						{
-							var expr = item as Expression;
-							if (expr.Left.IsColumn)
-							{
-								yield return (expr.Left as ColumnOperand).Column;
-							}
-							if (expr.Right.IsColumn)
-							{
-								yield return (expr.Right as ColumnOperand).Column;
-							}
-						}
-					}
-				}
-			}
+			/// <summary>
+			/// returns true if we got a WHERE clause in the SQL query
+			/// </summary>
+			public bool Defined => Root != null;
 
-			public ColumnsWhere(IEnumerable<ExpressionBase> where)
+			public IEnumerable<Column> Columns => Root != null ? Root.GetColumns() : Enumerable.Empty<Column>();
+
+			public ColumnsWhere(ExpressionItem root = null)
 			{
-				//ensure never null
-				Where = (where == null) ? new List<ExpressionBase>() : new List<ExpressionBase>(where);
+				Root = root;
 			}
 
 			public override string ToString()
 			{
-				if (Where.Count > 0)
-				{
-					return $"WHERE {String.Join(' ', Where)}";
-				}
-				return string.Empty;
+				return Root == null ? String.Empty : $"WHERE {Root.ToString()}";
 			}
 
 		}
+
 	}
 }

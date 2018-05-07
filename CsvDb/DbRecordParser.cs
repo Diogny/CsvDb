@@ -29,7 +29,7 @@ namespace CsvDb
 			{
 				throw new ArgumentException($"Table or Csv reader is null");
 			}
-			Values = new string[Count = table.Columns.Count];
+			Values = new string[Count = table.Count];
 			CsvValues = new string[Count];
 		}
 
@@ -39,7 +39,7 @@ namespace CsvDb
 			{
 				var value = Csv.GetField(i);
 				Values[i] = value;
-				CsvValues[i] = value.ToCsvCol(Table.Columns[i]);
+				CsvValues[i] = value.ToCsvCol(Table[i]);
 			}
 			return true;
 		}

@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using System.Reflection;
 using System.IO;
+using static CsvDb.DbQuery;
 
 namespace CsvDb
 {
@@ -24,7 +25,7 @@ namespace CsvDb
 		internal static DbColumnType NumericMask =
 			DbColumnType.Byte |
 			DbColumnType.Int16 | DbColumnType.Int32 | DbColumnType.Int64 |
-			DbColumnType.Float | DbColumnType.Double | DbColumnType.Decimal;
+			DbColumnType.Single | DbColumnType.Double | DbColumnType.Decimal;
 
 		/// <summary>
 		/// returns true if a database column type is numeric
@@ -34,6 +35,72 @@ namespace CsvDb
 		public static bool IsNumeric(this DbColumnType type)
 		{
 			return (type & NumericMask) != 0;
+		}
+
+		internal static DbColumnType CastingMask =
+		 DbColumnType.Bool |
+		 DbColumnType.Byte |
+		 DbColumnType.Char | DbColumnType.String |
+		 DbColumnType.Int16 | DbColumnType.Int32 | DbColumnType.Int64 |
+		 DbColumnType.Single | DbColumnType.Double | DbColumnType.Decimal;
+
+		public static bool IsCasting(this DbColumnType type)
+		{
+			return (type & CastingMask) != 0;
+		}
+
+		public static bool IsOperator(this TokenType Token)
+		{
+			return Token == TokenType.Equal || Token == TokenType.NotEqual ||
+						Token == TokenType.Less || Token == TokenType.LessOrEqual ||
+						Token == TokenType.Greater || Token == TokenType.GreaterOrEqual;
+		}
+
+		//public bool IsIdentifier => Token == TokenType.Number || Token == TokenType.String || Token == TokenType.Identifier;
+
+		//public bool IsLogical => Token == TokenType.AND || Token == TokenType.OR;
+
+		public static bool IsComparison(this TokenType token)
+		{
+			var value = (int)token;
+			return (value >= (int)TokenType.Equal && value <= (int)TokenType.LessOrEqual);
+		}
+
+		public static object CallGeneric(
+			object classObj,
+			string methodName,
+			DbColumnType valueType,
+			object[] parameters = null,
+			BindingFlags flags = BindingFlags.Default)
+		{
+			MethodInfo method =
+					classObj.GetType().GetMethod(methodName);
+			//123816
+			MethodInfo genMethod = method.MakeGenericMethod(Type.GetType($"System.{valueType}"));
+
+			var result = genMethod.Invoke(classObj, parameters);
+
+			return result;
+		}
+
+		public static System.TypeCode TypeCode(this DbColumnType type)
+		{
+			switch (type)
+			{
+				case DbColumnType.Byte: return System.TypeCode.Byte;
+				case DbColumnType.Char: return System.TypeCode.Char;
+				case DbColumnType.String: return System.TypeCode.String;
+				case DbColumnType.Int16: return System.TypeCode.Int16;
+				case DbColumnType.Int32: return System.TypeCode.Int32;
+				case DbColumnType.Int64: return System.TypeCode.Int64;
+				case DbColumnType.Single: return System.TypeCode.Single;
+				case DbColumnType.Double: return System.TypeCode.Double;
+				case DbColumnType.Decimal: return System.TypeCode.Decimal;
+				case DbColumnType.Bool: return System.TypeCode.Boolean;
+
+				default:
+					return System.TypeCode.DBNull;
+			}
 		}
 
 		/// <summary>
@@ -61,11 +128,11 @@ namespace CsvDb
 							other == DbColumnType.Int16 ||
 							other == DbColumnType.Int32 ||
 							other == DbColumnType.Int64) ? DbColumnType.Int64 : DbColumnType.None;
-				case DbColumnType.Float:
+				case DbColumnType.Single:
 				case DbColumnType.Double:
 				case DbColumnType.Decimal:
 					//cast to decimal if different
-					return (other == DbColumnType.Float ||
+					return (other == DbColumnType.Single ||
 						other == DbColumnType.Double ||
 						other == DbColumnType.Decimal) ? DbColumnType.Decimal : DbColumnType.None;
 			}
@@ -82,6 +149,30 @@ namespace CsvDb
 		public static bool CanCompareTo(this DbColumnType type, DbColumnType other)
 		{
 			return type.Normalize(other) != DbColumnType.None;
+		}
+
+		public static IEnumerable<Column> GetColumns(this ExpressionItem root)
+		{
+			switch (root.ExpressionType)
+			{
+				case ExpressionItemType.Operator:
+					var oper = root as ExpressionOperator;
+					if (oper != null)
+					{
+						foreach (var col in GetColumns(oper.Left).Concat(GetColumns(oper.Right)))
+						{
+							yield return col;
+						}
+					}
+					break;
+				case ExpressionItemType.Operand:
+					var column = root as ColumnOperand;
+					if (column != null)
+					{
+						yield return column.Column;
+					}
+					break;
+			}
 		}
 
 		/// <summary>
@@ -183,15 +274,19 @@ namespace CsvDb
 		/// <returns></returns>
 		public static DbColumnType ToCast(this TokenType item)
 		{
-			var itemValue = (int)item;
-			//base 
-			var tokenStartValue = (int)TokenType.Byte;
-			//max 
-			var tokenEndValue = (int)TokenType.Int64;
-
-			return (itemValue >= tokenStartValue && itemValue <= tokenEndValue) ?
-				(DbColumnType)(itemValue - tokenStartValue + 1) :
+			return (Enum.TryParse<DbColumnType>(item.ToString(), out DbColumnType result)) ?
+				result :
 				DbColumnType.None;
+
+			//var itemValue = (int)item;
+			////base 
+			//var tokenStartValue = (int)TokenType.Byte;
+			////max 
+			//var tokenEndValue = (int)TokenType.Int64;
+
+			//return (itemValue >= tokenStartValue && itemValue <= tokenEndValue) ?
+			//	(DbColumnType)(itemValue - tokenStartValue + 1) :
+			//	DbColumnType.None;
 		}
 
 
@@ -257,7 +352,7 @@ namespace CsvDb
 				case DbColumnType.Int64:
 					//
 					return reader.ReadInt64();
-				case DbColumnType.Float:
+				case DbColumnType.Single:
 					//
 					return reader.ReadSingle();
 				case DbColumnType.Double:
@@ -301,7 +396,7 @@ namespace CsvDb
 					var valueInt64 = Convert.ToInt64(key);
 					writer.Write(valueInt64);
 					break;
-				case nameof(DbColumnType.Float):
+				case nameof(DbColumnType.Single):
 					var valueFloat = Convert.ToSingle(key);
 					writer.Write(valueFloat);
 					break;

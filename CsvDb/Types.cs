@@ -16,10 +16,10 @@ namespace CsvDb
 		String = 0b00010000, // 16
 		Double = 0b00100000, // 32
 		Char = 0b01000000,   // 64
-		Float = 0b10000000,  // 128
+		Single = 0b10000000,  // 128
 		Decimal = 0b100000000,  // 256
 		Int64 = 0b1000000000,  // 512
-													 //Single = 0b10000000000,  // 1024
+		Bool = 0b10000000000,  // 1024
 	}
 
 	/// <summary>
@@ -142,7 +142,10 @@ namespace CsvDb
 		/// any number
 		/// </summary>
 		Number,
+		Column,
+		Assign,
 		//comparison operators  = <> > >= < <= 
+		//do not change or update Utils.IsComparison
 		Equal,
 		NotEqual,
 		Greater,

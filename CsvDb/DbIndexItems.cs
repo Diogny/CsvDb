@@ -24,8 +24,6 @@ namespace CsvDb
 
 		public string PathToItems { get; }
 
-		//implement a cache of pages
-
 		io.BinaryReader reader = null;
 
 		public IEnumerable<MetaItemsPage<T>> Pages { get { return Hash.Values; } }
@@ -146,35 +144,35 @@ namespace CsvDb
 		/// <param name="key">key to compare</param>
 		/// <param name="oper">comparison operator</param>
 		/// <returns></returns>
-		public IEnumerable<int> FindByOper(int offset, T key, TokenType oper)
+		public IEnumerable<KeyValuePair<T, List<int>>> FindByOper(int offset, T key, TokenType oper)
 		{
-			MetaItemsPage<T> page = this[offset];
+			MetaItemsPage<T> page = this[offset]; 
 			if (page == null)
 			{
 				yield break;
 			}
 			else
 			{
-				IEnumerable<int> collection = Enumerable.Empty<int>();
+				var collection = Enumerable.Empty<KeyValuePair<T, List<int>>>();
 				switch (oper)
 				{
 					case TokenType.Equal:
-						collection = page.Items.Where(i => i.Key.Equals(key)).SelectMany(i => i.Value);
+						collection = page.Items.Where(i => i.Key.Equals(key));
 						break;
 					case TokenType.NotEqual:
-						collection = page.Items.Where(i => i.Key.CompareTo(key) != 0).SelectMany(i => i.Value);
+						collection = page.Items.Where(i => i.Key.CompareTo(key) != 0);
 						break;
 					case TokenType.Less:
-						collection = page.Items.Where(i => i.Key.CompareTo(key) < 0).SelectMany(i => i.Value);
+						collection = page.Items.Where(i => i.Key.CompareTo(key) < 0);
 						break;
 					case TokenType.LessOrEqual:
-						collection = page.Items.Where(i => i.Key.CompareTo(key) <= 0).SelectMany(i => i.Value);
+						collection = page.Items.Where(i => i.Key.CompareTo(key) <= 0);
 						break;
 					case TokenType.Greater:
-						collection = page.Items.Where(i => i.Key.CompareTo(key) > 0).SelectMany(i => i.Value);
+						collection = page.Items.Where(i => i.Key.CompareTo(key) > 0);
 						break;
 					case TokenType.GreaterOrEqual:
-						collection = page.Items.Where(i => i.Key.CompareTo(key) >= 0).SelectMany(i => i.Value);
+						collection = page.Items.Where(i => i.Key.CompareTo(key) >= 0);
 						break;
 					default:
 						throw new ArgumentException($"invalid operator: {oper}");
@@ -185,6 +183,7 @@ namespace CsvDb
 				}
 			}
 		}
+
 
 		public IEnumerable<int> All(int offset)
 		{
@@ -283,7 +282,7 @@ namespace CsvDb
 								list.Add(pair);
 							}
 						}
-						
+
 						//values
 						if (UniqueKeyValue)
 						{

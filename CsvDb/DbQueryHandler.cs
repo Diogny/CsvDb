@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using io = System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace CsvDb
 {
@@ -15,24 +15,29 @@ namespace CsvDb
 		/// <summary>
 		/// database
 		/// </summary>
-		public CsvDb Database { get; private set; }
+		public CsvDb Database { get; }
 
 		/// <summary>
 		/// parsed sql query
 		/// </summary>
-		public DbQuery Query { get; protected set; }
-
-		/// <summary>
-		/// contains a collection of unique compiled columns of the sql query
-		/// </summary>
-		public Dictionary<string, DbColumnHandler> ColumnHandlers { get; }
+		public DbQuery Query { get; }
 
 		/// <summary>
 		/// database table data reader collection
 		/// </summary>
 		public List<DbTableDataReader> TableReaders { get; }
 
-		List<IndexTransf> IndexTranslators;
+		/// <summary>
+		/// row/record count
+		/// </summary>
+		public int RowCount { get; private set; }
+
+		internal SelectColumnHandler SelectIndexColumns;
+
+		/// <summary>
+		/// returns the real SELECT row column count
+		/// </summary>
+		public int ColumnCount => SelectIndexColumns.Count;
 
 		/// <summary>
 		/// 
@@ -47,39 +52,20 @@ namespace CsvDb
 				throw new ArgumentException("Cannot create query executer handler");
 			}
 
-			ColumnHandlers = new Dictionary<string, DbColumnHandler>();
-			TableReaders = new List<DbTableDataReader>();
+			//set index transformers to table columns
+			SelectIndexColumns = new SelectColumnHandler(query.Select.Columns);
 
-			//only where expression table.columns matters here
-			foreach (var column in query.Where.Columns)
-			{
-				var hash = $"{column.Meta.TableName}.{column.Name}";
-				if (!ColumnHandlers.ContainsKey(hash))
-				{
-					ColumnHandlers.Add(hash, new DbColumnHandler(column, db));
-					//if new column, then check for new table here too
-					if (!TableReaders.Any(t => t.Table.Name == column.Meta.TableName))
-					{
-						TableReaders.Add(DbTableDataReader.Create(db, column.Meta.TableName));
-					}
-				}
-			}
+			//WhereColumns = new Dictionary<string, DbColumn>();
+			TableReaders = new List<DbTableDataReader>();
 
 			//get table data reader from FROM tables too, in case WHERE has no column
 			foreach (var table in query.From)
 			{
 				if (!TableReaders.Any(t => t.Table.Name == table.Name))
 				{
-					TableReaders.Add(DbTableDataReader.Create(db, table.Name));
+					TableReaders.Add(DbTableDataReader.Create(db, table.Name, this));
 				}
 			}
-
-			//set index transformers to table columns
-			IndexTranslators = query.Columns.Columns.Select(col => new IndexTransf()
-			{
-				index = col.Meta.Index,
-				column = col
-			}).ToList();
 
 		}
 
@@ -91,357 +77,286 @@ namespace CsvDb
 			}
 			TableReaders.Clear();
 		}
-	}
-
-	struct IndexTransf
-	{
-		public DbQuery.Column column;
-
-		public int index;
-
-		public override string ToString() => $"[{index} {column}";
-	}
-
-	public class DbColumnHandler : IEquatable<DbColumnHandler>
-	{
-		/// <summary>
-		/// the text query column
-		/// </summary>
-		public DbQuery.Column QueryColumn { get; }
 
 		/// <summary>
-		/// real database column
+		/// execute query to get result rows
 		/// </summary>
-		public DbColumn Column { get; }
-
-		public Type Type { get; }
-
-		/// <summary>
-		/// holds the current row/record for expression comparison
-		/// </summary>
-		public object[] Data { get; internal set; }
-
-		/// <summary>
-		/// true if it has data
-		/// </summary>
-		public bool HasData => Data != null;
-
-		public DbColumnHandler(DbQuery.Column column, CsvDb db)
+		/// <returns></returns>
+		public IEnumerable<object[]> Rows()
 		{
-			if ((QueryColumn = column) == null ||
-				db == null ||
-				(Column = db.Index(column.Meta.TableName, column.Name)) == null ||
-				(Type = Type.GetType($"System.{Column.Type}")) == null)
+			//only for one table for now
+			var table = Query.Tables.First();
+			var handler = TableReaders.FirstOrDefault(r => r.Table.Name == table.Name);
+
+			var collection = Enumerable.Empty<int>();
+
+			if (!Query.Where.Defined)
 			{
-				throw new ArgumentException("compiled column null, empty or no enough data to compile table column");
+				//no WHERE, ALL table
+				//return the full table rows
+
+				//later mix all tables according to FROM tables and SELECT rows
+
+
+
+				var method = handler.GetType().GetMethod(nameof(DbTableDataReader.Rows),
+					BindingFlags.Instance | BindingFlags.NonPublic);
+
+				MethodInfo genMethod = method.MakeGenericMethod(handler.Table.Type);
+
+				collection = (IEnumerable<int>)genMethod.Invoke(handler, new object[] { });
 			}
-			//redundant
-			Data = null;
+			else
+			{
+				//filtered table
+				collection = ExecuteWhere(Query.Where.Root as DbQuery.ExpressionOperator);
+			}
+
+			//TOP
+			if (Query.Select.Top > 0)
+			{
+				collection = collection.Take(Query.Select.Top);
+			}
+
+			//process collection of offsets
+			if (Query.Select.IsFunction)
+			{
+				RowCount = 1;
+				//query functions contains only one column in SELECT
+				var column = SelectIndexColumns.Columns.First();
+				var valueType = column.Type;
+
+				if (Query.Select.Function == TokenType.COUNT)
+				{
+					//Enumerable.Count() returns an int
+					yield return new object[] { collection.Count() };
+				}
+				else
+				{
+					if (!valueType.IsNumeric())
+					{
+						throw new ArgumentException($"function {Query.Select.Function} column type must be numeric");
+					}
+					MethodInfo method =
+					this.GetType().GetMethod(nameof(ExecuteFunction), BindingFlags.Instance | BindingFlags.NonPublic);
+
+					MethodInfo genMethod = method.MakeGenericMethod(Type.GetType($"System.{valueType}"));
+
+					var result = genMethod.Invoke(this, new object[] { handler, valueType, collection });
+
+					yield return new object[] { result };
+				}
+			}
+			else
+			{
+				//output all rows filtered or not
+				RowCount = 0;
+				foreach (var offset in collection)
+				{
+					RowCount++;
+					yield return handler.ReadRecord(offset);
+				}
+			}
 		}
 
-		/// <summary>
-		/// used for fast retrieving
-		/// </summary>
-		public string Hash => $"{Column.Table.Name}.{Column.Name}";
-
-		public override int GetHashCode() => Hash.GetHashCode();
-
-		public override bool Equals(object obj)
+		internal T ExecuteFunction<T>(DbTableDataReader reader,
+			DbColumnType valueType,
+			IEnumerable<int> collection)
 		{
-			return Equals(obj as DbColumnHandler);
+			dynamic oneColumnCollection = collection;
+
+			//apply quantifiers here
+			if (Query.Select.Function != TokenType.COUNT)
+			{
+				//get real values
+
+				//not transformed, need to
+				var recordValues = new List<object[]>();
+				foreach (var offset in collection)
+				{
+					recordValues.Add(reader.ReadRecord(offset));
+				}
+				//read records return only one column
+				oneColumnCollection = recordValues.Select(cols => cols[0]).Cast<T>();
+			}
+
+			MethodInfo method =
+				this.GetType().GetMethod(nameof(ApplyFunction), BindingFlags.Instance | BindingFlags.NonPublic);
+
+			MethodInfo genMethod = method.MakeGenericMethod(Type.GetType($"System.{valueType}"));
+
+			var result = genMethod.Invoke(this, new object[] { oneColumnCollection, Query.Select.Function });
+
+			return (T)result;
 		}
 
-		public bool Equals(DbColumnHandler other)
+		//		Expression<Func<IEnumerable<T>, T>> CreateLambda<T>(string function)
+		//		{
+		//			var source = Expression.Parameter(
+		//					typeof(IEnumerable<T>), "source");
+
+		//			var p = Expression.Parameter(typeof(T), "p");
+
+		//			MethodCallExpression call = Expression.Call(
+		//						typeof(Enumerable), function, new Type[] { typeof(T) }, source);
+
+		//			return Expression.Lambda<Func<IEnumerable<T>, T>>(call, source);
+		//		}
+
+		internal T ApplyFunction<T>(IEnumerable<T> valueCollection, TokenType function)
 		{
-			return other != null && Column.Table.Name == other.Column.Table.Name && Column.Name == other.Column.Name;
+			switch (function)
+			{
+				//case TokenType.COUNT:
+				//	var count = valueCollection.Count();
+				//	return (T)Convert.ChangeType(count, typeof(T));
+				case TokenType.AVG:
+					var avg = valueCollection.Average(x => (dynamic)x);
+					return (T)Convert.ChangeType(avg, typeof(T));
+				case TokenType.SUM:
+					var sum = valueCollection.Sum(x => (dynamic)x);
+					return (T)Convert.ChangeType(sum, typeof(T));
+				default:
+					throw new ArgumentException($"invalid quantifier {function} in query");
+			}
+			//var lambda = CreateLambda<T>(functionName);
+			//var result = lambda.Compile().Invoke(valueCollection);
+
+			//return result;
 		}
 
-		public override string ToString() => Hash;
+		IEnumerable<int> ExecuteWhere(DbQuery.ExpressionOperator root)
+		{
+			var result = Enumerable.Empty<int>();
 
+			if (root.Operator.IsComparison())
+			{
+				//call DbQueryExpressionExecuter
+				//try first with Left
+				DbQuery.ColumnOperand columnOperand = root.Left as DbQuery.ColumnOperand;
+				DbQuery.ConstantOperand constantOperand = null;
+				if (columnOperand == null)
+				{
+					//try now with Right
+					columnOperand = root.Right as DbQuery.ColumnOperand;
+					if (columnOperand == null)
+					{
+						throw new ArgumentException($"there is no column operand on: {root}");
+					}
+					constantOperand = root.Left as DbQuery.ConstantOperand;
+				}
+				else
+				{
+					constantOperand = root.Right as DbQuery.ConstantOperand;
+				}
+
+				var type = System.Type.GetType($"System.{columnOperand.Type}");
+
+				MethodInfo method =
+					this.GetType().GetMethod(nameof(DbQueryHandler.ExecuteColumnExpression),
+					BindingFlags.Instance | BindingFlags.NonPublic);
+
+				MethodInfo genMethod = method.MakeGenericMethod(type);
+
+				//should record which table gave this result of offset rows
+
+				result = (IEnumerable<int>)genMethod.Invoke(this, new object[] { this, root });
+			}
+			else
+			{
+				//should be a logical operator
+				var left = ExecuteWhere(root.Left as DbQuery.ExpressionOperator);
+				var right = ExecuteWhere(root.Right as DbQuery.ExpressionOperator);
+				//
+				switch (root.Operator)
+				{
+					//this happens if left and right share the same table
+					// if not it's a multi-table
+
+					case TokenType.AND:
+						result = left.Intersect(right);
+						break;
+					case TokenType.OR:
+						result = left.Union(right);
+						break;
+				}
+			}
+			return result;
+		}
+
+		IEnumerable<int> ExecuteColumnExpression<T>(DbQueryHandler handler,
+			DbQuery.ComparisonOperator expr)
+			where T : IComparable<T>
+		{
+			var executer = new DbQueryExpressionExecuter<T>(handler, expr);
+
+			return executer.Execute().SelectMany(pair => pair.Value);
+		}
 
 	}
 
 	/// <summary>
-	/// Reads rows from a database table
+	/// Implements a SELECT column
 	/// </summary>
-	public abstract class DbTableDataReader : IDisposable
+	public class SelectColumn
 	{
-		public abstract void Dispose();
-
-		public DbTable Table { get; }
-
-		internal string Path = String.Empty;
-
-		internal abstract object[] ReadRecord(int offset);
+		/// <summary>
+		/// table column
+		/// </summary>
+		public DbQuery.Column Column { get; }
 
 		/// <summary>
-		/// column types
+		/// Column index inside table
 		/// </summary>
-		public DbColumnType[] ColumnTypes { get; private set; }
+		public int ColumnIndex { get; }
 
-		internal DbTableDataReader(DbTable table)
+		/// <summary>
+		/// Real output index
+		/// </summary>
+		public int Index { get; }
+
+		/// <summary>
+		/// type of column
+		/// </summary>
+		public DbColumnType Type { get; }
+
+		public SelectColumn(DbQuery.Column column, int index)
 		{
-			if ((Table = table) == null)
-			{
-				throw new ArgumentException("cannot read table data from undefined table");
-			}
-			ColumnTypes = Table.Columns
-				.Select(c => Enum.Parse<DbColumnType>(c.Type)).ToArray();
-
-			//default to CSV
-			var extension = table.Database.IsBinary ? CsvDb.SchemaTableDataExtension : CsvDb.SchemaTableDefaultExtension;
-
-			//path to table data file
-			Path = io.Path.Combine(table.Database.BinaryPath, $"{Table.Name}.{extension}");
+			Column = column;
+			ColumnIndex = column.Meta.Index;
+			Type = Enum.Parse<DbColumnType>(column.Meta.Type);
+			Index = index;
 		}
 
-		internal static DbTableDataReader Create(CsvDb db, string tableName)
-		{
-			if (db == null)
-			{
-				return null;
-			}
-			if ((db.Flags & DbSchemaConfigType.Binary) != 0)
-			{
-				return new DbTableBinDataReader(db.Table(tableName));
-			}
-			else
-			{
-				return new DbTableCsvDataReader(db.Table(tableName));
-			}
-		}
-
+		public override string ToString() => $"[{ColumnIndex} {Column}";
 	}
 
-	public class DbTableBinDataReader : DbTableDataReader
+	/// <summary>
+	/// Implements a query SELECT column handler
+	/// </summary>
+	public class SelectColumnHandler
 	{
-		io.BinaryReader reader = null;
+		Dictionary<string, SelectColumn> _columns;
 
-		public override void Dispose()
+		/// <summary>
+		/// Gets the columns in the SELECT clause
+		/// </summary>
+		public IEnumerable<SelectColumn> Columns => _columns.Values;
+
+		public int Count => _columns.Count;
+
+		/// <summary>
+		/// indexer for SELECT column
+		/// </summary>
+		/// <param name="hash">column hash: table.column</param>
+		/// <returns></returns>
+		public SelectColumn this[string hash] => _columns.TryGetValue(hash, out SelectColumn col) ? col : null;
+
+		public SelectColumnHandler(IEnumerable<DbQuery.Column> columnCollection)
 		{
-			if (reader != null)
-			{
-				reader.Dispose();
-				reader = null;
-			}
-		}
-
-		public UInt64 Mask { get; private set; }
-
-		public DbTableBinDataReader(DbTable table)
-			: base(table)
-		{
-			//open reader
-			reader = new io.BinaryReader(io.File.OpenRead(Path));
-		}
-
-		internal override object[] ReadRecord(int offset)
-		{
-			var mainMask = Table.RowMask;
-			var bytes = Table.RowMaskLength;
-
-			//point to record offset
-			reader.BaseStream.Position = offset;
-
-			//read record 
-			var buffer = new byte[sizeof(UInt64)];
-			reader.Read(buffer, 0, bytes);
-			var recordMask = BitConverter.ToUInt64(buffer, 0);
-			//copy main
-			var bitMask = mainMask;
-			var columnCount = Table.Columns.Count;
-
-			var dbRecord = new object[columnCount];
-
-			for (var i = 0; i < columnCount; i++)
-			{
-				var colType = ColumnTypes[i];
-
-				if ((recordMask & bitMask) == 0)
-				{
-					//not null
-					switch (colType)
-					{
-						case DbColumnType.Char:
-							dbRecord[i] = reader.ReadChar();
-							break;
-						case DbColumnType.Byte:
-							dbRecord[i] = reader.ReadByte();
-							break;
-						case DbColumnType.Int16:
-							dbRecord[i] = reader.ReadInt16();
-							break;
-						case DbColumnType.Int32:
-							dbRecord[i] = reader.ReadInt32();
-							break;
-						case DbColumnType.Int64:
-							dbRecord[i] = reader.ReadInt64();
-							break;
-						case DbColumnType.Float:
-							dbRecord[i] = reader.ReadSingle();
-							break;
-						case DbColumnType.Double:
-							dbRecord[i] = reader.ReadDouble();
-							break;
-						case DbColumnType.Decimal:
-							dbRecord[i] = reader.ReadDecimal();
-							break;
-						case DbColumnType.String:
-							dbRecord[i] = reader.ReadString();
-							break;
-					}
-				}
-				bitMask >>= 1;
-			}
-			return dbRecord;
-		}
-
-	}
-
-	public class DbTableCsvDataReader : DbTableDataReader
-	{
-
-		io.StreamReader reader = null;
-
-		public override void Dispose()
-		{
-			if (reader != null)
-			{
-				reader.Dispose();
-				reader = null;
-			}
-		}
-
-		public DbTableCsvDataReader(DbTable table)
-			: base(table)
-		{
-			//open reader
-			reader = new io.StreamReader(Path);
-		}
-
-		internal override object[] ReadRecord(int offset)
-		{
-			if (reader.EndOfStream)
-			{
-				return null;
-			}
-			var count = Table.Columns.Count;
-			var dbRecord = new string[count];
-			var columnIndex = 0;
-
-			sb.Length = 0;
-			char ch = (char)0;
-
-			//fill buffer initially
-			FillBuffer();
-
-			while (columnIndex < count)
-			{
-				ch = ReadChar();
-				//add when comma, (13) \r (10) \n
-				switch (ch)
-				{
-					case ',':
-						if (sb.Length > 0)
-						{
-							//store column
-							dbRecord[columnIndex] = sb.ToString();
-							sb.Length = 0;
-						}
-						//point to next column
-						columnIndex++;
-						break;
-					case '\r':
-					case '\n':
-						if (sb.Length > 0)
-						{
-							//store column
-							dbRecord[columnIndex] = sb.ToString();
-							sb.Length = 0;
-						}
-						//signal end of record
-						columnIndex = count;
-						break;
-					case '"':
-						bool endOfString = false;
-						while (!endOfString)
-						{
-							//read as many as possible
-							while ((ch = ReadChar()) != '"')
-							{
-								sb.Append(ch);
-							}
-							//we got a "
-							if (PeekChar() == '"')
-							{
-								//it's ""
-								charIndex++;
-								sb.Append("\"\"");
-							}
-							else
-							{
-								//consume last "
-								//ch = ReadChar();
-								//end of string reached
-								endOfString = true;
-							}
-						}
-						//leave string in sb until next comma or \r \n
-						//this way spaces after "string with spaces" will be discarded
-						break;
-					default:
-						if ((int)ch <= 32)
-						{
-							//do nothing, discard spaces before comma, "strings", ...
-						}
-						else
-						{
-							//read while > ' '
-							//single string word or symbol, number, etc
-							do
-							{
-								sb.Append(ch);
-							} while ((int)(ch = ReadChar()) > 32 && (ch != ','));
-							//read again the ch
-							charIndex--;
-							//leave string in sb
-						}
-						break;
-				}
-			}
-
-			//return record
-			return dbRecord;
-		}
-
-		//char buffer
-		char[] buffer = new char[1024];
-		int charIndex = 0;
-		StringBuilder sb = new StringBuilder();
-
-		void FillBuffer()
-		{
-			reader.Read(buffer, 0, buffer.Length);
-			charIndex = 0;
-		}
-
-		char ReadChar()
-		{
-			if (charIndex >= buffer.Length)
-			{
-				FillBuffer();
-			}
-			return buffer[charIndex++];
-		}
-
-		char PeekChar()
-		{
-			if (charIndex >= buffer.Length)
-			{
-				FillBuffer();
-			}
-			return buffer[charIndex];
+			_columns = columnCollection
+				.Select((col, ndx) => new SelectColumn(col, ndx))
+				.ToDictionary(p => p.Column.Hash);
 		}
 	}
-
 }

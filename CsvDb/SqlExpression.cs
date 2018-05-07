@@ -1,76 +1,170 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Text;
 
 namespace CsvDb
 {
 	public partial class DbQuery
 	{
 
-		/// <summary>
-		/// SQL Query WHERE expression enumerate
-		/// </summary>
-		public enum ExpressionEnum
+		public enum ExpressionItemType
 		{
-			Expression,
-			Logical
+			Operand,
+			Operator,
+			Casting
 		}
 
-		/// <summary>
-		/// SQL Query WHERE abstract expression class
-		/// </summary>
-		public abstract class ExpressionBase
+		public interface IValuesOf
 		{
-			/// <summary>
-			/// gets the expression type
-			/// </summary>
-			public ExpressionEnum Type { get; }
+			object[] CurrentRow(string table);
+		}
+
+		public abstract class ExpressionItem
+		{
+			public ExpressionItemType ExpressionType { get; }
 
 			/// <summary>
-			/// creates an expression base
+			/// this's used when there is no indexed column, so we have to get them from table
 			/// </summary>
-			/// <param name="type">expression type</param>
-			internal ExpressionBase(ExpressionEnum type)
+			/// <param name="valuesOf">function to get current row values</param>
+			/// <returns></returns>
+			public abstract ExpressionValue Evaluate(IValuesOf valuesOf);
+
+			internal ExpressionItem(ExpressionItemType type)
+			{
+				ExpressionType = type;
+			}
+
+			public override string ToString() => ExpressionType.ToString();
+		}
+
+		public class ExpressionValue
+		{
+			public DbColumnType Type { get; }
+
+			public object Value { get; }
+
+			public T ValueAs<T>()
+			{
+				return (T)Convert.ChangeType(Value, Type.TypeCode());
+			}
+
+			public bool CompareTo(TokenType oper, ExpressionValue other)
+			{
+				if (other == null)
+				{
+					throw new ArgumentException($"cannot compare: {Type} to null");
+				}
+				var commonType = Type.Normalize(other.Type);
+				if (commonType == DbColumnType.None)
+				{
+					throw new ArgumentException($"type: {Type} cannot compare to: {other.Type}");
+				}
+				switch (oper)
+				{
+					case TokenType.AND:
+						return ValueAs<bool>() && other.ValueAs<bool>();
+					case TokenType.OR:
+						return ValueAs<bool>() || other.ValueAs<bool>();
+					case TokenType.Equal:
+					case TokenType.NotEqual:
+					case TokenType.Greater:
+					case TokenType.GreaterOrEqual:
+					case TokenType.Less:
+					case TokenType.LessOrEqual:
+						//generic method
+						MethodInfo method =
+							this.GetType().GetMethod(nameof(CompareTo), BindingFlags.Instance | BindingFlags.NonPublic);
+						//make generic
+						MethodInfo genMethod = method.MakeGenericMethod(System.Type.GetType($"System.{commonType}"));
+						//invoke
+						var result = (bool)genMethod.Invoke(this, new object[] { oper, other });
+						//
+						return result;
+				}
+				throw new NotImplementedException($"operator: {oper} not implemented yet");
+			}
+
+			/// <summary>
+			/// Compare two values
+			/// </summary>
+			/// <typeparam name="T"></typeparam>
+			/// <param name="oper"></param>
+			/// <param name="other"></param>
+			/// <returns></returns>
+			internal bool CompareTo<T>(TokenType oper, ExpressionValue other)
+				where T : IComparable<T>
+			{
+				var thisValue = ValueAs<T>();
+				var otherValue = other.ValueAs<T>();
+				switch (oper)
+				{
+					case TokenType.Equal:
+						return thisValue.CompareTo(otherValue) == 0;
+					case TokenType.NotEqual:
+						return thisValue.CompareTo(otherValue) != 0;
+					case TokenType.Greater:
+						return thisValue.CompareTo(otherValue) > 0;
+					case TokenType.GreaterOrEqual:
+						return thisValue.CompareTo(otherValue) >= 0;
+					case TokenType.Less:
+						return thisValue.CompareTo(otherValue) < 0;
+					case TokenType.LessOrEqual:
+						return thisValue.CompareTo(otherValue) <= 0;
+					default:
+						return false;
+				}
+			}
+
+			public ExpressionValue(DbColumnType type, object value)
 			{
 				Type = type;
+				Value = value;
 			}
+
+			public override string ToString() => $"({Type}){Value}";
 		}
+
+		public interface IBinaryTree<T>
+		{
+			T Left { get; }
+
+			IBinaryTree<T> Data { get; }
+
+			T Right { get; }
+		}
+
+		#region Operators
 
 		/// <summary>
 		/// SQL Query WHERE expression class
 		/// </summary>
-		public class Expression : ExpressionBase
+		public abstract class ExpressionOperator : ExpressionItem//, IBinaryTree<ExpressionItem>
 		{
 			/// <summary>
 			/// Left operand
 			/// </summary>
-			public Operand Left { get; }
+			public ExpressionItem Left { get; }
 
 			/// <summary>
 			/// Expression operator
 			/// </summary>
-			public Operator Operator { get; }
+			public TokenType Operator { get; }
+
+			public abstract String OperatorText { get; }
 
 			/// <summary>
 			/// Right operand
 			/// </summary>
-			public Operand Right { get; }
+			public ExpressionItem Right { get; }
 
-			/// <summary>
-			/// gets the database table column in the expression
-			/// </summary>
-			public Operand Column
-			{
-				get
-				{
-					return Left.GroupType == OperandType.Column ?
-						Left :
-						Right;
-				}
-			}
+			//public IBinaryTree<ExpressionItem> Data => this;
 
 			/// <summary>
 			/// returns true if left and right operands are table columns
 			/// </summary>
-			public bool TwoColumns => Left.GroupType == OperandType.Column && Right.GroupType == OperandType.Column;
+			//public bool TwoColumns => Left.GroupType == OperandType.Column && Right.GroupType == OperandType.Column;
 
 			/// <summary>
 			/// creates a WHERE expression
@@ -78,8 +172,8 @@ namespace CsvDb
 			/// <param name="left">left expression</param>
 			/// <param name="oper">operator</param>
 			/// <param name="right">right expression</param>
-			internal Expression(Operand left, TokenType oper, Operand right)
-				: base(ExpressionEnum.Expression)
+			internal ExpressionOperator(ExpressionItem left, TokenType oper, ExpressionItem right)
+				: base(ExpressionItemType.Operator)
 			{
 				if ((Left = left) == null)
 				{
@@ -89,54 +183,101 @@ namespace CsvDb
 				{
 					throw new ArgumentException($"invalid right operand in expression: {right}");
 				}
-				Operator = new Operator(oper);
+				Operator = oper;
 			}
 
-			public override string ToString() => $"{Left} {Operator} {Right}";
+			public override string ToString() => $"{Left} {OperatorText} {Right}";
+
+			internal static ExpressionOperator Create(ExpressionItem left, TokenType oper, ExpressionItem right)
+			{
+				if (oper == TokenType.AND || oper == TokenType.OR)
+				{
+					return new LogicalOperator(left, oper, right);
+				}
+				else if (oper.IsComparison())
+				{
+					return new ComparisonOperator(left, oper, right);
+				}
+				return null;
+			}
+
+			public override ExpressionValue Evaluate(IValuesOf valuesOf)
+			{
+				var left = Left.Evaluate(valuesOf);
+
+				var right = Right.Evaluate(valuesOf);
+
+				return new ExpressionValue(DbColumnType.Bool, left.CompareTo(Operator, right));
+			}
 		}
+
 
 		/// <summary>
 		/// AND, OR logical expression
 		/// </summary>
-		public class LogicalExpression : ExpressionBase
+		public class LogicalOperator : ExpressionOperator
 		{
-			/// <summary>
-			/// logical type
-			/// </summary>
-			public TokenType Logical { get; }
+
+			public override string OperatorText => Operator.ToString();
 
 			/// <summary>
 			/// creates a logical expression AND, OR
 			/// </summary>
 			/// <param name="logical"></param>
-			internal LogicalExpression(TokenType logical)
-				: base(ExpressionEnum.Logical)
+			internal LogicalOperator(ExpressionItem left, TokenType logical, ExpressionItem right)
+				: base(left, logical, right)
 			{
-				if (!((Logical = logical) == TokenType.AND || Logical == TokenType.OR))
+				if (!(logical == TokenType.AND || logical == TokenType.OR))
 				{
 					throw new ArgumentException($"Invalid logical operator: {logical}");
 				}
 			}
 
-			public override string ToString() => $"{Logical}";
-
 		}
+
 
 		/// <summary>
 		/// SQL Query WHERE expression operator class
 		/// </summary>
-		public class Operator
+		public class ComparisonOperator : ExpressionOperator
 		{
 			/// <summary>
 			/// operator type
 			/// </summary>
 			public TokenType Token { get; }
 
+			public override string OperatorText
+			{
+				get
+				{
+					switch (Token)
+					{
+						case TokenType.Assign:
+							return "=";
+						case TokenType.Equal:
+							return "==";
+						case TokenType.NotEqual:
+							return "<>";
+						case TokenType.Greater:
+							return ">";
+						case TokenType.GreaterOrEqual:
+							return ">=";
+						case TokenType.Less:
+							return "<";
+						case TokenType.LessOrEqual:
+							return "<=";
+						default:
+							return null;
+					}
+				}
+			}
+
 			/// <summary>
 			/// creates an expression operator
 			/// </summary>
 			/// <param name="oper">operator type</param>
-			public Operator(TokenType oper)
+			public ComparisonOperator(ExpressionItem left, TokenType oper, ExpressionItem right)
+				: base(left, oper, right)
 			{
 				switch (oper)
 				{
@@ -153,32 +294,16 @@ namespace CsvDb
 				}
 			}
 
-			public override string ToString()
-			{
-				switch (Token)
-				{
-					case TokenType.Equal:
-						return "=";
-					case TokenType.NotEqual:
-						return "<>";
-					case TokenType.Greater:
-						return ">";
-					case TokenType.GreaterOrEqual:
-						return ">=";
-					case TokenType.Less:
-						return "<";
-					case TokenType.LessOrEqual:
-						return "<=";
-					default:
-						return null;
-				}
-			}
 		}
+
+		#endregion
+
+		#region Operands
 
 		/// <summary>
 		/// SQL Query WHERE abstract expression operand class
 		/// </summary>
-		public abstract class Operand
+		public abstract class ExpressionOperand : ExpressionItem
 		{
 			//column name or Identifier, [table identifier].column name, 
 			//constant: String, Number
@@ -194,11 +319,6 @@ namespace CsvDb
 			public string Text { get; protected internal set; }
 
 			/// <summary>
-			/// Man group type of operand
-			/// </summary>
-			public OperandType GroupType { get; }
-
-			/// <summary>
 			/// Atomic type of operand
 			/// </summary>
 			public abstract DbColumnType Type { get; }
@@ -209,20 +329,13 @@ namespace CsvDb
 			public abstract bool IsColumn { get; }
 
 			/// <summary>
-			/// gets the value of the operand
-			/// </summary>
-			/// <returns></returns>
-			public abstract object Value();
-
-			/// <summary>
 			/// creates an expression operand
 			/// </summary>
-			/// <param name="groupType">main group type</param>
 			/// <param name="text">text</param>
 			/// <param name="cast">cast, None if doesnt apply</param>
-			internal Operand(OperandType groupType, string text, DbColumnType cast = DbColumnType.None)
+			internal ExpressionOperand(string text, DbColumnType cast = DbColumnType.None)
+				: base(ExpressionItemType.Operand)
 			{
-				GroupType = groupType;
 				Cast = cast;
 				Text = text;
 			}
@@ -234,7 +347,7 @@ namespace CsvDb
 		/// <summary>
 		/// represents a expression constant operand
 		/// </summary>
-		public abstract class ConstantOperand : Operand
+		public abstract class ConstantOperand : ExpressionOperand
 		{
 			/// <summary>
 			/// returns false
@@ -247,8 +360,8 @@ namespace CsvDb
 			/// <param name="groupType">main group type</param>
 			/// <param name="text">text</param>
 			/// <param name="cast">cast, None if doesnt apply</param>
-			internal ConstantOperand(OperandType groupType, string text, DbColumnType cast = DbColumnType.None)
-				: base(groupType, text, cast)
+			internal ConstantOperand(string text, DbColumnType cast)
+				: base(text, cast)
 			{ }
 		}
 
@@ -267,11 +380,17 @@ namespace CsvDb
 			/// </summary>
 			/// <param name="text">text</param>
 			/// <param name="cast">cast, None if doesnt apply</param>
-			public StringOperand(string text, DbColumnType cast = DbColumnType.None)
-				: base(OperandType.String, text.UnwrapQuotes(), cast)
+			public StringOperand(string text)
+				: base(text.UnwrapQuotes(), DbColumnType.None)
 			{ }
 
-			public override object Value() => Text;
+			public override ExpressionValue Evaluate(IValuesOf valuesOf)
+			{
+				return new ExpressionValue(DbColumnType.String, Text);
+			}
+
+			public override string ToString() => $"{(Cast != DbColumnType.None ? $"({Cast})" : "")}'{Text}'";
+
 		}
 
 		/// <summary>
@@ -291,22 +410,30 @@ namespace CsvDb
 			/// </summary>
 			/// <param name="text">text</param>
 			/// <param name="cast">cast, None if doesnt apply</param>
-			public NumberOperand(string text, DbColumnType cast = DbColumnType.None)
-				: base(OperandType.Number, text, cast)
+			public NumberOperand(string text, DbColumnType cast)
+				: base(text, cast)
 			{
 				if ((valueType = text.ToNumberType()) == null)
 				{
 					throw new ArgumentException($"Invalid number operand: {text}");
 				}
+				if (cast != DbColumnType.None && !cast.IsNumeric())
+				{
+					throw new ArgumentException($"Invalid numeric cast: {cast}");
+				}
 			}
 
-			public override object Value() => valueType.Item2;
+			public override ExpressionValue Evaluate(IValuesOf valuesOf)
+			{
+				return new ExpressionValue(Type, valueType.Item2);
+			}
+
 		}
 
 		/// <summary>
 		/// SQL Query WHERE abstract expression column operand class
 		/// </summary>
-		public class ColumnOperand : Operand
+		public class ColumnOperand : ExpressionOperand
 		{
 			/// <summary>
 			/// gets the column operand
@@ -329,24 +456,49 @@ namespace CsvDb
 			/// <param name="column">column</param>
 			/// <param name="cast">cast, None if doesnt apply</param>
 			public ColumnOperand(Column column, DbColumnType cast = DbColumnType.None)
-				: base(OperandType.Column, column == null ? String.Empty : column.Identifier(), cast)
+				: base(column == null ? String.Empty : column.Identifier(), cast)
 			{
 				if ((Column = column) == null)
 				{
 					throw new ArgumentException($"Column operand null or empty");
 				}
 				Type = Enum.Parse<DbColumnType>(Column.Meta.Type);
+				if (cast != DbColumnType.None)
+				{
+					if ((Type.IsNumeric() && !cast.IsNumeric()))
+					{
+						throw new ArgumentException($"cast types: {Type} and {cast} doesnot match");
+					}
+				}
 			}
 
-			/// <summary>
-			/// throws an exception, can't evaluate
-			/// </summary>
-			/// <returns></returns>
-			public override object Value()
+			public override ExpressionValue Evaluate(IValuesOf valuesOf)
 			{
-				throw new NotImplementedException("Cannot get value of table column operand");
+				var columnValues = valuesOf.CurrentRow(Column.Meta.TableName);
+
+				return new ExpressionValue(Type, columnValues[Column.Meta.Index]);
+			}
+		}
+
+		#endregion
+
+		public class CastingExpression : ExpressionItem
+		{
+			public DbColumnType Type { get; }
+
+			public CastingExpression(DbColumnType type)
+				: base(ExpressionItemType.Casting)
+			{
+				Type = type;
 			}
 
+			public override ExpressionValue Evaluate(IValuesOf valuesOf)
+			{
+				//if you reach here, there's a big bug 
+				throw new NotImplementedException();
+			}
+
+			public override string ToString() => $"({Type})";
 		}
 
 	}

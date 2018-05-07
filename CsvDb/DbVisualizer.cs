@@ -50,7 +50,9 @@ namespace CsvDb
 			}
 		}
 
-		internal DbRecordReader reader = null;
+		//internal DbRecordReader reader = null;
+
+		internal DbQueryHandler handler = null;
 
 		/// <summary>
 		/// creates a database visualizer, must be disposed to release resources
@@ -71,13 +73,10 @@ namespace CsvDb
 		/// <param name="options">visualize options</param>
 		public DbVisualizer(CsvDb db, DbQuery query, DbVisualize options = DbVisualize.Paged)
 		{
-			reader = DbRecordReader.Create(db, query);
+			//reader = DbRecordReader.Create(db, query);
+			handler = new DbQueryHandler(db, query);
 
 			Options = options;
-
-
-			//for testing only
-			var handler = new DbQueryHandler(db, query);
 		}
 
 		/// <summary>
@@ -85,10 +84,10 @@ namespace CsvDb
 		/// </summary>
 		public void Dispose()
 		{
-			if (reader != null)
+			if (handler != null)
 			{
-				reader.Dispose();
-				reader = null;
+				handler.Dispose();
+				handler = null;
 			}
 		}
 
@@ -97,23 +96,43 @@ namespace CsvDb
 		/// </summary>
 		public void Display()
 		{
-			if (reader == null)
+			if (handler == null)
 			{
 				throw new ArgumentException("database record/row reader is null or undefined");
 			}
 
-			if (reader.Query.Columns.IsFunction)
-			{
-				var row = reader.Rows().ToList();
-				var header = row[0][0].ToString();
-				var valueStr = row[1][0].ToString();
+			var boxed = Paged && (Options & DbVisualize.Framed) != 0;
 
-				Console.WriteLine(header);
-				if (Paged && (Options & DbVisualize.UnderlineHeader) != 0)
+			if (handler.Query.Select.IsFunction)
+			{
+				var row = handler.Rows().ToList();
+				//only one header
+				var header = handler.Query.Select.Header[0];
+
+				var valueObj = row[0][0];
+				var valueStr = valueObj.ToString();
+
+				int width = Math.Max(header.Length, valueStr.Length);
+
+				if (boxed)
 				{
-					Console.WriteLine(new String('─', Math.Max(valueStr.Length, header.Length)));
+					var spacer = new String('─', width + 2);
+					Console.WriteLine($"┌{spacer}┐");
+					Console.WriteLine($"│ {header.PadRight(width)} │");
+					Console.WriteLine($"├{spacer}┤");
+					Console.WriteLine($"│ {valueStr.PadRight(width)} │");
+					Console.WriteLine($"└{spacer}┘");
 				}
-				Console.WriteLine(valueStr);
+				else
+				{
+					Console.WriteLine(header);
+					if (Paged && (Options & DbVisualize.UnderlineHeader) != 0)
+					{
+						Console.WriteLine(new String('─', width));
+					}
+					Console.WriteLine(valueStr);
+				}
+
 			}
 			else
 			{
@@ -121,16 +140,14 @@ namespace CsvDb
 
 				var stop = false;
 				var showWait = Paged;
-				var headerColumns = reader.Query.Columns.Header;
+				var headerColumns = handler.Query.Select.Header;
 				//page holder
 				var page = new List<List<string>>(PageSize);
 				var pageCount = 0;
 
-				var boxed = Paged && (Options & DbVisualize.Framed) != 0;
-
 				var lineNumbers = (Options & DbVisualize.LineNumbers) != 0;
 
-				var enumerator = reader.Rows().GetEnumerator();
+				var enumerator = handler.Rows().GetEnumerator();
 				while (!stop)
 				{
 					//read page
@@ -138,7 +155,7 @@ namespace CsvDb
 					page.Clear();
 
 					//format header and column width
-					var headerWidths = reader.Query.Columns.Header.Select(h => h.Length).ToList();
+					var headerWidths = handler.Query.Select.Header.Select(h => h.Length).ToList();
 
 					if (lineNumbers)
 					{
@@ -153,7 +170,7 @@ namespace CsvDb
 
 						if (lineNumbers)
 						{
-							row.Insert(0, (reader.RowCount).ToString());
+							row.Insert(0, (handler.RowCount).ToString());
 						}
 
 						//add row to page
@@ -177,7 +194,7 @@ namespace CsvDb
 
 						//show header
 						var header = String.Join(charB,
-							reader.Query.Columns.Header.Select((s, ndx) => $" {s.PadRight(headerWidths[ndx + skip])} "));
+							handler.Query.Select.Header.Select((s, ndx) => $" {s.PadRight(headerWidths[ndx + skip])} "));
 
 						if (lineNumbers)
 						{
@@ -236,7 +253,7 @@ namespace CsvDb
 				}
 
 			}
-			Console.WriteLine($" displayed {reader.RowCount.ToString("##,#")} row(s)");
+			Console.WriteLine($" displayed {handler.RowCount.ToString("##,#")} row(s)");
 		}
 	}
 

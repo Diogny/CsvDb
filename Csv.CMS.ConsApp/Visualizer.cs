@@ -71,6 +71,25 @@ namespace Csv.CMS.ConsApp
 			Console.WriteLine(output);
 		}
 
+		public void ShowItemPage<T>(DbColumn column, int offset)
+			where T : IComparable<T>
+		{
+			var indexItem = column.IndexItems<T>();
+			var page = indexItem[offset];
+
+			var handler = DbTableDataReader.Create(Database, column.Table.Name);
+
+			foreach (var item in page.Items)
+			{
+				Console.WriteLine(item.Key);
+				//foreach (var ofs in item.Value)
+				//{
+				//	var row = handler.ReadDbRecord(ofs);
+				//	Console.WriteLine($"  {string.Join(", ", row)}");
+				//}
+			}
+		}
+
 		string DisplayTreeStructureInfo<T>(DbIndexTree<T> index)
 			where T : IComparable<T>
 		{
@@ -177,6 +196,8 @@ namespace Csv.CMS.ConsApp
 			});
 			Console.WriteLine(output);
 		}
+
+
 
 		string DisplayItemsPageInfo<T>(DbIndexItems<T> index)
 			where T : IComparable<T>

@@ -153,59 +153,59 @@ namespace ConsoleApp
 
 		static void SqlQueryExecuteTests(Config.ConfigSettings appConfig)
 		{
-			var sw = new System.Diagnostics.Stopwatch();
-			sw.Start();
+			//var sw = new System.Diagnostics.Stopwatch();
+			//sw.Start();
 
-			var db = OpenDatabase(appConfig);
+			//var db = OpenDatabase(appConfig);
 
-			sw.Stop();
-			Console.WriteLine($"\r\nDatabase: {db.Name}");
-			Console.WriteLine(">created on {0} ms", sw.ElapsedMilliseconds);
+			//sw.Stop();
+			//Console.WriteLine($"\r\nDatabase: {db.Name}");
+			//Console.WriteLine(">created on {0} ms", sw.ElapsedMilliseconds);
 
-			var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> 'NJB' LIMIT 5"
-									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> 'NJB' LIMIT 5"
-									//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id = 180"
-									//		180,NJB,74,,3,,
-				"SELECT * FROM trips WHERE route_id = 204 AND service_id = 5 AND trip_id = 52325"
-				//		204,5,52325,"810 WOODBRIDGE CENTER-Exact Fare",1,810MX003,6369
-				;
+			//var query = //"SELECT * FROM routes WHERE route_id >= (Int32)5 AND agency_id <> 'NJB' LIMIT 5"
+			//						//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id >= 5 AND agency_id <> 'NJB' LIMIT 5"
+			//						//"SELECT route_id, agency_id,route_type FROM routes WHERE route_id = 180"
+			//						//		180,NJB,74,,3,,
+			//	"SELECT * FROM trips WHERE route_id = 204 AND service_id = 5 AND trip_id = 52325"
+			//	//		204,5,52325,"810 WOODBRIDGE CENTER-Exact Fare",1,810MX003,6369
+			//	;
 
-			Console.WriteLine($"\r\nIn query: {query}");
+			//Console.WriteLine($"\r\nIn query: {query}");
 
-			sw.Restart();
-			var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db)); // old one: CsvDb.CsvDbQuery.Parse(db, query);
+			//sw.Restart();
+			//var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db)); // old one: CsvDb.CsvDbQuery.Parse(db, query);
 
-			sw.Stop();
-			Console.WriteLine(">parsed on {0} ms", sw.ElapsedMilliseconds);
+			//sw.Stop();
+			//Console.WriteLine(">parsed on {0} ms", sw.ElapsedMilliseconds);
 
-			var outQuery = dbQuery.ToString();
+			//var outQuery = dbQuery.ToString();
 
-			Console.WriteLine($"\r\nOut query: {outQuery}\r\n");
+			//Console.WriteLine($"\r\nOut query: {outQuery}\r\n");
 
-			//to calculate times
-			sw.Restart();
+			////to calculate times
+			//sw.Restart();
 
-			var reader = DbRecordReader.Create(db, dbQuery);
-			var rows = reader.Rows().ToList();
-			reader.Dispose();
+			//var reader = DbRecordReader.Create(db, dbQuery);
+			//var rows = reader.Rows().ToList();
+			//reader.Dispose();
 
-			sw.Stop();
-			Console.WriteLine(">{rows.Count} row(s) retrieved on {0} ms", sw.ElapsedMilliseconds);
+			//sw.Stop();
+			//Console.WriteLine(">{rows.Count} row(s) retrieved on {0} ms", sw.ElapsedMilliseconds);
 
-			//header
-			sw.Restart();
+			////header
+			//sw.Restart();
 
-			var header = String.Join("|", dbQuery.Columns.Header);
-			Console.WriteLine($"\r\n{header}");
-			Console.WriteLine($"{new string('-', header.Length)}");
+			//var header = String.Join("|", dbQuery.Select.Header);
+			//Console.WriteLine($"\r\n{header}");
+			//Console.WriteLine($"{new string('-', header.Length)}");
 
-			foreach (var record in rows)
-			{
-				Console.WriteLine($"{String.Join(",", record)}");
-			}
+			//foreach (var record in rows)
+			//{
+			//	Console.WriteLine($"{String.Join(",", record)}");
+			//}
 
-			sw.Stop();
-			Console.WriteLine("\r\n>row(s) displayed on {0} ms", sw.ElapsedMilliseconds);
+			//sw.Stop();
+			//Console.WriteLine("\r\n>row(s) displayed on {0} ms", sw.ElapsedMilliseconds);
 		}
 
 		static bool SqlQueryFinalParseTests(Config.ConfigSettings appConfig)
@@ -290,183 +290,183 @@ namespace ConsoleApp
 
 		static bool CsvToBinTable(CsvDb.CsvDb db, string tableName)
 		{
-			//FIND THIS
-			// "stops" table row count csv doesn't match with bin file
+			////FIND THIS
+			//// "stops" table row count csv doesn't match with bin file
 
-			var showPer = tableName.StartsWith('-');
+			//var showPer = tableName.StartsWith('-');
 
-			if (showPer)
-			{
-				tableName = tableName.Substring(1);
-			}
+			//if (showPer)
+			//{
+			//	tableName = tableName.Substring(1);
+			//}
 
-			var table = db.Table(tableName);
-			if (table == null)
-			{
-				Console.WriteLine($"cannot find table: {tableName} in database");
-				return false;
-			}
-			//get file size of csv file
-			var csvPath = io.Path.Combine(db.BinaryPath, $"{table.Name}.csv");
-			var csvFileInfo = new io.FileInfo(csvPath);
+			//var table = db.Table(tableName);
+			//if (table == null)
+			//{
+			//	Console.WriteLine($"cannot find table: {tableName} in database");
+			//	return false;
+			//}
+			////get file size of csv file
+			//var csvPath = io.Path.Combine(db.BinaryPath, $"{table.Name}.csv");
+			//var csvFileInfo = new io.FileInfo(csvPath);
 
-			var binPath = io.Path.Combine(db.BinaryPath, $"{table.Name}.bin");
+			//var binPath = io.Path.Combine(db.BinaryPath, $"{table.Name}.bin");
 
-			if (!showPer)
-			{
-				//calculate bytes needed to store null flags for every column in every record
-				//  this way reduce space for many null values on columns
-				//   and support nulls for any field type
-				int bytes = Math.DivRem(table.Columns.Count, 8, out int remainder);
-				int bits = bytes * 8 + remainder;
-				UInt64 mask = (UInt64)Math.Pow(2, bits - 1);
-				if (remainder != 0)
-				{
-					bytes++;
-				}
+			//if (!showPer)
+			//{
+			//	//calculate bytes needed to store null flags for every column in every record
+			//	//  this way reduce space for many null values on columns
+			//	//   and support nulls for any field type
+			//	int bytes = Math.DivRem(table.Columns.Count, 8, out int remainder);
+			//	int bits = bytes * 8 + remainder;
+			//	UInt64 mask = (UInt64)Math.Pow(2, bits - 1);
+			//	if (remainder != 0)
+			//	{
+			//		bytes++;
+			//	}
 
-				var stream = new io.MemoryStream();
-				var bufferWriter = new io.BinaryWriter(stream);
+			//	var stream = new io.MemoryStream();
+			//	var bufferWriter = new io.BinaryWriter(stream);
 
-				using (var writer = new io.BinaryWriter(io.File.Create(binPath)))
-				//using (var reader = new io.StreamReader(csvPath))
-				{
-					//placeholder for row count
-					Int32 value = 0;
-					writer.Write(value);
+			//	using (var writer = new io.BinaryWriter(io.File.Create(binPath)))
+			//	//using (var reader = new io.StreamReader(csvPath))
+			//	{
+			//		//placeholder for row count
+			//		Int32 value = 0;
+			//		writer.Write(value);
 
-					//write mask 32-bits unsigned int 64 bits UInt64, so max table columns is 64
-					writer.Write(mask);
+			//		//write mask 32-bits unsigned int 64 bits UInt64, so max table columns is 64
+			//		writer.Write(mask);
 
-					//var buffer = new io.MemoryStream(5 * 1024);
+			//		//var buffer = new io.MemoryStream(5 * 1024);
 
-					var queryText = $"SELECT * FROM {table.Name}";
-					var reader = DbRecordReader.Create(db, DbQuery.Parse(queryText, new CsvDbDefaultValidator(db)));
-					int rowCount = 0;
+			//		var queryText = $"SELECT * FROM {table.Name}";
+			//		var reader = DbRecordReader.Create(db, DbQuery.Parse(queryText, new CsvDbDefaultValidator(db)));
+			//		int rowCount = 0;
 
-					foreach (var record in reader.Rows())
-					{
-						rowCount++;
+			//		foreach (var record in reader.Rows())
+			//		{
+			//			rowCount++;
 
-						//start with mask, first column, leftmost
-						UInt64 flags = 0;
-						//
-						var columnBit = mask;
+			//			//start with mask, first column, leftmost
+			//			UInt64 flags = 0;
+			//			//
+			//			var columnBit = mask;
 
-						stream.Position = 0;
+			//			stream.Position = 0;
 
-						for (var index = 0; index < reader.ColumnCount; index++)
-						{
-							string textValue = (string)record[index];
-							var colType = reader.ColumnTypes[index];
+			//			for (var index = 0; index < reader.ColumnCount; index++)
+			//			{
+			//				string textValue = (string)record[index];
+			//				var colType = reader.ColumnTypes[index];
 
-							if (textValue == null)
-							{
-								//signal only the null flag as true
-								flags |= columnBit;
-							}
-							else
-							{
-								switch (colType)
-								{
-									case DbColumnType.String:
-										bufferWriter.Write(textValue);
-										break;
-									case DbColumnType.Char:
-										char charValue = (char)0;
-										if (!Char.TryParse(textValue, out charValue))
-										{
-											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
-										}
-										//write
-										bufferWriter.Write(charValue);
-										break;
-									case DbColumnType.Byte:
-										byte byteValue = 0;
-										if (!Byte.TryParse(textValue, out byteValue))
-										{
-											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
-										}
-										//write
-										bufferWriter.Write(byteValue);
-										break;
-									case DbColumnType.Int16:
-										Int16 int16Value = 0;
-										if (!Int16.TryParse(textValue, out int16Value))
-										{
-											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
-										}
-										//write
-										bufferWriter.Write(int16Value);
-										break;
-									case DbColumnType.Int32:
-										Int32 int32Value = 0;
-										if (!Int32.TryParse(textValue, out int32Value))
-										{
-											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
-										}
-										//write
-										bufferWriter.Write(int32Value);
-										break;
-									case DbColumnType.Float:
-										float floatValue = 0.0f;
-										if (!float.TryParse(textValue, out floatValue))
-										{
-											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
-										}
-										//write
-										bufferWriter.Write(floatValue);
-										break;
-									case DbColumnType.Double:
-										Double doubleValue = 0.0;
-										if (!Double.TryParse(textValue, out doubleValue))
-										{
-											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
-										}
-										//write
-										bufferWriter.Write(doubleValue);
-										break;
-									case DbColumnType.Decimal:
-										Decimal decimalValue = 0;
-										if (!Decimal.TryParse(textValue, out decimalValue))
-										{
-											throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
-										}
-										//write
-										bufferWriter.Write(decimalValue);
-										break;
-									default:
-										throw new ArgumentException($"unsupported type: {colType}");
-								}
-							}
-							//shift right column Bit until it reaches 0 -the last column rightmost
-							columnBit >>= 1;
-						}
-						if (columnBit != 0)
-						{
-							Console.WriteLine("Error on column bit flags");
-						}
-						//write true binary record
-						var flagsBuffer = BitConverter.GetBytes(flags);
-						writer.Write(flagsBuffer, 0, bytes);
+			//				if (textValue == null)
+			//				{
+			//					//signal only the null flag as true
+			//					flags |= columnBit;
+			//				}
+			//				else
+			//				{
+			//					switch (colType)
+			//					{
+			//						case DbColumnType.String:
+			//							bufferWriter.Write(textValue);
+			//							break;
+			//						case DbColumnType.Char:
+			//							char charValue = (char)0;
+			//							if (!Char.TryParse(textValue, out charValue))
+			//							{
+			//								throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+			//							}
+			//							//write
+			//							bufferWriter.Write(charValue);
+			//							break;
+			//						case DbColumnType.Byte:
+			//							byte byteValue = 0;
+			//							if (!Byte.TryParse(textValue, out byteValue))
+			//							{
+			//								throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+			//							}
+			//							//write
+			//							bufferWriter.Write(byteValue);
+			//							break;
+			//						case DbColumnType.Int16:
+			//							Int16 int16Value = 0;
+			//							if (!Int16.TryParse(textValue, out int16Value))
+			//							{
+			//								throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+			//							}
+			//							//write
+			//							bufferWriter.Write(int16Value);
+			//							break;
+			//						case DbColumnType.Int32:
+			//							Int32 int32Value = 0;
+			//							if (!Int32.TryParse(textValue, out int32Value))
+			//							{
+			//								throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+			//							}
+			//							//write
+			//							bufferWriter.Write(int32Value);
+			//							break;
+			//						case DbColumnType.Single:
+			//							float floatValue = 0.0f;
+			//							if (!float.TryParse(textValue, out floatValue))
+			//							{
+			//								throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+			//							}
+			//							//write
+			//							bufferWriter.Write(floatValue);
+			//							break;
+			//						case DbColumnType.Double:
+			//							Double doubleValue = 0.0;
+			//							if (!Double.TryParse(textValue, out doubleValue))
+			//							{
+			//								throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+			//							}
+			//							//write
+			//							bufferWriter.Write(doubleValue);
+			//							break;
+			//						case DbColumnType.Decimal:
+			//							Decimal decimalValue = 0;
+			//							if (!Decimal.TryParse(textValue, out decimalValue))
+			//							{
+			//								throw new ArgumentException($"unable to cast: {textValue} to: {colType}");
+			//							}
+			//							//write
+			//							bufferWriter.Write(decimalValue);
+			//							break;
+			//						default:
+			//							throw new ArgumentException($"unsupported type: {colType}");
+			//					}
+			//				}
+			//				//shift right column Bit until it reaches 0 -the last column rightmost
+			//				columnBit >>= 1;
+			//			}
+			//			if (columnBit != 0)
+			//			{
+			//				Console.WriteLine("Error on column bit flags");
+			//			}
+			//			//write true binary record
+			//			var flagsBuffer = BitConverter.GetBytes(flags);
+			//			writer.Write(flagsBuffer, 0, bytes);
 
-						//write non-null records
-						var recBinary = stream.ToArray();
-						writer.Write(recBinary, 0, recBinary.Length);
-					}
+			//			//write non-null records
+			//			var recBinary = stream.ToArray();
+			//			writer.Write(recBinary, 0, recBinary.Length);
+			//		}
 
-					//write row count
-					writer.BaseStream.Position = 0;
-					writer.Write(rowCount);
+			//		//write row count
+			//		writer.BaseStream.Position = 0;
+			//		writer.Write(rowCount);
 
-					Console.WriteLine($"writen {rowCount} row(s)");
-					reader.Dispose();
-				}
-			}
+			//		Console.WriteLine($"writen {rowCount} row(s)");
+			//		reader.Dispose();
+			//	}
+			//}
 
-			var binFileInfo = new io.FileInfo(binPath);
-			var percent = ((double)binFileInfo.Length / csvFileInfo.Length);
-			Console.WriteLine("binary file is {0:P2}", percent);
+			//var binFileInfo = new io.FileInfo(binPath);
+			//var percent = ((double)binFileInfo.Length / csvFileInfo.Length);
+			//Console.WriteLine("binary file is {0:P2}", percent);
 
 			return true;
 		}

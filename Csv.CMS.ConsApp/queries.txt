@@ -9,6 +9,17 @@ SELECT * FROM agency
 └─────┴───────────┴────────────────┴───────────────────────────┴──────────────────┴─────────────┴──────────────┘
  displayed 1 row(s)
 
+ SELECT agency_id AS id, agency_name AS name FROM agency
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+┌─────┬─────┬────────────────┐
+│ #   │ id  │ name           │
+├─────┼─────┼────────────────┤
+│ 1   │ NJB │ NJ TRANSIT BUS │
+└─────┴─────┴────────────────┘
+ displayed 1 row(s)
+
+
 SELECT agency_id, agency_name, agency_timezone, agency_lang, agency_url FROM agency
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -43,7 +54,7 @@ SELECT route_id, agency_id,route_short_name,route_type FROM routes
  displayed 254 row(s)
 
 
- SELECT route_id, agency_id,route_short_name,route_type FROM routes LIMIT 7
+ SELECT TOP 7 route_id, agency_id,route_short_name,route_type FROM routes
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬───────────┬──────────────────┬────────────┐
@@ -60,21 +71,58 @@ SELECT route_id, agency_id,route_short_name,route_type FROM routes
  displayed 7 row(s)
 
 
+ SELECT * FROM routes WHERE route_id >= 1 AND route_id < 10
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+┌─────┬──────────┬───────────┬──────────────────┬─────────────────┬────────────┬───────────┬─────────────┐
+│ #   │ route_id │ agency_id │ route_short_name │ route_long_name │ route_type │ route_url │ route_color │
+├─────┼──────────┼───────────┼──────────────────┼─────────────────┼────────────┼───────────┼─────────────┤
+│ 1   │ 1        │ NJB       │ 1                │                 │ 3          │           │             │
+│ 2   │ 2        │ NJB       │ 10               │                 │ 3          │           │             │
+│ 3   │ 3        │ NJB       │ 107              │                 │ 3          │           │             │
+│ 4   │ 4        │ NJB       │ 108              │                 │ 3          │           │             │
+│ 5   │ 5        │ NJB       │ 11               │                 │ 3          │           │             │
+│ 6   │ 6        │ NJB       │ 111              │                 │ 3          │           │             │
+│ 7   │ 7        │ NJB       │ 112              │                 │ 3          │           │             │
+│ 8   │ 8        │ NJB       │ 113              │                 │ 3          │           │             │
+│ 9   │ 9        │ NJB       │ 114              │                 │ 3          │           │             │
+└─────┴──────────┴───────────┴──────────────────┴─────────────────┴────────────┴───────────┴─────────────┘
+ displayed 9 row(s)
+
+
+  SELECT * FROM routes WHERE route_id >= 250
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+┌─────┬──────────┬───────────┬──────────────────┬─────────────────┬────────────┬───────────┬─────────────┐
+│ #   │ route_id │ agency_id │ route_short_name │ route_long_name │ route_type │ route_url │ route_color │
+├─────┼──────────┼───────────┼──────────────────┼─────────────────┼────────────┼───────────┼─────────────┤
+│ 1   │ 250      │ NJB       │ AC4A             │                 │ 3          │           │             │
+│ 2   │ 251      │ NJB       │ AC4B             │                 │ 3          │           │             │
+│ 3   │ 252      │ NJB       │ AC5              │                 │ 3          │           │             │
+│ 4   │ 253      │ NJB       │ GO25             │                 │ 3          │           │             │
+│ 5   │ 254      │ NJB       │ GO28             │                 │ 3          │           │             │
+└─────┴──────────┴───────────┴──────────────────┴─────────────────┴────────────┴───────────┴─────────────┘
+ displayed 5 row(s)
+
+
+ SELECT * FROM stops WHERE stop_id > 43000
+
+
 
 //LOGICALS
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-SELECT * FROM routes WHERE route_id = 1 AND agency_id = 'NJB'
-  --error [agency_id] not indexed
+SELECT * FROM routes WHERE route_id == 1 AND agency_id == 'NJB'
+  --error: cannot evaluate no indexed column: [1] agency_id: String
 
-SELECT * FROM routes WHERE route_id = 1 AND route_id = 2
+SELECT * FROM routes WHERE route_id == 1 AND route_id == 2
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  
  displayed 0 row(s)
 
 
-SELECT * FROM routes WHERE route_id = 1 OR route_id = 2
+SELECT * FROM routes WHERE route_id == 1 OR route_id == 2
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬───────────┬──────────────────┬─────────────────┬────────────┬───────────┬─────────────┐
@@ -86,7 +134,7 @@ SELECT * FROM routes WHERE route_id = 1 OR route_id = 2
  displayed 2 row(s)
 
 
-SELECT * FROM routes WHERE route_id = 1 AND route_short_name = '1'
+SELECT * FROM routes WHERE route_id == 1 AND route_short_name == '1'
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬───────────┬──────────────────┬─────────────────┬────────────┬───────────┬─────────────┐
@@ -99,7 +147,7 @@ SELECT * FROM routes WHERE route_id = 1 AND route_short_name = '1'
 
 //search route by it's route short name
 
-SELECT * FROM routes WHERE route_short_name = '122'
+SELECT * FROM routes WHERE route_short_name == '122'
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬───────────┬──────────────────┬─────────────────┬────────────┬───────────┬─────────────┐
@@ -112,7 +160,7 @@ SELECT * FROM routes WHERE route_short_name = '122'
 
 //search trips by its route_id
 
-SELECT * FROM trips WHERE route_id = 16
+SELECT * FROM trips WHERE route_id == 16
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬────────────┬─────────┬─────────────────────────┬──────────────┬──────────┬──────────┐
@@ -145,7 +193,7 @@ SELECT * FROM trips WHERE route_id = 16
  displayed 34 row(s)
 
 
- SELECT * FROM trips WHERE route_id = 16 LIMIT 5
+ SELECT TOP 5 * FROM trips WHERE route_id == 16
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬────────────┬─────────┬───────────────┬──────────────┬──────────┬──────────┐
@@ -162,7 +210,7 @@ SELECT * FROM trips WHERE route_id = 16
 
 //search calendar_dates by todays' data [yyyymmdd]
 
-SELECT * FROM calendar_dates WHERE date = 20180522
+SELECT * FROM calendar_dates WHERE date == 20180522
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬────────────┬──────────┬────────────────┐
@@ -179,7 +227,7 @@ SELECT * FROM trips t
 	JOIN calendar_dates c ON t.service_id EQUALS c.service_id
 	WHERE c.date = 20180322
 
-SELECT * FROM stop_times WHERE trip_id = 3108
+SELECT * FROM stop_times WHERE trip_id == 3108
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬─────────┬──────────────┬────────────────┬─────────┬───────────────┬─────────────┬───────────────┬─────────────────────┐
@@ -202,7 +250,7 @@ SELECT * FROM stop_times WHERE trip_id = 3108
  displayed 13 row(s)
 
 
-SELECT * FROM stops WHERE stop_id = 32457
+SELECT * FROM stops WHERE stop_id == 32457
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬─────────┬───────────┬──────────────────────────────┬───────────┬───────────┬────────────┬─────────┐
@@ -213,7 +261,7 @@ SELECT * FROM stops WHERE stop_id = 32457
  displayed 1 row(s)
 
 
-SELECT * FROM shapes WHERE shape_id = 1
+SELECT * FROM shapes WHERE shape_id == 1
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬──────────────┬──────────────┬───────────────────┬─────────────────────┐
@@ -237,7 +285,7 @@ SELECT * FROM shapes WHERE shape_id = 1
 └─────┴──────────┴──────────────┴──────────────┴───────────────────┴─────────────────────┘
  displayed 82 row(s)
 
-SELECT * FROM stop_times WHERE trip_id = 1 AND stop_id = 27677
+SELECT * FROM stop_times WHERE trip_id == 1 AND stop_id == 27677
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬─────────┬──────────────┬────────────────┬─────────┬───────────────┬─────────────┬───────────────┬─────────────────────┐
@@ -248,7 +296,7 @@ SELECT * FROM stop_times WHERE trip_id = 1 AND stop_id = 27677
  displayed 1 row(s)
 
 
-SELECT * FROM stops WHERE stop_id = 194 AND stop_code = '10833'
+SELECT * FROM stops WHERE stop_id == 194 AND stop_code == '10833'
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬─────────┬───────────┬──────────────────────────┬───────────┬──────────┬────────────┬─────────┐
@@ -259,7 +307,7 @@ SELECT * FROM stops WHERE stop_id = 194 AND stop_code = '10833'
  displayed 1 row(s)
 
 
-SELECT stop_id, stop_code, stop_name, stop_lat, stop_lon, zone_id FROM stops WHERE stop_id = 194 AND stop_code = '10833'
+SELECT stop_id, stop_code, stop_name, stop_lat, stop_lon, zone_id FROM stops WHERE stop_id == 194 AND stop_code == '10833'
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬─────────┬───────────┬──────────────────────────┬──────────┬────────────┬─────────┐
@@ -270,7 +318,7 @@ SELECT stop_id, stop_code, stop_name, stop_lat, stop_lon, zone_id FROM stops WHE
  displayed 1 row(s)
 
 
-SELECT * FROM stops WHERE stop_id = 194
+SELECT * FROM stops WHERE stop_id == 194
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬─────────┬───────────┬──────────────────────────┬───────────┬──────────┬────────────┬─────────┐
@@ -281,7 +329,7 @@ SELECT * FROM stops WHERE stop_id = 194
  displayed 1 row(s)
 
 
-SELECT * FROM stops WHERE stop_code = '10833'
+SELECT * FROM stops WHERE stop_code == '10833'
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬─────────┬───────────┬──────────────────────────┬───────────┬──────────┬────────────┬─────────┐
@@ -292,7 +340,7 @@ SELECT * FROM stops WHERE stop_code = '10833'
  displayed 1 row(s)
 
 
-SELECT * FROM calendar_dates WHERE date = 20180504
+SELECT * FROM calendar_dates WHERE date == 20180504
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬────────────┬──────────┬────────────────┐
@@ -309,84 +357,114 @@ SELECT * FROM calendar_dates WHERE date = 20180504
 
 
 SELECT COUNT(agency_id) FROM agency
-------------------------------
+-----------------------------------------------------------
 
-COUNT
------
-1
+┌───────┐
+│ COUNT │
+├───────┤
+│ 1     │
+└───────┘
+ displayed 1 row(s)
+
+
+SELECT COUNT(agency_id) AS Quantity FROM agency
+------------------------------------------------------------
+
+┌──────────┐
+│ Quantity │
+├──────────┤
+│ 1        │
+└──────────┘
  displayed 1 row(s)
 
 
 SELECT COUNT(route_id) FROM routes
------------------------------------
+------------------------------------------------------------
 
-COUNT
------
-254
+┌───────┐
+│ COUNT │
+├───────┤
+│ 254   │
+└───────┘
  displayed 1 row(s)
 
 ===COUNT==== with non Int32 columns
 
-SELECT COUNT(agency_id) FROM routes
--------------------------------------
 
-COUNT
-─────
-254
+SELECT COUNT(agency_id) FROM routes
+------------------------------------------------------------
+
+┌───────┐
+│ COUNT │
+├───────┤
+│ 254   │
+└───────┘
  displayed 1 row(s)
 
 
 SELECT COUNT(route_id) FROM routes WHERE route_id > 247
 ------------------------------------------------------------
 
-COUNT
------
-7
+┌───────┐
+│ COUNT │
+├───────┤
+│ 7     │
+└───────┘
  displayed 1 row(s)
 
 
 SELECT SUM(route_id) FROM routes
 ------------------------------------------------------------
 
-SUM
-------
-32385
+┌───────┐
+│ SUM   │
+├───────┤
+│ 32385 │
+└───────┘
  displayed 1 row(s)
 
 
 SELECT SUM(trip_id) FROM trips
 ------------------------------------------------------------
 
-SUM
-─────────
-472704378
+┌───────────┐
+│ SUM       │
+├───────────┤
+│ 472704378 │
+└───────────┘
  displayed 1 row(s)
 
 
 SELECT COUNT(trip_id) FROM trips
 ------------------------------------------------------------
 
-COUNT
-─────
-30747
+┌───────┐
+│ COUNT │
+├───────┤
+│ 30747 │
+└───────┘
  displayed 1 row(s)
 
 
 SELECT COUNT(stop_id) FROM stop_times
 ------------------------------------------------------------
 
-COUNT
-───────
-1642266
+┌─────────┐
+│ COUNT   │
+├─────────┤
+│ 1642266 │
+└─────────┘
  displayed 1 row(s)
 
 
 SELECT AVG(route_id) FROM routes
 ------------------------------------------------------------
 
-AVG
-----------------
-128
+┌─────┐
+│ AVG │
+├─────┤
+│ 128 │
+└─────┘
  displayed 1 row(s)
 
  

@@ -24,7 +24,7 @@ namespace CsvDb
 			/// <summary>
 			/// join expression
 			/// </summary>
-			public Expression Expression { get; }
+			public ComparisonOperator Expression { get; }
 
 			/// <summary>
 			/// creates an SQL query JOIN
@@ -32,7 +32,7 @@ namespace CsvDb
 			/// <param name="token">join type</param>
 			/// <param name="table">join table</param>
 			/// <param name="expression">join expression</param>
-			internal SqlJoin(TokenType token, Table table, Expression expression)
+			internal SqlJoin(TokenType token, Table table, ComparisonOperator expression)
 			{
 				if (!JoinStarts.Contains(Token = token) || (Table = table) == null || (Expression = expression) == null)
 				{

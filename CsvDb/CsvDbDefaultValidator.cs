@@ -143,7 +143,7 @@ namespace CsvDb
 			{
 				return false;
 			}
-			return table.Column(columnName) != null;
+			return table[columnName] != null;
 		}
 
 		/// <summary>

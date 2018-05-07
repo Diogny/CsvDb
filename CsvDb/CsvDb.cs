@@ -241,7 +241,7 @@ namespace CsvDb
 				foreach (var table in Tables)
 				{
 					table.Database = this;
-					table.Columns.ForEach(column =>
+					foreach (var column in table.Columns)
 					{
 						//update
 						if (!column.Indexed)
@@ -250,7 +250,7 @@ namespace CsvDb
 							column.ItemPages = 0;
 						}
 						column.Table = table;
-					});
+					}
 				};
 
 				return true;
@@ -288,10 +288,7 @@ namespace CsvDb
 		/// </summary>
 		/// <param name="tableName">table name</param>
 		/// <returns></returns>
-		public DbTable Table(string tableName)
-		{
-			return Tables.FirstOrDefault(t => String.Compare(t.Name, tableName, true) == 0);
-		}
+		public DbTable Table(string tableName) => this[tableName];
 
 		/// <summary>
 		/// Get the table
@@ -314,11 +311,11 @@ namespace CsvDb
 		/// <summary>
 		/// Gets the table column
 		/// </summary>
-		/// <param name="tableColumnName">table.column</param>
+		/// <param name="hash">table.column</param>
 		/// <returns></returns>
-		public DbColumn Index(string tableColumnName)
+		public DbColumn Index(string hash)
 		{
-			var cols = tableColumnName?.Split('.', StringSplitOptions.RemoveEmptyEntries);
+			var cols = hash?.Split('.', StringSplitOptions.RemoveEmptyEntries);
 			DbColumn index = null;
 			if (cols != null && cols.Length == 2)
 			{
@@ -387,13 +384,7 @@ namespace CsvDb
 		/// </summary>
 		/// <param name="tableName">table name</param>
 		/// <returns></returns>
-		public DbTable this[string tableName]
-		{
-			get
-			{
-				return _tables.TryGetValue(tableName, out DbTable table) ? table : null;
-			}
-		}
+		public DbTable this[string tableName] => _tables.TryGetValue(tableName, out DbTable table) ? table : null;
 
 		public DbSchemaConfig() { }
 
@@ -431,9 +422,11 @@ namespace CsvDb
 					RowMaskLength = reader.ReadInt32(),
 					Pager = DbTablePager.Load(reader),
 					Count = reader.ReadInt32(),
-					Columns = new List<DbColumn>()
+					_columns = new Dictionary<string, DbColumn>()
 				};
 				//read columns
+				var columnKeyList = new List<string>();
+
 				for (var c = 0; c < table.Count; c++)
 				{
 					var col = new DbColumn()
@@ -449,13 +442,31 @@ namespace CsvDb
 						NodePages = reader.ReadInt32(),
 						ItemPages = reader.ReadInt32()
 					};
-					table.Columns.Add(col);
+					if (!table.Add(col))
+					{
+						throw new ArgumentException($"duplicated column: {col.Name} on table {table.Name}");
+					}
+					columnKeyList.Add(col.Name);
 				}
+				//check count
+				if (table.Count != table.Columns.Count())
+				{
+					throw new ArgumentException($"invalid table count on: {table.Name}");
+				}
+				table._columnKeyList = columnKeyList.ToArray();
+
 				//schema.Tables.Add(table);
 				schema._tables.Add(table.Name, table);
 			}
 			return schema;
 		}
+
+		//struct MetaPageFrequency
+		//{
+		//	public int Offset;
+
+		//	public double Frequency;
+		//}
 
 		/// <summary>
 		/// Saves the database schema
@@ -477,6 +488,9 @@ namespace CsvDb
 			int pageCount = _tables.Count; // Tables.Count;
 			writer.Write(pageCount);
 
+			//frequency
+			//var frequencyList = new List<KeyValuePair<string, List<MetaPageFrequency>>>();
+
 			foreach (var table in _tables.Select(t => t.Value)) // Tables
 			{
 				table.Name.BinarySave(writer);
@@ -494,6 +508,7 @@ namespace CsvDb
 				//columns
 				writer.Write(table.Count);
 
+
 				foreach (var column in table.Columns)
 				{
 					column.Indexer.BinarySave(writer);
@@ -506,8 +521,19 @@ namespace CsvDb
 					//
 					writer.Write(column.NodePages);
 					writer.Write(column.ItemPages);
+
+					//frequency
+					//var hash = $"{table.Name}.{column.Name}";
+					//var freq = new KeyValuePair<string, List<MetaPageFrequency>>(hash, new List<MetaPageFrequency>());
+					//frequencyList.Add(freq);
+
+					
 				}
+
 			}
+
+			//save frequency data to disk
+
 		}
 
 	}
@@ -532,7 +558,44 @@ namespace CsvDb
 
 		public int Count { get; set; }
 
-		public List<DbColumn> Columns { get; set; }
+		internal string[] _columnKeyList;
+
+		internal Dictionary<string, DbColumn> _columns;
+		/// <summary>
+		/// get all columns from table
+		/// </summary>
+		public IEnumerable<DbColumn> Columns => _columns.Values;
+
+		/// <summary>
+		/// indexer for columns
+		/// </summary>
+		/// <param name="name">column name</param>
+		/// <returns></returns>
+		public DbColumn this[string name] =>
+			_columns.TryGetValue(name, out DbColumn column) ? column : null;
+
+		/// <summary>
+		/// indexer for columns
+		/// </summary>
+		/// <param name="position">0-based column position</param>
+		/// <returns></returns>
+		public DbColumn this[int position] =>
+			(position >= 0 && position < _columnKeyList.Length) ? this[_columnKeyList[position]] : null;
+
+		/// <summary>
+		/// adds a new column to the table
+		/// </summary>
+		/// <param name="column">column</param>
+		/// <returns></returns>
+		internal bool Add(DbColumn column)
+		{
+			if (column == null || this[column.Name] != null)
+			{
+				return false;
+			}
+			_columns.Add(column.Name, column);
+			return true;
+		}
 
 		//[Newtonsoft.Json.JsonProperty(Required = Newtonsoft.Json.Required.Default)]
 		[Newtonsoft.Json.JsonIgnore]
@@ -564,7 +627,7 @@ namespace CsvDb
 			}
 		}
 
-		public DbColumn Column(string name) => Columns.FirstOrDefault(c => c.Name == name);
+		//public DbColumn Column(string name) => Columns.FirstOrDefault(c => c.Name == name);
 
 		public override string ToString() => $"{Name} ({Count})";
 

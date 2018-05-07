@@ -89,7 +89,7 @@ namespace Csv.CMS.ConsApp
 				con.WriteLine("	│ (D)isplay available database(s)              │                                             │");
 				con.WriteLine("	│ (M)ount database                             │ (K)ill/close database                       │");
 				con.WriteLine("	│ (S)earch Database                            │ (E)execute Queries                          │");
-				con.WriteLine("	│                                              │ Display (T)ables Info                       │");
+				con.WriteLine("	│ (P)age                                       │ Display (T)ables Info                       │");
 				con.WriteLine("	│ Display Index Tree (N)ode Structure          │ Display (I)ndex Tree Structure              │");
 				con.WriteLine("	│ (X)treme class                               │                                             │");
 				con.WriteLine("	├──────────────────────────────────────────────┴─────────────────────────────────────────────┤");
@@ -225,6 +225,28 @@ namespace Csv.CMS.ConsApp
 									}
 								}
 							} while (!finish);
+						}
+						break;
+					case ConsoleKey.P:
+						//display index page
+						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+						{
+							con.Write("[table].index: ");
+							var tbleColumn = con.ReadLine();
+							con.Write(" id/offset: ");
+							DbColumn column = null;
+							if (!int.TryParse(con.ReadLine(), out int offset) ||
+								(column = db.Index(tbleColumn)) == null)
+							{
+								con.WriteLine(" \r\n error: invalid table column or id/offset of page");
+							}
+							else
+							{
+								Utils.CallGeneric(new Visualizer(db),
+									nameof(Visualizer.ShowItemPage), 
+									column.TypeEnum,
+									new object[] { column, offset });
+							}
 						}
 						break;
 					case ConsoleKey.I:

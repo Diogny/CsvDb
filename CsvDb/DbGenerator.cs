@@ -184,7 +184,7 @@ namespace CsvDb
 					binWriter = new io.BinaryWriter(io.File.Create(io.Path.Combine(rootPath, $"bin\\{table.Name}.{CsvDb.SchemaTableDataExtension}")));
 
 					//save column mask
-					table.RowMaskLength = Math.DivRem(table.Columns.Count, 8, out int remainder);
+					table.RowMaskLength = Math.DivRem(table.Count, 8, out int remainder);
 					int bits = table.RowMaskLength * 8 + remainder;
 					table.RowMask = (UInt64)Math.Pow(2, bits - 1);
 					if (remainder != 0)
@@ -341,7 +341,7 @@ namespace CsvDb
 										//write
 										bufferWriter.Write(int32Value);
 										break;
-									case DbColumnType.Float:
+									case DbColumnType.Single:
 										float floatValue = 0.0f;
 										throwException = !float.TryParse(textValue, out floatValue);
 										//write
