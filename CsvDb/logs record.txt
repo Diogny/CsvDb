@@ -36,4 +36,6 @@
 .-cleaning and prep up, ColumnsWhere
 2018/05/05 - 2018/05/06
 .-real sql query parser, prep up real engine, fix search bugs
-2018/05/08 - 
+2018/05/08 - 2018/05/14
+.-command arg parser & prep up classes
+2018/05/15 -

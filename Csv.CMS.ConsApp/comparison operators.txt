@@ -1,0 +1,14 @@
+﻿Comparison Operators Table
+
+Logical operator		Description								Example filter string
+	eq								Equal												City eq 'Redmond'
+	gt								Greater than								Price gt 20
+	ge								Greater than or equal to		Price ge 10
+	lt								Less than										Price lt 20
+	le								Less than or equal					Price le 100
+	ne								Not equal										City ne 'London'
+	and								And													Price le 200 and Price gt 3.5
+	or								Or													Price le 3.5 or Price gt 200
+	not								Not													not isAvailable
+
+

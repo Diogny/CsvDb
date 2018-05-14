@@ -1,4 +1,9 @@
 ﻿
+C# Interactive
+
+#r "C:\Users\Diogny\Me\OneDrive\Projects\VS2017\CsvDb\CsvDb\bin\Debug\netcoreapp2.0\CsvDb.dll"
+
+
 use [database]
 use [table]
 

@@ -103,9 +103,16 @@ namespace CsvDb
 
 			var boxed = Paged && (Options & DbVisualize.Framed) != 0;
 
+			var stopWatch = new System.Diagnostics.Stopwatch();
+
 			if (handler.Query.Select.IsFunction)
 			{
+				stopWatch.Start();
+
 				var row = handler.Rows().ToList();
+
+				stopWatch.Stop();
+
 				//only one header
 				var header = handler.Query.Select.Header[0];
 
@@ -132,7 +139,6 @@ namespace CsvDb
 					}
 					Console.WriteLine(valueStr);
 				}
-
 			}
 			else
 			{
@@ -148,6 +154,7 @@ namespace CsvDb
 				var lineNumbers = (Options & DbVisualize.LineNumbers) != 0;
 
 				var enumerator = handler.Rows().GetEnumerator();
+
 				while (!stop)
 				{
 					//read page
@@ -163,11 +170,21 @@ namespace CsvDb
 						headerWidths.Insert(0, 3);
 					}
 
+					//read page, so I can measure ellapsed time
+					stopWatch.Start();
+					var pageRowCollection = new List<List<string>>();
 					while (count-- > 0 && enumerator.MoveNext())
 					{
 						//convert to string for visualization
 						var row = enumerator.Current.Select(c => (c == null) ? String.Empty : c.ToString()).ToList();
 
+						pageRowCollection.Add(row);
+					}
+					stopWatch.Stop();
+
+					//process page
+					foreach(var row in pageRowCollection)
+					{
 						if (lineNumbers)
 						{
 							row.Insert(0, (handler.RowCount).ToString());
@@ -185,6 +202,7 @@ namespace CsvDb
 							headerWidths[i] = Math.Max(headerWidths[i], (col == null) ? 0 : col.ToString().Length);
 						}
 					}
+
 					//
 					if (!(stop = page.Count == 0))
 					{
@@ -254,6 +272,8 @@ namespace CsvDb
 
 			}
 			Console.WriteLine($" displayed {handler.RowCount.ToString("##,#")} row(s)");
+			Console.WriteLine("  ellapsed {0} ms", stopWatch.ElapsedMilliseconds);
+
 		}
 	}
 

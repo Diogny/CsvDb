@@ -98,13 +98,15 @@ namespace CsvDb
 				//later mix all tables according to FROM tables and SELECT rows
 
 
-
-				var method = handler.GetType().GetMethod(nameof(DbTableDataReader.Rows),
+				var type = handler.GetType();
+				var method = type.GetMethod(nameof(DbTableDataReader.Rows),
 					BindingFlags.Instance | BindingFlags.NonPublic);
 
 				MethodInfo genMethod = method.MakeGenericMethod(handler.Table.Type);
+				//get first key
+				var key = handler.Table.Columns.FirstOrDefault(c => c.Key);
 
-				collection = (IEnumerable<int>)genMethod.Invoke(handler, new object[] { });
+				collection = (IEnumerable<int>)genMethod.Invoke(handler, new object[] { key });
 			}
 			else
 			{
@@ -232,24 +234,11 @@ namespace CsvDb
 			if (root.Operator.IsComparison())
 			{
 				//call DbQueryExpressionExecuter
-				//try first with Left
-				DbQuery.ColumnOperand columnOperand = root.Left as DbQuery.ColumnOperand;
-				DbQuery.ConstantOperand constantOperand = null;
-				if (columnOperand == null)
+				if (!root.TrySplitColumnConstant(out DbQuery.ColumnOperand columnOperand,
+					out DbQuery.ConstantOperand constantOperand))
 				{
-					//try now with Right
-					columnOperand = root.Right as DbQuery.ColumnOperand;
-					if (columnOperand == null)
-					{
-						throw new ArgumentException($"there is no column operand on: {root}");
-					}
-					constantOperand = root.Left as DbQuery.ConstantOperand;
+					throw new ArgumentException("cannot execute WHERE conditions");
 				}
-				else
-				{
-					constantOperand = root.Right as DbQuery.ConstantOperand;
-				}
-
 				var type = System.Type.GetType($"System.{columnOperand.Type}");
 
 				MethodInfo method =
@@ -260,7 +249,8 @@ namespace CsvDb
 
 				//should record which table gave this result of offset rows
 
-				result = (IEnumerable<int>)genMethod.Invoke(this, new object[] { this, root });
+				result = (IEnumerable<int>)genMethod.Invoke(this,
+					new object[] { this, columnOperand, root.Operator, constantOperand });
 			}
 			else
 			{
@@ -279,16 +269,27 @@ namespace CsvDb
 					case TokenType.OR:
 						result = left.Union(right);
 						break;
+					default:
+						throw new ArgumentException($"expected logical operator and we got: {root.Operator}");
 				}
 			}
 			return result;
 		}
 
+		/// <summary>
+		/// call generic class
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="handler"></param>
+		/// <param name="columnOperand"></param>
+		/// <param name="oper"></param>
+		/// <param name="constantOperand"></param>
+		/// <returns></returns>
 		IEnumerable<int> ExecuteColumnExpression<T>(DbQueryHandler handler,
-			DbQuery.ComparisonOperator expr)
+			DbQuery.ColumnOperand columnOperand, TokenType oper, DbQuery.ConstantOperand constantOperand)
 			where T : IComparable<T>
 		{
-			var executer = new DbQueryExpressionExecuter<T>(handler, expr);
+			var executer = new DbQueryExpressionExecuter<T>(handler, columnOperand, oper, constantOperand);
 
 			return executer.Execute().SelectMany(pair => pair.Value);
 		}

@@ -8,6 +8,7 @@ SELECT * FROM agency
 │ 1   │ NJB       │ NJ TRANSIT BUS │ http://www.njtransit.com/ │ America/New_York │ en          │              │
 └─────┴───────────┴────────────────┴───────────────────────────┴──────────────────┴─────────────┴──────────────┘
  displayed 1 row(s)
+  ellapsed 0 ms
 
  SELECT agency_id AS id, agency_name AS name FROM agency
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -18,7 +19,7 @@ SELECT * FROM agency
 │ 1   │ NJB │ NJ TRANSIT BUS │
 └─────┴─────┴────────────────┘
  displayed 1 row(s)
-
+  ellapsed 0 ms
 
 SELECT agency_id, agency_name, agency_timezone, agency_lang, agency_url FROM agency
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -29,7 +30,7 @@ SELECT agency_id, agency_name, agency_timezone, agency_lang, agency_url FROM age
 │ 1   │ NJB       │ NJ TRANSIT BUS │ America/New_York │ en          │ http://www.njtransit.com/ │
 └─────┴───────────┴────────────────┴──────────────────┴─────────────┴───────────────────────────┘
  displayed 1 row(s)
-
+  ellapsed 0 ms
 
 SELECT route_id, agency_id,route_short_name,route_type FROM routes
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -52,7 +53,7 @@ SELECT route_id, agency_id,route_short_name,route_type FROM routes
 │ 254 │ 254      │ NJB       │ GO28             │ 3          │
 └─────┴──────────┴───────────┴──────────────────┴────────────┘
  displayed 254 row(s)
-
+  ellapsed 48 ms
 
  SELECT TOP 7 route_id, agency_id,route_short_name,route_type FROM routes
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -69,7 +70,7 @@ SELECT route_id, agency_id,route_short_name,route_type FROM routes
 │ 7   │ 7        │ NJB       │ 112              │ 3          │
 └─────┴──────────┴───────────┴──────────────────┴────────────┘
  displayed 7 row(s)
-
+  ellapsed 1 ms
 
  SELECT * FROM routes WHERE route_id >= 1 AND route_id < 10
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -88,9 +89,9 @@ SELECT route_id, agency_id,route_short_name,route_type FROM routes
 │ 9   │ 9        │ NJB       │ 114              │                 │ 3          │           │             │
 └─────┴──────────┴───────────┴──────────────────┴─────────────────┴────────────┴───────────┴─────────────┘
  displayed 9 row(s)
+  ellapsed 2 ms
 
-
-  SELECT * FROM routes WHERE route_id >= 250
+ SELECT * FROM routes WHERE route_id >= 250
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ┌─────┬──────────┬───────────┬──────────────────┬─────────────────┬────────────┬───────────┬─────────────┐
@@ -103,10 +104,39 @@ SELECT route_id, agency_id,route_short_name,route_type FROM routes
 │ 5   │ 254      │ NJB       │ GO28             │                 │ 3          │           │             │
 └─────┴──────────┴───────────┴──────────────────┴─────────────────┴────────────┴───────────┴─────────────┘
  displayed 5 row(s)
+  ellapsed 0 ms
 
 
  SELECT * FROM stops WHERE stop_id > 43000
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+┌─────┬─────────┬───────────┬──────────────────────────────────────────┬───────────┬───────────┬────────────┬─────────┐
+│ #   │ stop_id │ stop_code │ stop_name                                │ stop_desc │ stop_lat  │ stop_lon   │ zone_id │
+├─────┼─────────┼───────────┼──────────────────────────────────────────┼───────────┼───────────┼────────────┼─────────┤
+│ 1   │ 43001   │ 22526     │ US-206 at HUTCHINSON DR                  │           │ 40.330129 │ -74.68891  │ 0       │
+│ 2   │ 43002   │ 26333     │ SIX FLAGS PARKWAY AT CORAL #1            │           │ 40.140039 │ -74.444033 │ 0       │
+│ 3   │ 43003   │ 26334     │ SIX FLAGS PARKWAY AT CORAL #2            │           │ 40.139839 │ -74.443791 │ 0       │
+│ 4   │ 43004   │ 26335     │ SIX FLAGS PARKWAY AT CORAL #3            │           │ 40.139639 │ -74.443602 │ 0       │
+│ 5   │ 43006   │ 27969     │ PENNSVILLE RD AT SODERS RD               │           │ 39.683107 │ -75.476452 │ 0       │
+│ 6   │ 43007   │ 30751     │ KLOCKNER AVE AT SMITH AVE                │           │ 40.23801  │ -74.710061 │ 0       │
+│ 7   │ 43008   │ 31246     │ US-46 AT MONEY ST                        │           │ 40.88099  │ -74.08129  │ 0       │
+│ 8   │ 43009   │ 31309     │ CAMDEN AVE AT REVERE AVE#                │           │ 39.958099 │ -74.974892 │ 0       │
+│ 9   │ 43010   │ 31310     │ CAMDEN AVE 250'W OF FAIRVIEW AVE#        │           │ 39.959828 │ -74.959521 │ 0       │
+...
+│ 603 │ 43793   │ 32732     │ STATE ST AT W CAMDEN ST#                      │           │ 40.88772  │ -74.042763 │ 0       │
+│ 604 │ 43794   │ 32733     │ BRIDGE ST AT MAIN ST                          │           │ 40.880198 │ -74.043712 │ 0       │
+│ 605 │ 43795   │ 32734     │ MAIN ST AT WARD ST                            │           │ 40.89066  │ -74.039673 │ 0       │
+│ 606 │ 43796   │ 32755     │ RIVER ST 475'S OF UNIVERSITY PLAZA DR         │           │ 40.894688 │ -74.038402 │ 0       │
+│ 607 │ 43797   │ 32756     │ RIVER ST 207'S OF UNIVERSITY PLAZA DR         │           │ 40.895458 │ -74.038642 │ 0       │
+│ 608 │ 43798   │ 32772     │ CR-530 950'W OF FOUR MILE RD.#                │           │ 39.96652  │ -74.641133 │ 0       │
+└─────┴─────────┴───────────┴───────────────────────────────────────────────┴───────────┴───────────┴────────────┴─────────┘
+┌─────┬─────────┬───────────┬───────────────────────────┬───────────┬───────────┬───────────┬─────────┐
+│ #   │ stop_id │ stop_code │ stop_name                 │ stop_desc │ stop_lat  │ stop_lon  │ zone_id │
+├─────┼─────────┼───────────┼───────────────────────────┼───────────┼───────────┼───────────┼─────────┤
+│ 609 │ 43799   │ 32774     │ CR-530 AT ACADEMIC DRIVE# │           │ 39.966679 │ -74.64765 │ 0       │
+└─────┴─────────┴───────────┴───────────────────────────┴───────────┴───────────┴───────────┴─────────┘
+ displayed 609 row(s)
+  ellapsed 96 ms
 
 
 //LOGICALS
@@ -132,7 +162,7 @@ SELECT * FROM routes WHERE route_id == 1 OR route_id == 2
 │ 2   │ 2        │ NJB       │ 10               │                 │ 3          │           │             │
 └─────┴──────────┴───────────┴──────────────────┴─────────────────┴────────────┴───────────┴─────────────┘
  displayed 2 row(s)
-
+  ellapsed 1 ms
 
 SELECT * FROM routes WHERE route_id == 1 AND route_short_name == '1'
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -338,7 +368,7 @@ SELECT * FROM stops WHERE stop_code == '10833'
 │ 1   │ 194     │ 10833     │ MAIN ST AT E. MERION AVE │           │ 39.39727 │ -74.517571 │ 0       │
 └─────┴─────────┴───────────┴──────────────────────────┴───────────┴──────────┴────────────┴─────────┘
  displayed 1 row(s)
-
+  ellapsed 73 ms
 
 SELECT * FROM calendar_dates WHERE date == 20180504
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -365,7 +395,7 @@ SELECT COUNT(agency_id) FROM agency
 │ 1     │
 └───────┘
  displayed 1 row(s)
-
+  ellapsed 0 ms
 
 SELECT COUNT(agency_id) AS Quantity FROM agency
 ------------------------------------------------------------
@@ -376,7 +406,7 @@ SELECT COUNT(agency_id) AS Quantity FROM agency
 │ 1        │
 └──────────┘
  displayed 1 row(s)
-
+  ellapsed 0 ms
 
 SELECT COUNT(route_id) FROM routes
 ------------------------------------------------------------
@@ -387,6 +417,7 @@ SELECT COUNT(route_id) FROM routes
 │ 254   │
 └───────┘
  displayed 1 row(s)
+  ellapsed 0 ms
 
 ===COUNT==== with non Int32 columns
 
@@ -400,7 +431,7 @@ SELECT COUNT(agency_id) FROM routes
 │ 254   │
 └───────┘
  displayed 1 row(s)
-
+  ellapsed 0 ms
 
 SELECT COUNT(route_id) FROM routes WHERE route_id > 247
 ------------------------------------------------------------
@@ -411,7 +442,7 @@ SELECT COUNT(route_id) FROM routes WHERE route_id > 247
 │ 7     │
 └───────┘
  displayed 1 row(s)
-
+  ellapsed 5 ms
 
 SELECT SUM(route_id) FROM routes
 ------------------------------------------------------------
@@ -422,7 +453,7 @@ SELECT SUM(route_id) FROM routes
 │ 32385 │
 └───────┘
  displayed 1 row(s)
-
+  ellapsed 350 ms
 
 SELECT SUM(trip_id) FROM trips
 ------------------------------------------------------------
@@ -433,7 +464,7 @@ SELECT SUM(trip_id) FROM trips
 │ 472704378 │
 └───────────┘
  displayed 1 row(s)
-
+  ellapsed 2799 ms
 
 SELECT COUNT(trip_id) FROM trips
 ------------------------------------------------------------
@@ -444,7 +475,7 @@ SELECT COUNT(trip_id) FROM trips
 │ 30747 │
 └───────┘
  displayed 1 row(s)
-
+  ellapsed 9 ms
 
 SELECT COUNT(stop_id) FROM stop_times
 ------------------------------------------------------------
@@ -455,7 +486,7 @@ SELECT COUNT(stop_id) FROM stop_times
 │ 1642266 │
 └─────────┘
  displayed 1 row(s)
-
+  ellapsed 816 ms
 
 SELECT AVG(route_id) FROM routes
 ------------------------------------------------------------
@@ -466,5 +497,5 @@ SELECT AVG(route_id) FROM routes
 │ 128 │
 └─────┘
  displayed 1 row(s)
-
+  ellapsed 36 ms
  

@@ -19,6 +19,191 @@ namespace CsvDb
 	{
 		//https://msdn.microsoft.com/en-us/magazine/mt808499.aspx
 
+		public static T ConvertTo1<T>(this byte[] bytes, int offset = 0)
+		{
+			var type = typeof(T);
+			if (type == typeof(sbyte)) return (T)(object)((sbyte)bytes[offset]);
+			if (type == typeof(byte)) return (T)(object)bytes[offset];
+			if (type == typeof(short)) return (T)(object)((short)(bytes[offset + 1] << 8 | bytes[offset]));
+			if (type == typeof(ushort)) return (T)(object)((ushort)(bytes[offset + 1] << 8 | bytes[offset]));
+			if (type == typeof(int)) return (T)(object)(bytes[offset + 3] << 24 | bytes[offset + 2] << 16 | bytes[offset + 1] << 8 | bytes[offset]);
+			if (type == typeof(uint)) return (T)(object)((uint)bytes[offset + 3] << 24 | (uint)bytes[offset + 2] << 16 | (uint)bytes[offset + 1] << 8 | bytes[offset]);
+			if (type == typeof(long)) return (T)(object)((long)bytes[offset + 7] << 56 | (long)bytes[offset + 6] << 48 | (long)bytes[offset + 5] << 40 | (long)bytes[offset + 4] << 32 | (long)bytes[offset + 3] << 24 | (long)bytes[offset + 2] << 16 | (long)bytes[offset + 1] << 8 | bytes[offset]);
+			if (type == typeof(ulong)) return (T)(object)((ulong)bytes[offset + 7] << 56 | (ulong)bytes[offset + 6] << 48 | (ulong)bytes[offset + 5] << 40 | (ulong)bytes[offset + 4] << 32 | (ulong)bytes[offset + 3] << 24 | (ulong)bytes[offset + 2] << 16 | (ulong)bytes[offset + 1] << 8 | bytes[offset]);
+
+			throw new NotImplementedException();
+		}
+
+		public static bool TryParseToken(this string text, out TokenType comparison)
+		{
+			switch (text)
+			{
+				case "==":
+					comparison = TokenType.Equal;
+					break;
+				case "<>":
+					comparison = TokenType.NotEqual;
+					break;
+				case ">":
+					comparison = TokenType.Greater;
+					break;
+				case ">=":
+					comparison = TokenType.GreaterOrEqual;
+					break;
+				case "<":
+					comparison = TokenType.Less;
+					break;
+				case "<=":
+					comparison = TokenType.LessOrEqual;
+					break;
+				default:
+					comparison = TokenType.None;
+					return false;
+			}
+			return true;
+		}
+
+		public class BitconverterExt
+		{
+			public static byte[] GetBytes(decimal dec)
+			{
+				//Load four 32 bit integers from the Decimal.GetBits function 
+				Int32[] bits = decimal.GetBits(dec);
+				//Create a temporary list to hold the bytes 
+				List<byte> bytes = new List<byte>();
+				//iterate each 32 bit integer 
+				foreach (Int32 i in bits)
+				{
+					//add the bytes of the current 32bit integer 
+					//to the bytes list 
+					bytes.AddRange(BitConverter.GetBytes(i));
+				}
+				//return the bytes list as an array 
+				return bytes.ToArray();
+			}
+
+			public static decimal ToDecimal(byte[] bytes)
+			{
+				//check that it is even possible to convert the array 
+				if (bytes.Count() != 16)
+					throw new Exception("A decimal must be created from exactly 16 bytes");
+				//make an array to convert back to int32's 
+				Int32[] bits = new Int32[4];
+				for (int i = 0; i <= 15; i += 4)
+				{
+					//convert every 4 bytes into an int32 
+					bits[i / 4] = BitConverter.ToInt32(bytes, i);
+				}
+				//Use the decimal's new constructor to 
+				//create an instance of decimal 
+				return new decimal(bits);
+			}
+		}
+
+		public static T BitConvertTo<T>(this byte[] bytes, int offset = 0)
+		{
+			var type = typeof(T);
+			if (type == typeof(sbyte)) return ((sbyte)bytes[offset]).As<T>();
+			if (type == typeof(byte)) return bytes[offset].As<T>();
+			if (type == typeof(short)) return BitConverter.ToInt16(bytes, offset).As<T>();
+			if (type == typeof(ushort)) return BitConverter.ToUInt16(bytes, offset).As<T>();
+			if (type == typeof(int)) return BitConverter.ToInt32(bytes, offset).As<T>();
+			if (type == typeof(uint)) return BitConverter.ToUInt32(bytes, offset).As<T>();
+			if (type == typeof(long)) return BitConverter.ToInt64(bytes, offset).As<T>();
+			if (type == typeof(ulong)) return BitConverter.ToUInt64(bytes, offset).As<T>();
+			if (type == typeof(float)) return BitConverter.ToSingle(bytes, offset).As<T>();
+			if (type == typeof(double)) return BitConverter.ToDouble(bytes, offset).As<T>();
+			if (type == typeof(decimal)) return BitconverterExt.ToDecimal(bytes).As<T>();
+			if (type == typeof(char)) return BitConverter.ToChar(bytes, offset).As<T>();
+			if (type == typeof(string)) return BitConverter.ToString(bytes, offset).As<T>();
+
+			throw new NotImplementedException();
+		}
+
+		/// <summary>
+		/// generic comparer
+		/// </summary>
+		/// <typeparam name="T">type of T</typeparam>
+		/// <param name="comparer">comparison operator</param>
+		/// <param name="left">left operand</param>
+		/// <param name="right">right oeprand</param>
+		/// <returns></returns>
+		public static bool Compare<T>(this TokenType comparer, T left, T right)
+			where T : IComparable<T>
+		{
+			switch (comparer)
+			{
+				case TokenType.Equal:
+					return (left.CompareTo(right) == 0);
+				case TokenType.NotEqual:
+					return (left.CompareTo(right) != 0);
+				case TokenType.Greater:
+					return (left.CompareTo(right) > 0);
+				case TokenType.GreaterOrEqual:
+					return (left.CompareTo(right) >= 0);
+				case TokenType.Less:
+					return (left.CompareTo(right) < 0);
+				case TokenType.LessOrEqual:
+					return (left.CompareTo(right) <= 0);
+				default:
+					throw new ArgumentException($"Invalid comparison operator: {comparer}");
+			}
+		}
+
+		public static int ConvertToInt(this byte[] bytes, int offset = 0)
+		{
+			return (bytes[offset + 3] << 24 | bytes[offset + 2] << 16 | bytes[offset + 1] << 8 | bytes[offset]);
+		}
+
+		public static T As<T>(this object o)
+		{
+			return (T)o;
+		}
+
+		/// <summary>
+		/// Gets the size in bytes of a database column type, String (-1)
+		/// </summary>
+		/// <param name="type">column type</param>
+		/// <returns></returns>
+		public static int GetSize(this DbColumnType type)
+		{
+			switch (type)
+			{
+				case DbColumnType.Bool:
+				case DbColumnType.None:
+				default:
+					return 0;
+
+				case DbColumnType.Byte:
+				case DbColumnType.Char:
+					return 1;
+				case DbColumnType.Int16:
+					return 2;
+				case DbColumnType.Int32:
+				case DbColumnType.Single:
+					return 4;
+				case DbColumnType.Int64:
+				case DbColumnType.Double:
+					return 8;
+				case DbColumnType.Decimal:
+					return 16;
+
+				case DbColumnType.String:
+					return -1;
+			}
+		}
+
+		public static string GetStr(this DbColumnType type, object value)
+		{
+			if (value == null)
+			{
+				return String.Empty;
+			}
+			return type == DbColumnType.String ?
+				$"'{value}'" :
+				value.ToString();
+		}
+
 		/// <summary>
 		/// numeric mask
 		/// </summary>
@@ -44,11 +229,21 @@ namespace CsvDb
 		 DbColumnType.Int16 | DbColumnType.Int32 | DbColumnType.Int64 |
 		 DbColumnType.Single | DbColumnType.Double | DbColumnType.Decimal;
 
+		/// <summary>
+		/// return true if a db column type is a casting type
+		/// </summary>
+		/// <param name="type">db column type</param>
+		/// <returns></returns>
 		public static bool IsCasting(this DbColumnType type)
 		{
 			return (type & CastingMask) != 0;
 		}
 
+		/// <summary>
+		/// returns true if token is an operator
+		/// </summary>
+		/// <param name="Token">token</param>
+		/// <returns></returns>
 		public static bool IsOperator(this TokenType Token)
 		{
 			return Token == TokenType.Equal || Token == TokenType.NotEqual ||
@@ -56,14 +251,139 @@ namespace CsvDb
 						Token == TokenType.Greater || Token == TokenType.GreaterOrEqual;
 		}
 
-		//public bool IsIdentifier => Token == TokenType.Number || Token == TokenType.String || Token == TokenType.Identifier;
-
-		//public bool IsLogical => Token == TokenType.AND || Token == TokenType.OR;
-
+		/// <summary>
+		/// returns true if the token is a comparison operator
+		/// </summary>
+		/// <param name="token">token</param>
+		/// <returns></returns>
 		public static bool IsComparison(this TokenType token)
 		{
 			var value = (int)token;
 			return (value >= (int)TokenType.Equal && value <= (int)TokenType.LessOrEqual);
+		}
+
+		//public bool IsIdentifier => Token == TokenType.Number || Token == TokenType.String || Token == TokenType.Identifier;
+
+		//public bool IsLogical => Token == TokenType.AND || Token == TokenType.OR;
+
+		public static object ToObject(this DbColumnType type, string text)
+		{
+			switch (type)
+			{
+				case DbColumnType.Bool:
+					if (Boolean.TryParse(text, out bool boolValue))
+					{
+						return boolValue;
+					}
+					break;
+				case DbColumnType.Byte:
+					if (Byte.TryParse(text, out byte byteValue))
+					{
+						return byteValue;
+					}
+					break;
+				case DbColumnType.Char:
+					if (Char.TryParse(text, out char charValue))
+					{
+						return charValue;
+					}
+					break;
+				case DbColumnType.Decimal:
+					if (Decimal.TryParse(text, out decimal decimalValue))
+					{
+						return decimalValue;
+					}
+					break;
+				case DbColumnType.Double:
+					if (Double.TryParse(text, out double doubleValue))
+					{
+						return doubleValue;
+					}
+					break;
+				case DbColumnType.Int16:
+					if (Int16.TryParse(text, out Int16 int16Value))
+					{
+						return int16Value;
+					}
+					break;
+				case DbColumnType.Int32:
+					if (Int32.TryParse(text, out Int32 int32Value))
+					{
+						return int32Value;
+					}
+					break;
+				case DbColumnType.Int64:
+					if (Int64.TryParse(text, out Int64 int64Value))
+					{
+						return int64Value;
+					}
+					break;
+				case DbColumnType.Single:
+					if (Single.TryParse(text, out Single singleValue))
+					{
+						return singleValue;
+					}
+					break;
+				case DbColumnType.String:
+					return text.UnwrapQuotes();
+			}
+			return null;
+		}
+
+		/// <summary>
+		/// Tries to split a table column hash in the form: table.column
+		/// </summary>
+		/// <param name="hash">table.column hash</param>
+		/// <param name="first">table name</param>
+		/// <param name="second">column name</param>
+		/// <returns></returns>
+		public static bool TrySplitHash(this string hash, out string first, out string second)
+		{
+			var index = string.IsNullOrWhiteSpace(hash) ? -1 : hash.IndexOf('.');
+
+			first = String.IsNullOrWhiteSpace(first = (index < 0) ? null : hash.Substring(0, index)) ? null : first.Trim();
+
+			second = String.IsNullOrWhiteSpace(second = index < 0 || (index == hash.Length - 1) ? null : hash.Substring(index + 1)) ? null : second.Trim();
+
+			return first != null && second != null;
+		}
+
+		public static bool TrySplitColumnConstant(this ExpressionOperator expression,
+			out DbQuery.ColumnOperand column, out DbQuery.ConstantOperand constant)
+		{
+			column = null;
+			constant = null;
+			if (expression == null)
+			{
+				return false;
+			}
+			//try first with left
+			if ((column = expression.Left as DbQuery.ColumnOperand) == null)
+			{
+				if ((column = expression.Right as DbQuery.ColumnOperand) != null)
+				{
+					constant = expression.Left as DbQuery.ConstantOperand;
+				}
+			}
+			else
+			{
+				constant = expression.Right as DbQuery.ConstantOperand;
+			}
+			return column != null && constant != null;
+		}
+
+		public static string GetKey(this CommandArgValue arg)
+		{
+			return (arg == null) ?
+				null :
+				((arg.Type == CommandArgItemType.String) ? arg.Key.UnwrapQuotes() : arg.Key);
+		}
+
+		public static string GetValue(this CommandArgValue arg)
+		{
+			return (!(arg is CommandArgKeypair argKeyPair)) ?
+				null :
+				((argKeyPair.ValueType == CommandArgItemType.String) ? argKeyPair.Value.UnwrapQuotes() : argKeyPair.Value);
 		}
 
 		public static object CallGeneric(
@@ -73,8 +393,11 @@ namespace CsvDb
 			object[] parameters = null,
 			BindingFlags flags = BindingFlags.Default)
 		{
-			MethodInfo method =
-					classObj.GetType().GetMethod(methodName);
+			var type = classObj.GetType();
+			MethodInfo method = (flags == BindingFlags.Default) ?
+				type.GetMethod(methodName) :
+				type.GetMethod(methodName, flags);
+
 			//123816
 			MethodInfo genMethod = method.MakeGenericMethod(Type.GetType($"System.{valueType}"));
 
@@ -83,6 +406,11 @@ namespace CsvDb
 			return result;
 		}
 
+		/// <summary>
+		/// Gets the System TypeCode of a db column type
+		/// </summary>
+		/// <param name="type">db column type</param>
+		/// <returns></returns>
 		public static System.TypeCode TypeCode(this DbColumnType type)
 		{
 			switch (type)
@@ -227,7 +555,9 @@ namespace CsvDb
 		/// <returns>unwrapped string text</returns>
 		public static string UnwrapQuotes(this string text)
 		{
-			if (text != null && text[0] == '\'' && text[text.Length - 1] == '\'')
+			if (text != null &&
+				text[0] == text[text.Length - 1] &&
+				(text[0] == '\'' || text[0] == '"'))
 			{
 				return text.Substring(1, text.Length - 2);
 			}
@@ -288,7 +618,6 @@ namespace CsvDb
 			//	(DbColumnType)(itemValue - tokenStartValue + 1) :
 			//	DbColumnType.None;
 		}
-
 
 		//any of these chars should be wrapped by ""
 		//	"	,	line-break
@@ -419,7 +748,7 @@ namespace CsvDb
 			}
 		}
 
-		static byte MASK = 0b1101011;
+		static readonly byte MASK = 0b1101011;
 
 		public static void BinarySave(this string text, io.BinaryWriter writer)
 		{

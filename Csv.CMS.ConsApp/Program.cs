@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using con = System.Console;
 
 namespace Csv.CMS.ConsApp
@@ -91,6 +90,7 @@ namespace Csv.CMS.ConsApp
 				con.WriteLine("	│ (S)earch Database                            │ (E)execute Queries                          │");
 				con.WriteLine("	│ (P)age                                       │ Display (T)ables Info                       │");
 				con.WriteLine("	│ Display Index Tree (N)ode Structure          │ Display (I)ndex Tree Structure              │");
+				con.WriteLine("	│ (C)omparer                                   │ (V)isualize record(s)                       │");
 				con.WriteLine("	│ (X)treme class                               │                                             │");
 				con.WriteLine("	├──────────────────────────────────────────────┴─────────────────────────────────────────────┤");
 				con.WriteLine("	│  SELECT [*] | [t0.col0, t0.col1,..] | [COUNT|AVG|SUM](col)                                 │");
@@ -122,204 +122,88 @@ namespace Csv.CMS.ConsApp
 			}
 
 			System.Reflection.Assembly assembly = null;
+			var nl = Environment.NewLine;
+			bool end = false;
+			//this's the matched rule
+			CommandArgRulesAction action = null;
 
 			//con.TreatControlCAsInput = true;
-			bool end = false;
 
-			while (!end)
-			{
-				con.Write(">");
-
-				while (!con.KeyAvailable) // Loop until input is entered
-					Thread.Sleep(250);
-
-				ConsoleKeyInfo key = con.ReadKey();
-				con.WriteLine();
-				switch (key.Key)
+			var actions = new CommandArgRules(
+				new CommandArgRulesAction[]
 				{
-					case ConsoleKey.X:
-						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+					new CommandArgRulesAction(
+					() =>
 						{
-							con.Write("\r\n  database table as class: ");
-							var tbleName = con.ReadLine();
-							DbTable table = db.Table(tbleName);
-							//
-							if (table == null)
+							end = true;
+							if (db != null)
 							{
-								con.WriteLine($"cannot find table [{tbleName}]");
+								db.Dispose();
 							}
-							else
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => new string[] { "quit", "q" }.Contains( arg.Key) && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() => displayHelp(),
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => new string[] { "help", "h"}.Contains( arg.Key) && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() => con.Clear(),
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => new string[] { "c", "clear" }.Contains( arg.Key) && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							if (!IsObjectNull(db, $" no database to close"))
 							{
-								if (assembly == null)
+								con.WriteLine($" closing database [{db.Name}]");
+								db.Dispose();
+								db = null;
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => new string[] { "k", "kill" }.Contains( arg.Key) && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							//m "data-bin"
+							if (!IsObjectNull(db, $"\r\nplease first unmount current database", testFor: false))
+							{
+								if ((db = OpenDatabase(
+									dbName: action.Arguments.FirstOrDefault().Arg.GetKey(),
+									logTimes: true)) != null)
 								{
-									assembly = Utils.CreateDbClasses(db);
-									if (assembly == null)
-									{
-										con.WriteLine("Cannot generate database table classes");
-									}
-									else
-									{
-										con.WriteLine("database table classes generated succesfully!");
-									}
-								}
-								if (assembly != null)
-								{
-									//I can compile code once and load assembly at start
-									//   just recompile when database table changes
-
-									//var an = System.Reflection.AssemblyName.GetAssemblyName(filePath);
-									//System.Reflection.Assembly.Load(an);
-									//AppDomain.CurrentDomain.Load(assembly.GetName());
-
-									//get it OK!
-									//Type type = assembly.GetType($"CsvDb.Dynamic.{tbleName}");
-									//object obj = Activator.CreateInstance(type);
-
-									//this was a test, constructor must be parameterless so CsvHelper can create it
-									Type dynTbleClass = assembly.GetType($"CsvDb.Dynamic.{tbleName}");
-									object obj = CreateClass(
-										dynTbleClass,
-										new object[] {
-											//table
-										}
-									);
-									var mthd = dynTbleClass.GetMethod("Link");
-									mthd.Invoke(obj, new object[]
-									{
-										table
-									});
-									//now I can use CsvHelper to parse CSV rows using this classes if needed
-
-									//don't get it
-									var classType = Type.GetType($"CsvDb.Dynamic.{tbleName}");
-
-									con.WriteLine("ok");
+									con.WriteLine($"\r\nUsing database: {db.Name}{db.IsBinary.IfTrue(" [Binary]")}{db.IsCsv.IfTrue(" [Csv]")}");
 								}
 							}
-
-						}
-						break;
-					case ConsoleKey.E:
-						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+						},
+						new CommandArgRule[]
 						{
-							con.WriteLine("Execute database queries:\r\n  -empty query ends");
-							string query = null;
-							bool finish = false;
-							do
-							{
-								con.Write("\r\n  query: ");
-								query = con.ReadLine();
-								if (!(finish = String.IsNullOrWhiteSpace(query)))
-								{
-									try
-									{
-										sw.Restart();
-										var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db));
-										sw.Stop();
-										con.WriteLine("    query parsed on {0} ms", sw.ElapsedMilliseconds);
-										con.WriteLine($"     {dbQuery}");
-									}
-									catch (Exception ex)
-									{
-										con.WriteLine($"    error: {ex.Message}");
-									}
-								}
-							} while (!finish);
+							new CommandArgRule(0, (arg) => new string[] { "m", "mount", "use" }.Contains( arg.Key) && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg) => arg.Type == CommandArgItemType.Identifier ||
+								arg.Type == CommandArgItemType.String)
 						}
-						break;
-					case ConsoleKey.P:
-						//display index page
-						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
-						{
-							con.Write("[table].index: ");
-							var tbleColumn = con.ReadLine();
-							con.Write(" id/offset: ");
-							DbColumn column = null;
-							if (!int.TryParse(con.ReadLine(), out int offset) ||
-								(column = db.Index(tbleColumn)) == null)
-							{
-								con.WriteLine(" \r\n error: invalid table column or id/offset of page");
-							}
-							else
-							{
-								Utils.CallGeneric(new Visualizer(db),
-									nameof(Visualizer.ShowItemPage), 
-									column.TypeEnum,
-									new object[] { column, offset });
-							}
-						}
-						break;
-					case ConsoleKey.I:
-						//display index structure
-						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
-						{
-							con.Write("[table].index: ");
-							var tbleColumn = con.ReadLine();
-							var vis = new Visualizer(db);
-							vis.DisplayItemsPageStructureInfo(tbleColumn);
-						}
-						break;
-					case ConsoleKey.N:
-						//display index structure
-						if (!IsObjectNull(db, $"\r\nno database in use to show info"))
-						{
-							con.Write("[table].index: ");
-							var tbleColumn = con.ReadLine();
-							var vis = new Visualizer(db);
-							vis.DisplayTreeNodePageStructureInfo(tbleColumn);
-						}
-						break;
-					case ConsoleKey.M:
-						if (!IsObjectNull(db, $"\r\nplease first unmount current database", testFor: false))
-						{
-							con.Write("database name >");
-							var dbName = con.ReadLine();
-							if ((db = OpenDatabase(dbName: dbName, logTimes: true)) != null)
-							{
-								con.WriteLine($"\r\nUsing database: {db.Name}{db.IsBinary.IfTrue(" [Binary]")}{db.IsCsv.IfTrue(" [Csv]")}");
-							}
-						}
-						break;
-					case ConsoleKey.K:
-						if (!IsObjectNull(db, $" no database to close"))
-						{
-							con.WriteLine($" closing database [{db.Name}]");
-							db.Dispose();
-							db = null;
-						}
-						break;
-					case ConsoleKey.D:
-						var prefix = "\r\n   -";
-						var txt = String.Join(prefix, availableDatabases);
-						if (String.IsNullOrWhiteSpace(txt))
-						{
-							txt = $"{prefix}there is no available database";
-						}
-						else
-						{
-							txt = $"{prefix}{txt}";
-						}
-						con.WriteLine($" database(s){txt}");
-						break;
-					case ConsoleKey.H:
-						displayHelp();
-						break;
-					case ConsoleKey.T:
-						//display tables
-						if (!IsObjectNull(db, " there's no database in use"))
-						{
-							ShowAllTableInfo(db);
-						}
-						break;
-					case ConsoleKey.S:
-						try
+					),
+					new CommandArgRulesAction(
+						() =>
 						{
 							if (!IsObjectNull(db, " there's no database in use"))
 							{
 								con.Write(" query >");
 								var query = con.In.ReadLine();
 								con.WriteLine();
-								//con.WriteLine($" processing: {query}");
 
 								sw.Restart();
 								var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db));
@@ -337,26 +221,338 @@ namespace Csv.CMS.ConsApp
 								visualizer.Display();
 								visualizer.Dispose();
 							}
-						}
-						catch (Exception ex)
+						},
+						new CommandArgRule[]
 						{
-							con.WriteLine($"error: {(ex.InnerException == null ? ex.Message : ex.InnerException.Message)}");
+							new CommandArgRule(0, (arg) => arg.Key == "search" && !arg.IsKeyPair)
 						}
-						break;
-					case ConsoleKey.Q:
-						end = true;
-						if (db != null)
+					),
+					new CommandArgRulesAction(
+						() =>
 						{
-							db.Dispose();
+							if (!IsObjectNull(db, " there's no database in use"))
+							{
+								con.WriteLine("Execute database queries:\r\n  -empty query ends");
+								string query = null;
+								bool finish = false;
+								do
+								{
+									con.Write("\r\n  query: ");
+									query = con.ReadLine();
+									if (!(finish = String.IsNullOrWhiteSpace(query)))
+									{
+										try
+										{
+											sw.Restart();
+											var dbQuery = DbQuery.Parse(query, new CsvDbDefaultValidator(db));
+											sw.Stop();
+											con.WriteLine("    query parsed on {0} ms", sw.ElapsedMilliseconds);
+											con.WriteLine($"     {dbQuery}");
+										}
+										catch (Exception ex)
+										{
+											con.WriteLine($"    error: {ex.Message}");
+										}
+									}
+								} while (!finish);
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "execute" && !arg.IsKeyPair)
 						}
-						break;
-					case ConsoleKey.R:
-						con.Clear();
-						break;
-					default:
-						con.WriteLine(" -invalid option, press [h] for help");
-						break;
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							if (!IsObjectNull(db, " there's no database in use"))
+							{
+								con.Write("\r\n  database table as class: ");
+								var tbleName = con.ReadLine();
+								DbTable table = db.Table(tbleName);
+								//
+								if (table == null)
+								{
+									con.WriteLine($"cannot find table [{tbleName}]");
+								}
+								else
+								{
+									if (assembly == null)
+									{
+										assembly = Utils.CreateDbClasses(db);
+										if (assembly == null)
+										{
+											con.WriteLine("Cannot generate database table classes");
+										}
+										else
+										{
+											con.WriteLine("database table classes generated succesfully!");
+										}
+									}
+									if (assembly != null)
+									{
+										//I can compile code once and load assembly at start
+										//   just recompile when database table changes
+
+										//var an = System.Reflection.AssemblyName.GetAssemblyName(filePath);
+										//System.Reflection.Assembly.Load(an);
+										//AppDomain.CurrentDomain.Load(assembly.GetName());
+
+										//get it OK!
+										//Type type = assembly.GetType($"CsvDb.Dynamic.{tbleName}");
+										//object obj = Activator.CreateInstance(type);
+
+										//this was a test, constructor must be parameterless so CsvHelper can create it
+										Type dynTbleClass = assembly.GetType($"CsvDb.Dynamic.{tbleName}");
+										object obj = CreateClass(
+											dynTbleClass,
+											new object[] {
+												//table
+											}
+										);
+										var mthd = dynTbleClass.GetMethod("Link");
+										mthd.Invoke(obj, new object[]
+										{
+											table
+										});
+										//now I can use CsvHelper to parse CSV rows using this classes if needed
+
+										//don't get it
+										var classType = Type.GetType($"CsvDb.Dynamic.{tbleName}");
+
+										con.WriteLine("ok");
+									}
+								}
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "x" && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							//compare
+							//display "routes.route_id" /oper:>= 250
+							if (!IsObjectNull(db, " there's no database in use"))
+							{
+								var dbTblCol = action.Arguments.FirstOrDefault(r => r.Id == 1).Arg.GetKey();
+
+								var operArg = action.Arguments.FirstOrDefault(r => r.Id == 2).Arg as CommandArgKeypair;
+
+								var constArg = action.Arguments.FirstOrDefault(r => r.Id == 2).Arg;
+
+								DbColumn column = null;
+								if ((column = db.Index(dbTblCol)) != null &&
+									operArg.Value.TryParseToken(out TokenType token))
+								{
+									var reader = DbTableDataReader.Create(db, column.Table);
+
+									object value = column.TypeEnum.ToObject(constArg.Key);
+
+									var collection = (IEnumerable<int>)Utils.CallGeneric(
+										reader, nameof(DbTableDataReader.Compare), column.TypeEnum,
+										new object[] { column, token, value },
+										 System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance
+									);
+									var lista = collection.ToList();
+									con.WriteLine($" ({lista.Count}) match(es)");
+								}
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair),
+							new CommandArgRule(2, (arg) => arg.Key == "/oper" && arg.IsKeyPair),
+							new CommandArgRule(3, (arg) => arg.Type == CommandArgItemType.Integer || arg.Type == CommandArgItemType.String)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							con.WriteLine($" databases:{nl}  {String.Join($"{nl}  ", availableDatabases)}");
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							if (!IsObjectNull(db, " there's no database in use"))
+							{
+								ShowAllTableInfo(db);
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg) => arg.Key =="/tables" && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							//display index structure
+							//display /i "trips.trip_id"
+							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+							{
+								var vis = new Visualizer(db);
+								vis.DisplayItemsPageStructureInfo(
+									action.Arguments.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
+								);
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg)=> arg.Key== "/i" && !arg.IsKeyPair),
+							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							//display index structure
+							//display /n "trips.trip_id"
+							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+							{
+								var vis = new Visualizer(db);
+								vis.DisplayTreeNodePageStructureInfo(
+									action.Arguments.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
+								);
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg)=> arg.Key== "/n" && !arg.IsKeyPair),
+							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							//display index page
+							//display /p "trips.trip_id" /offset:8
+							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+							{
+								DbColumn column = null;
+								if (!int.TryParse(action.Arguments.FirstOrDefault(r => r.Id == 3).Arg.GetValue(),
+														out int offset) ||
+									(column = db.Index(action.Arguments.FirstOrDefault( r => r.Id == 2).Arg.GetKey())) == null)
+								{
+									con.WriteLine(" \r\n error: invalid table column or id/offset of page");
+								}
+								else
+								{
+									Utils.CallGeneric(new Visualizer(db),
+										nameof(Visualizer.ShowItemPage),
+										column.TypeEnum,
+										new object[] { column, offset });
+								}
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg)=> arg.Key== "/p" && !arg.IsKeyPair),
+							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair),
+							new CommandArgRule(3, (arg) => arg.Key == "/offset" && arg.IsKeyPair &&
+								((CommandArgKeypair)arg).ValueType == CommandArgItemType.Integer)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							//display index page
+							//display /r "trips.trip_id" 12
+							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+							{
+								DbColumn column = null;
+								if (!int.TryParse(action.Arguments.FirstOrDefault(r => r.Id == 3).Arg.GetKey(), 
+												out int count) ||
+									(column = db.Index(
+											action.Arguments.FirstOrDefault( r => r.Id == 2).Arg.GetKey()
+										)) == null)
+								{
+									con.WriteLine(" \r\n  error: invalid data");
+								}
+								else
+								{
+									Utils.CallGeneric(new Visualizer(db),
+										nameof(Visualizer.ShowTableColumnRows),
+										column.TypeEnum,
+										new object[] { column, count });
+								}
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg)=> arg.Key== "/r" && !arg.IsKeyPair),
+							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair),
+							new CommandArgRule(3, (arg) => arg.Type == CommandArgItemType.Integer && !arg.IsKeyPair)
+						}
+					),
+					new CommandArgRulesAction(
+						() =>
+						{
+							//display index page
+							//test /t:1
+							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
+							{
+								var agencyType = db.Classes["agency"];
+								var agencyObject = agencyType != null ? Activator.CreateInstance(agencyType.Type) : null;
+
+								//var agencyId_Prop = agencyType.Type.GetProperty("agency_id");
+								//agencyId_Prop.SetValue(agencyObject, "NJT");
+
+								var agencyApply = agencyType.Type.GetMethod("Apply");
+								agencyApply.Invoke(agencyObject, new object[] {
+									agencyType.Props,
+									new object[] {
+										"NJB", "NJ TRANSIT BUS", "http://www.njtransit.com/", "America/New_York", "en", null
+									}});
+								var ts = agencyType.Type.GetMethod("ToString", new Type[] { typeof(DbProperty[]) });
+								if (ts != null)
+								{
+									var s = ts.Invoke(agencyObject, new object[] { agencyType.Props });
+									con.WriteLine(s);
+								}
+								con.WriteLine($" generated agency class: {(agencyObject != null).ToYesNo()}");
+							}
+						},
+						new CommandArgRule[]
+						{
+							new CommandArgRule(0, (arg) => arg.Key == "test" && !arg.IsKeyPair),
+							new CommandArgRule(1, (arg)=> arg.Key== "/t:1" && arg.IsKeyPair)
+						}
+					)
 				}
+			);
+
+			while (!end)
+			{
+				con.Write(">");
+
+				var args = new CommandLineParser(con.ReadLine()).Arguments();
+
+				//here we should have only one rule match
+				var matches = actions.Actions.Where(a => a.Match(args)).ToList();
+				if (matches.Count != 1)
+				{
+					con.WriteLine(" no command or too many matches");
+				}
+				else
+				{
+					(action = matches[0]).Action?.Invoke();
+				}
+				//clear action rules
+				actions.Clear();
 			}
 			return true;
 		}
@@ -370,6 +566,8 @@ namespace Csv.CMS.ConsApp
 					name = table.Name,
 					flags = table.Multikey.IfTrue("-m"),
 					rows = $"{table.Rows.ToString("##,#")} row(s)",
+					mask = table.RowMask,
+					masklen = table.RowMaskLength,
 					columnRows =
 						(from col in table.Columns
 						 select new List<KeyValuePair<string, string>>()
@@ -423,6 +621,7 @@ namespace Csv.CMS.ConsApp
 				}
 				//end line
 				con.WriteLine(text.Replace('┬', '┴').Replace('├', '└').Replace('┤', '┘'));
+				con.WriteLine($"  RowMask: {Convert.ToString((long)t.mask, 2)}   RowMask length: {t.masklen}");
 				con.WriteLine();
 			}
 			//reference

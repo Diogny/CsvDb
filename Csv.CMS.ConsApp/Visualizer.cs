@@ -71,23 +71,45 @@ namespace Csv.CMS.ConsApp
 			Console.WriteLine(output);
 		}
 
+		public void ShowTableColumnRows<T>(DbColumn column, int count)
+				where T : IComparable<T>
+		{
+			var handler = DbTableDataReader.Create(Database, column.Table.Name);
+			var offset = 0;
+			//while (count-- > 0)
+			{
+				var row = handler.ReadDbRecord(offset);
+
+				Console.WriteLine(String.Join(", ", row));
+			}
+
+		}
+
 		public void ShowItemPage<T>(DbColumn column, int offset)
 			where T : IComparable<T>
 		{
 			var indexItem = column.IndexItems<T>();
 			var page = indexItem[offset];
 
+			if (page == null)
+			{
+				Console.WriteLine($"Page offset: {offset} is invalid");
+				return;
+			}
 			var handler = DbTableDataReader.Create(Database, column.Table.Name);
 
+			int rows = 0;
 			foreach (var item in page.Items)
 			{
-				Console.WriteLine(item.Key);
+				Console.WriteLine($"[{item.Key}]  ({item.Value.Count}) offset value(s)");
 				//foreach (var ofs in item.Value)
 				//{
 				//	var row = handler.ReadDbRecord(ofs);
 				//	Console.WriteLine($"  {string.Join(", ", row)}");
 				//}
+				rows++;
 			}
+			Console.WriteLine($"   displayed ({rows}) key(s)");
 		}
 
 		string DisplayTreeStructureInfo<T>(DbIndexTree<T> index)

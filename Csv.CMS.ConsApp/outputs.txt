@@ -1,96 +1,151 @@
 ﻿>h
-
-Menu
- Shows (h)elp
- (D)isplay database(s)
- (M)ount database
- (U)nmount database
- (S)earch Database
- Display (t)ables
- Display (c)olumn
- Clea(r)
- (Q)uit
+        ┌────────────────────────────────┬─────────────────────────────┬─────────────────────────────┐
+        │ (H)elp                         │ Clea(r)                     │ (Q)uit                      │
+        ├────────────────────────────────┴─────────────┬───────────────┴─────────────────────────────┤
+        │ (D)isplay available database(s)              │                                             │
+        │ (M)ount database                             │ (K)ill/close database                       │
+        │ (S)earch Database                            │ (E)execute Queries                          │
+        │ (P)age                                       │ Display (T)ables Info                       │
+        │ Display Index Tree (N)ode Structure          │ Display (I)ndex Tree Structure              │
+        │ (X)treme class                               │                                             │
+        ├──────────────────────────────────────────────┴─────────────────────────────────────────────┤
+        │  SELECT [*] | [t0.col0, t0.col1,..] | [COUNT|AVG|SUM](col)                                 │
+        │      FROM table [t0]                                                                       │
+        │      WHERE                                                                                 │
+        │      [INNER|CROSS|(LEFT|RIGHT|FULL) OUTER] JOIN table0 t0 ON expr:<left> oper <right>      │
+        └────────────────────────────────────────────────────────────────────────────────────────────┘
 >d
  database(s)
-   -data
-   -data-light
-   -data-extra-light
->u
- no database to unmount
+   -data-full
+   -data-bin
+>k
+ no database to close
 >m
-database name >data
- opened on: 437 ms
+database name >data-bin
+ opened on 48 ms
 
-Using database: NJTranst
+Using database: NJTransit-bin [Binary]
 >t
- [agency] 1 row(s)
-   agency_id: string   [key] [indexed] [unique]  1 page(s)
-   agency_name: string
-   agency_url: string
-   agency_timezone: string
-   agency_lang: string
-   agency_phone: string
- [routes] 254 row(s)
-   route_id: int32   [key] [indexed] [unique]  1 page(s)
-   agency_id: string
-   route_short_name: string   [indexed] [unique]  1 page(s)
-   route_long_name: string
-   route_type: int32
-   route_url: string
-   route_color: string
- [stops] 16531 row(s)
-   stop_id: int32   [key] [indexed] [unique]  255 page(s)
-   stop_code: string   [indexed] [unique]  255 page(s)
-   stop_name: string
-   stop_desc: string
-   stop_lat: double
-   stop_lon: double
-   zone_id: int32
- [calendar_dates] 691 row(s)
-   service_id: int32
-   date: int32   [key] [indexed] [unique]  1 page(s)
-   exception_type: int32
- [trips] [multikey]  37024 row(s)
-   route_id: int32   [key] [indexed] [unique]  1 page(s)
-   service_id: int32   [key] [indexed] [unique]  1 page(s)
-   trip_id: int32   [key] [indexed] [unique]  511 page(s)
-   trip_headsign: string
-   direction_id: int32
-   block_id: string
-   shape_id: int32
- [stop_times] [multikey]  1934026 row(s)
-   trip_id: int32   [key] [indexed] [unique]  511 page(s)
-   arrival_time: string
-   departure_time: string
-   stop_id: int32   [key] [indexed] [unique]  255 page(s)
-   stop_sequence: int32
-   pickup_type: int32
-   drop_off_type: int32
-   shape_dist_traveled: double
- [shapes] 1935202 row(s)
-   shape_id: int32   [key] [indexed] [unique]  63 page(s)
-   shape_pt_lat: double
-   shape_pt_lon: double
-   shape_pt_sequence: int32
-   shape_dist_traveled: double
+┌───────────────────────────────────────────────────────────┐
+│agency                                             1 row(s)│
+├─────────────────────────────────┬────────┬────────┬───────┤
+│column                           │type    │flags   │pages  │
+├─────────────────────────────────┼────────┼────────┼───────┤
+│agency_id                        │String  │-k-i-u  │1      │
+│agency_name                      │String  │        │0      │
+│agency_url                       │String  │        │0      │
+│agency_timezone                  │String  │        │0      │
+│agency_lang                      │String  │        │0      │
+│agency_phone                     │String  │        │0      │
+└─────────────────────────────────┴────────┴────────┴───────┘
+  RowMask: 100000   RowMask length: 1
+
+┌───────────────────────────────────────────────────────────┐
+│routes                                           254 row(s)│
+├─────────────────────────────────┬────────┬────────┬───────┤
+│column                           │type    │flags   │pages  │
+├─────────────────────────────────┼────────┼────────┼───────┤
+│route_id                         │Int32   │-k-i-u  │1      │
+│agency_id                        │String  │        │0      │
+│route_short_name                 │String  │-i-u    │1      │
+│route_long_name                  │String  │        │0      │
+│route_type                       │Int32   │        │0      │
+│route_url                        │String  │        │0      │
+│route_color                      │String  │        │0      │
+└─────────────────────────────────┴────────┴────────┴───────┘
+  RowMask: 1000000   RowMask length: 1
+
+┌───────────────────────────────────────────────────────────┐
+│stops                                         16,517 row(s)│
+├─────────────────────────────────┬────────┬────────┬───────┤
+│column                           │type    │flags   │pages  │
+├─────────────────────────────────┼────────┼────────┼───────┤
+│stop_id                          │Int32   │-k-i-u  │383    │
+│stop_code                        │String  │-i-u    │383    │
+│stop_name                        │String  │        │0      │
+│stop_desc                        │String  │        │0      │
+│stop_lat                         │Double  │        │0      │
+│stop_lon                         │Double  │        │0      │
+│zone_id                          │Int32   │        │0      │
+└─────────────────────────────────┴────────┴────────┴───────┘
+  RowMask: 1000000   RowMask length: 1
+
+┌───────────────────────────────────────────────────────────┐
+│calendar_dates                                   624 row(s)│
+├─────────────────────────────────┬────────┬────────┬───────┤
+│column                           │type    │flags   │pages  │
+├─────────────────────────────────┼────────┼────────┼───────┤
+│service_id                       │Int32   │        │0      │
+│date                             │Int32   │-k-i-u  │1      │
+│exception_type                   │Int32   │        │0      │
+└─────────────────────────────────┴────────┴────────┴───────┘
+  RowMask: 100   RowMask length: 1
+
+┌───────────────────────────────────────────────────────────┐
+│trips                                      -m 30,747 row(s)│
+├─────────────────────────────────┬────────┬────────┬───────┤
+│column                           │type    │flags   │pages  │
+├─────────────────────────────────┼────────┼────────┼───────┤
+│route_id                         │Int32   │-k-i-u  │1      │
+│service_id                       │Int32   │-k-i-u  │2      │
+│trip_id                          │Int32   │-k-i-u  │383    │
+│trip_headsign                    │String  │        │0      │
+│direction_id                     │Int32   │        │0      │
+│block_id                         │String  │        │0      │
+│shape_id                         │Int32   │        │0      │
+└─────────────────────────────────┴────────┴────────┴───────┘
+  RowMask: 1000000   RowMask length: 1
+
+┌───────────────────────────────────────────────────────────┐
+│stop_times                              -m 1,642,266 row(s)│
+├─────────────────────────────────┬────────┬────────┬───────┤
+│column                           │type    │flags   │pages  │
+├─────────────────────────────────┼────────┼────────┼───────┤
+│trip_id                          │Int32   │-k-i-u  │383    │
+│arrival_time                     │String  │        │0      │
+│departure_time                   │String  │        │0      │
+│stop_id                          │Int32   │-k-i-u  │383    │
+│stop_sequence                    │Int32   │        │0      │
+│pickup_type                      │Int32   │        │0      │
+│drop_off_type                    │Int32   │        │0      │
+│shape_dist_traveled              │Double  │        │0      │
+└─────────────────────────────────┴────────┴────────┴───────┘
+  RowMask: 10000000   RowMask length: 1
+
+┌───────────────────────────────────────────────────────────┐
+│shapes                                       219,340 row(s)│
+├─────────────────────────────────┬────────┬────────┬───────┤
+│column                           │type    │flags   │pages  │
+├─────────────────────────────────┼────────┼────────┼───────┤
+│shape_id                         │Int32   │-k-i-u  │47     │
+│shape_pt_lat                     │Double  │        │0      │
+│shape_pt_lon                     │Double  │        │0      │
+│shape_pt_sequence                │Int32   │        │0      │
+│shape_dist_traveled              │Double  │        │0      │
+└─────────────────────────────────┴────────┴────────┴───────┘
+  RowMask: 10000   RowMask length: 1
+
+ref:   -m MultiKey   -k Key   -i Indexed   -u Unique
+
 >s
  query >SELECT * FROM agency
 
- query parsed on: 40 ms
- 1 row(s) retrieved on: 104 ms
+ query parsed on 81 ms
+  SELECT * FROM agency
+┌─────┬───────────┬────────────────┬───────────────────────────┬──────────────────┬─────────────┬──────────────┐
+│ #   │ agency_id │ agency_name    │ agency_url                │ agency_timezone  │ agency_lang │ agency_phone │
+├─────┼───────────┼────────────────┼───────────────────────────┼──────────────────┼─────────────┼──────────────┤
+│ 1   │ NJB       │ NJ TRANSIT BUS │ http://www.njtransit.com/ │ America/New_York │ en          │              │
+└─────┴───────────┴────────────────┴───────────────────────────┴──────────────────┴─────────────┴──────────────┘
+ displayed 1 row(s)
+>k
+ closing database [NJTransit-bin]
+>q
 
-agency_id|agency_name|agency_url|agency_timezone|agency_lang|agency_phone
--------------------------------------------------------------------------
-NJB,NJ TRANSIT BUS,http://www.njtransit.com/,America/New_York,en,
+Press any key to finish!
 
- displayed on: 15 ms
->u
- unmounting database [NJTranst]
->t
- there's no database in use
->c
- there's no database in use
->
+
+
 
 System.Runtime, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a'
 

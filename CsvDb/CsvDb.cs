@@ -128,6 +128,8 @@ namespace CsvDb
 		/// </summary>
 		protected internal String SchemaJsonFilePath = String.Empty;
 
+		public DbClassGenerator Classes { get; }
+
 		/// <summary>
 		/// Creates a Csv database schema from a json file
 		/// </summary>
@@ -199,6 +201,8 @@ namespace CsvDb
 			ReadPolicy = DbIndexItemsPolicy.ReadAlways;
 
 			Load();
+
+			Classes = new DbClassGenerator(this);
 		}
 
 		/// <summary>
@@ -252,6 +256,7 @@ namespace CsvDb
 						column.Table = table;
 					}
 				};
+				SaveKeyIndexedKeyOffsets();
 
 				return true;
 			}
@@ -259,6 +264,47 @@ namespace CsvDb
 			{
 				Console.WriteLine(ex.Message);
 				return false;
+			}
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="forced">true to write it anyways</param>
+		void SaveKeyIndexedKeyOffsets(bool forced = false)
+		{
+			foreach (var table in Tables)
+			{
+				var handler = DbTableDataReader.Create(this, table);
+
+				foreach (var column in table.Columns.Where(col => col.Key))
+				{
+					var path = $"{BinaryPath}\\{column.Hash}.offset";
+					if (!io.File.Exists(path) || forced)
+					{
+						using (var writer = new io.BinaryWriter(io.File.Create(path)))
+						{
+							Utils.CallGeneric(
+									this, nameof(StoreKeyIndexedOffsets), column.TypeEnum,
+									new object[] { handler, column, writer },
+									System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+								);
+						}
+					}
+				}
+			}
+		}
+
+		void StoreKeyIndexedOffsets<T>(DbTableDataReader handler, DbColumn column, io.BinaryWriter writer)
+			where T : IComparable<T>
+		{
+			//write row count
+			var rows = handler.Rows<T>(column).ToList();
+			writer.Write(rows.Count);
+			//write all offsets
+			foreach (var row in rows)
+			{
+				writer.Write(row);
 			}
 		}
 
@@ -315,13 +361,9 @@ namespace CsvDb
 		/// <returns></returns>
 		public DbColumn Index(string hash)
 		{
-			var cols = hash?.Split('.', StringSplitOptions.RemoveEmptyEntries);
-			DbColumn index = null;
-			if (cols != null && cols.Length == 2)
-			{
-				index = Index(cols[0], cols[1]);
-			}
-			return index;
+			return hash.TrySplitHash(out string table, out string column) ?
+				Index(table, column) :
+				null;
 		}
 
 		public override string ToString() => $"{Name} ({Schema.Count}) table(s)";
@@ -425,7 +467,7 @@ namespace CsvDb
 					_columns = new Dictionary<string, DbColumn>()
 				};
 				//read columns
-				var columnKeyList = new List<string>();
+				var columnNameList = new List<string>();
 
 				for (var c = 0; c < table.Count; c++)
 				{
@@ -446,15 +488,38 @@ namespace CsvDb
 					{
 						throw new ArgumentException($"duplicated column: {col.Name} on table {table.Name}");
 					}
-					columnKeyList.Add(col.Name);
+					columnNameList.Add(col.Name);
 				}
+
 				//check count
 				if (table.Count != table.Columns.Count())
 				{
 					throw new ArgumentException($"invalid table count on: {table.Name}");
 				}
-				table._columnKeyList = columnKeyList.ToArray();
+				table._columnNameList = columnNameList.ToArray();
 
+				//get key
+				table.Keys = table.Columns.Where(c => c.Key).ToArray();
+
+				var keyCount = table.Keys.Length;
+				if (table.Multikey)
+				{
+					//must have more than one key
+					table.Key = null;
+					if (keyCount < 2)
+					{
+						throw new ArgumentException($"table: {table} is multi-key and has less than 2 keys");
+					}
+				}
+				else
+				{
+					//must have just one key
+					if (keyCount != 1)
+					{
+						throw new ArgumentException($"table: {table} must have one key");
+					}
+					table.Key = table.Keys[0];
+				}
 				//schema.Tables.Add(table);
 				schema._tables.Add(table.Name, table);
 			}
@@ -527,7 +592,7 @@ namespace CsvDb
 					//var freq = new KeyValuePair<string, List<MetaPageFrequency>>(hash, new List<MetaPageFrequency>());
 					//frequencyList.Add(freq);
 
-					
+
 				}
 
 			}
@@ -550,7 +615,20 @@ namespace CsvDb
 
 		public bool Generate { get; set; }
 
+		/// <summary>
+		/// returns true if table has more than one key column
+		/// </summary>
 		public bool Multikey { get; set; }
+
+		/// <summary>
+		/// Gets the key column of the table, null if Multikey is true
+		/// </summary>
+		public DbColumn Key { get; internal set; }
+
+		/// <summary>
+		/// For Multikey tables
+		/// </summary>
+		public DbColumn[] Keys { get; internal set; }
 
 		public int Rows { get; set; }
 
@@ -558,7 +636,7 @@ namespace CsvDb
 
 		public int Count { get; set; }
 
-		internal string[] _columnKeyList;
+		internal string[] _columnNameList;
 
 		internal Dictionary<string, DbColumn> _columns;
 		/// <summary>
@@ -580,7 +658,7 @@ namespace CsvDb
 		/// <param name="position">0-based column position</param>
 		/// <returns></returns>
 		public DbColumn this[int position] =>
-			(position >= 0 && position < _columnKeyList.Length) ? this[_columnKeyList[position]] : null;
+			(position >= 0 && position < _columnNameList.Length) ? this[_columnNameList[position]] : null;
 
 		/// <summary>
 		/// adds a new column to the table
@@ -663,6 +741,8 @@ namespace CsvDb
 		public int ItemPages { get; set; }
 
 		public int NodePages { get; set; }
+
+		public string Hash => $"{Table.Name}.{Name}";
 
 		/// <summary>
 		/// Returns the sum of item pages plus tree node pages
