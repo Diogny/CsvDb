@@ -323,36 +323,37 @@ namespace CsvDb
 	// "sdsdsd ""sdsds"" ddcdc"
 	// 'dcdced ''ddewdwe'' dwede'
 
-	public enum CommandArgItemType
+	[Flags]
+	public enum CommandArgItemType : int
 	{
 		/// <summary>
 		/// None
 		/// </summary>
-		None,
+		None = 0,
 		/// <summary>
 		/// delimited with string quotes
 		/// </summary>
-		String,
+		String = 1,
 		/// <summary>
 		/// A number
 		/// </summary>
-		Integer,
+		Integer = 2,
 		/// <summary>
 		/// task
 		/// </summary>
-		Identifier,
+		Identifier = 4,
 		/// <summary>
 		/// -task	 --task
 		/// </summary>
-		Option,
+		Option = 8,
 		/// <summary>
 		/// /f		/src   /fG8
 		/// </summary>
-		Directive,
+		Directive = 16,
 		/// <summary>
 		/// /Anything
 		/// </summary>
-		Chars
+		Chars = 32
 	}
 
 	/// <summary>
@@ -366,7 +367,7 @@ namespace CsvDb
 		public string Key { get; }
 
 		/// <summary>
-		/// Gets the type of the key value
+		/// Gets the single unique non-flag type of the key value
 		/// </summary>
 		public CommandArgItemType Type { get; }
 
@@ -446,7 +447,7 @@ namespace CsvDb
 		public override bool IsKeyPair => true;
 
 		/// <summary>
-		/// Type of the value
+		/// Gets the single unique non-flag type of the key pair value
 		/// </summary>
 		public CommandArgItemType ValueType { get; }
 
@@ -475,14 +476,14 @@ namespace CsvDb
 	}
 
 	/// <summary>
-	/// Implements a command argumenty rule
+	/// Implements a command argument rule
 	/// </summary>
 	public class CommandArgRule
 	{
 		/// <summary>
 		/// Unique id number inside a collection of rules in an Action
 		/// </summary>
-		public int Id { get;  }
+		public int Id { get; internal set; }
 
 		/// <summary>
 		/// Gets the command argument value, null if not matched
@@ -502,14 +503,101 @@ namespace CsvDb
 		/// <summary>
 		/// Creates a command argument rule
 		/// </summary>
-		/// <param name="id">unique id</param>
 		/// <param name="condition">matching condition</param>
-		public CommandArgRule(int id, Func<CommandArgValue, bool> condition)
+		public CommandArgRule(Func<CommandArgValue, bool> condition)
 		{
-			Id = id;
-			Condition = condition;
-			//
+			//unlinked
+			Id = -1;
+			//unmatched
 			Arg = null;
+			//
+			Condition = condition;
+		}
+
+		/// <summary>
+		/// Creates a command argument rule
+		/// </summary>
+		/// <param name="condition">matching condition</param>
+		/// <returns></returns>
+		public static CommandArgRule Create(Func<CommandArgValue, bool> condition) => new CommandArgRule(condition);
+
+		/// <summary>
+		/// Creates a new command argument main entry key
+		/// </summary>
+		/// <param name="entries">valid string entries</param>
+		/// <returns></returns>
+		public static CommandArgRule Command(params string[] entries)
+		{
+			if (entries == null)
+			{
+				throw new ArgumentException("command key entries is empty or null");
+			}
+			return new CommandArgRule((arg) => entries.Contains(arg.Key) && !arg.IsKeyPair);
+		}
+
+		/// <summary>
+		/// Creates a new command with key matching specific type and non-keypair
+		/// </summary>
+		/// <param name="type">matching types</param>
+		/// <returns></returns>
+		public static CommandArgRule KeyTypeAs(CommandArgItemType type)
+		{
+			if (type == CommandArgItemType.None)
+			{
+				throw new ArgumentException("invalid rule none type match");
+			}
+			return new CommandArgRule((arg) => !arg.IsKeyPair && (type & arg.Type) != 0);
+		}
+
+		/// <summary>
+		/// Creates a new command with key equal a string
+		/// </summary>
+		/// <param name="key">key string value</param>
+		/// <returns></returns>
+		public static CommandArgRule KeyValueEquals(string key)
+		{
+			if (key == null)
+			{
+				throw new ArgumentException("invalid rule key is null");
+			}
+			return new CommandArgRule((arg) => !arg.IsKeyPair && arg.Key == key.Trim());
+		}
+
+		/// <summary>
+		/// Creates a new command (key, pair) equals 
+		/// </summary>
+		/// <param name="key">key string value</param>
+		/// <param name="value">value string</param>
+		/// <returns></returns>
+		public static CommandArgRule KeyPairEquals(string key, string value)
+		{
+			if (key == null || value == null)
+			{
+				throw new ArgumentException("invalid rule key, pair is null");
+			}
+			return new CommandArgRule((arg) =>
+				arg.IsKeyPair &&
+				arg.Key == key.Trim() &&
+				(arg as CommandArgKeypair).Value == value.Trim());
+		}
+
+		/// <summary>
+		/// Creates a new command (key, pair) as a key equals an string and an specific value-type
+		/// </summary>
+		/// <param name="key">key string</param>
+		/// <param name="valueType">value-type</param>
+		/// <returns></returns>
+		public static CommandArgRule KeyPairAs(string key, CommandArgItemType valueType)
+		{
+			if (key == null || valueType == CommandArgItemType.None)
+			{
+				throw new ArgumentException("invalid rule key and/or value type");
+			}
+			return new CommandArgRule((arg) =>
+				arg.IsKeyPair &&
+				arg.Key == key.Trim() &&
+				(arg as CommandArgKeypair).ValueType == valueType
+			);
 		}
 
 		/// <summary>
@@ -528,7 +616,7 @@ namespace CsvDb
 			{
 				return true;
 			}
-			if (Condition(arg))
+			if (arg != null && Condition(arg))
 			{
 				Arg = arg;
 				return true;
@@ -556,14 +644,14 @@ namespace CsvDb
 		public List<CommandArgRule> Rules { get; }
 
 		/// <summary>
-		/// Get the command or first rule
+		/// Gets the amount of rules without the command entry
 		/// </summary>
-		public CommandArgRule Command => Rules.FirstOrDefault();
+		public int Count => Rules.Count;
 
 		/// <summary>
-		/// Gets the arguments after the Command rule
+		/// Get the command or first rule
 		/// </summary>
-		public IEnumerable<CommandArgRule> Arguments => Rules.Skip(1);
+		public CommandArgRule Command { get; }
 
 		/// <summary>
 		/// Gets the name of the action rule
@@ -573,22 +661,56 @@ namespace CsvDb
 		/// <summary>
 		/// Creates a command argument rule action
 		/// </summary>
+		/// <param name="command">main command entry</param>
 		/// <param name="action">action to execute</param>
 		/// <param name="ruleCollection">collection of rules</param>
-		public CommandArgRulesAction(Action action, IEnumerable<CommandArgRule> ruleCollection)
+		public CommandArgRulesAction(CommandArgRule command, Action action,
+			IEnumerable<CommandArgRule> ruleCollection = null)
 		{
-			if (ruleCollection == null)
+			if ((Command = command) == null)
 			{
-				throw new ArgumentException("empty rules");
+				throw new ArgumentException("command entry rule cannot be empty or null");
 			}
+			//link, 0-based
+			Command.Id = 0;
+
 			Action = action;
-			Rules = new List<CommandArgRule>(ruleCollection);
+			Rules = (ruleCollection == null) ?
+				new List<CommandArgRule>() :
+				new List<CommandArgRule>(ruleCollection);
+		}
+
+		/// <summary>
+		/// Self returning add new rule method
+		/// </summary>
+		/// <param name="ruleArray">new rule</param>
+		/// <returns></returns>
+		public CommandArgRulesAction Add(params CommandArgRule[] ruleArray)
+		{
+			if (ruleArray != null)
+			{
+				foreach (var rule in ruleArray)
+				{
+					if (rule == null)
+					{
+						throw new ArgumentException("cannot add empty rule");
+					}
+					Rules.Add(rule);
+					// 1-based, command has Id = 0
+					rule.Id = Count;
+				}
+			}
+			return this;
 		}
 
 		/// <summary>
 		/// Clear all previous matchings if any
 		/// </summary>
-		public void Clear() => Rules.ForEach(rule => rule.Clear());
+		public void Clear()
+		{
+			Command.Clear();
+			Rules.ForEach(rule => rule.Clear());
+		}
 
 		/// <summary>
 		/// Tries to match all rules against a collection of argument values
@@ -610,7 +732,7 @@ namespace CsvDb
 			foreach (var arg in argsCollection.Skip(1))
 			{
 				//try to match any no-matched rule with any argument in any position after first command
-				if (!Arguments.Where(rule => !rule.Matched).Any(rule => rule.Match(arg)))
+				if (!Rules.Where(rule => !rule.Matched).Any(rule => rule.Match(arg)))
 				{
 					return false;
 				}

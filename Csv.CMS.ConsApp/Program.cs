@@ -82,23 +82,26 @@ namespace Csv.CMS.ConsApp
 			//Action displayHelp = () =>
 			void displayHelp()
 			{
-				con.WriteLine("	┌────────────────────────────────┬─────────────────────────────┬─────────────────────────────┐");
-				con.WriteLine("	│ (H)elp                         │ Clea(r)                     │ (Q)uit                      │");
-				con.WriteLine("	├────────────────────────────────┴─────────────┬───────────────┴─────────────────────────────┤");
-				con.WriteLine("	│ (D)isplay available database(s)              │                                             │");
-				con.WriteLine("	│ (M)ount database                             │ (K)ill/close database                       │");
-				con.WriteLine("	│ (S)earch Database                            │ (E)execute Queries                          │");
-				con.WriteLine("	│ (P)age                                       │ Display (T)ables Info                       │");
-				con.WriteLine("	│ Display Index Tree (N)ode Structure          │ Display (I)ndex Tree Structure              │");
-				con.WriteLine("	│ (C)omparer                                   │ (V)isualize record(s)                       │");
-				con.WriteLine("	│ (X)treme class                               │                                             │");
-				con.WriteLine("	├──────────────────────────────────────────────┴─────────────────────────────────────────────┤");
-				con.WriteLine("	│  SELECT [*] | [t0.col0, t0.col1,..] | [COUNT|AVG|SUM](col)                                 │");
-				con.WriteLine("	│      FROM table [t0]                                                                       │");
-				con.WriteLine("	│      WHERE                                                                                 │");
-				con.WriteLine("	│      [INNER|CROSS|(LEFT|RIGHT|FULL) OUTER] JOIN table0 t0 ON expr:<left> oper <right>      │");
-				con.WriteLine("	└────────────────────────────────────────────────────────────────────────────────────────────┘");
-
+				con.WriteLine("	┌────────────────────────────────┬────────────────────────────────┬──────────────────────────────────┐");
+				con.WriteLine("	│ Help  h  help                  │ Clear  c  clear                │ Quit  q quit                     │");
+				con.WriteLine("	├────────────────────────────────┴────────┬───────────────────────┴──────────────────────────────────┤");
+				con.WriteLine("	│ Mount database   m|use|mount 'db name'  │ Display database(s)   display                            │");
+				con.WriteLine("	│ Kill/close database   k  kill           │ Display Tables Info   display /tables                    │");
+				con.WriteLine("	│ Search Database       search            │ Display Index Tree Structure                             │");
+				con.WriteLine("	│ Eexecute Queries      execute           │                 display 'table.column' /i                │");
+				con.WriteLine("	│ Xtreme class          x                 │ Display Index Tree Node Structure                        │");
+				con.WriteLine("	│                                         │                 display 'table.column' /n                │");
+				con.WriteLine("	│                                         │ Non-indexed search                                       │");
+				con.WriteLine("	│                                         │                 display 'table.column' /oper:> constant  │");
+				con.WriteLine("	│                                         │ Page            display 'table.column' /p /offset:int    │");
+				con.WriteLine("	│                                         │ Visualize recs  display 'table.column' /r count          │");
+				con.WriteLine("	├─────────────────────────────────────────┴──────────────────────────────────────────────────────────┤");
+				con.WriteLine("	│  SELECT [*] | [t0.col0, t0.col1,..] | [COUNT|AVG|SUM](col)                                         │");
+				con.WriteLine("	│      FROM table [t0]                                                                               │");
+				con.WriteLine("	│      WHERE                                                                                         │");
+				con.WriteLine("	│      [INNER|CROSS|(LEFT|RIGHT|FULL) OUTER] JOIN table0 t0 ON expr:<left> oper <right>              │");
+				con.WriteLine("	└────────────────────────────────────────────────────────────────────────────────────────────────────┘");
+				
 				// ORDER BY 
 
 				//	SELECT * FROM [table] t
@@ -124,43 +127,30 @@ namespace Csv.CMS.ConsApp
 			System.Reflection.Assembly assembly = null;
 			var nl = Environment.NewLine;
 			bool end = false;
+
 			//this's the matched rule
-			CommandArgRulesAction action = null;
+			CommandArgRulesAction matchedRule = null;
 
 			//con.TreatControlCAsInput = true;
 
-			var actions = new CommandArgRules(
+			var ruleCollection = new CommandArgRules(
 				new CommandArgRulesAction[]
 				{
 					new CommandArgRulesAction(
-					() =>
-						{
-							end = true;
-							if (db != null)
+						CommandArgRule.Command("quit", "q"),
+						() =>
 							{
-								db.Dispose();
+								end = true;
+								if (db != null)
+								{
+									db.Dispose();
+								}
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => new string[] { "quit", "q" }.Contains( arg.Key) && !arg.IsKeyPair)
-						}
 					),
+					new CommandArgRulesAction(CommandArgRule.Command("help", "h"), () => displayHelp()),
+					new CommandArgRulesAction(CommandArgRule.Command("c", "clear"), () => con.Clear()),
 					new CommandArgRulesAction(
-						() => displayHelp(),
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => new string[] { "help", "h"}.Contains( arg.Key) && !arg.IsKeyPair)
-						}
-					),
-					new CommandArgRulesAction(
-						() => con.Clear(),
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => new string[] { "c", "clear" }.Contains( arg.Key) && !arg.IsKeyPair)
-						}
-					),
-					new CommandArgRulesAction(
+						CommandArgRule.Command("k", "kill"),
 						() =>
 						{
 							if (!IsObjectNull(db, $" no database to close"))
@@ -169,34 +159,26 @@ namespace Csv.CMS.ConsApp
 								db.Dispose();
 								db = null;
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => new string[] { "k", "kill" }.Contains( arg.Key) && !arg.IsKeyPair)
 						}
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("m", "mount", "use"),
 						() =>
 						{
 							//m "data-bin"
 							if (!IsObjectNull(db, $"\r\nplease first unmount current database", testFor: false))
 							{
 								if ((db = OpenDatabase(
-									dbName: action.Arguments.FirstOrDefault().Arg.GetKey(),
+									dbName: matchedRule.Rules.FirstOrDefault().Arg.GetKey(),
 									logTimes: true)) != null)
 								{
 									con.WriteLine($"\r\nUsing database: {db.Name}{db.IsBinary.IfTrue(" [Binary]")}{db.IsCsv.IfTrue(" [Csv]")}");
 								}
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => new string[] { "m", "mount", "use" }.Contains( arg.Key) && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg) => arg.Type == CommandArgItemType.Identifier ||
-								arg.Type == CommandArgItemType.String)
 						}
-					),
+					).Add(CommandArgRule.KeyTypeAs(CommandArgItemType.Identifier | CommandArgItemType.String)),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("search"),
 						() =>
 						{
 							if (!IsObjectNull(db, " there's no database in use"))
@@ -221,13 +203,10 @@ namespace Csv.CMS.ConsApp
 								visualizer.Display();
 								visualizer.Dispose();
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "search" && !arg.IsKeyPair)
 						}
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("execute"),
 						() =>
 						{
 							if (!IsObjectNull(db, " there's no database in use"))
@@ -256,13 +235,10 @@ namespace Csv.CMS.ConsApp
 									}
 								} while (!finish);
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "execute" && !arg.IsKeyPair)
 						}
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("x"),
 						() =>
 						{
 							if (!IsObjectNull(db, " there's no database in use"))
@@ -324,24 +300,21 @@ namespace Csv.CMS.ConsApp
 									}
 								}
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "x" && !arg.IsKeyPair)
 						}
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("display"),
 						() =>
 						{
 							//compare
 							//display "routes.route_id" /oper:>= 250
 							if (!IsObjectNull(db, " there's no database in use"))
 							{
-								var dbTblCol = action.Arguments.FirstOrDefault(r => r.Id == 1).Arg.GetKey();
+								var dbTblCol = matchedRule.Rules.FirstOrDefault(r => r.Id == 1).Arg.GetKey();
 
-								var operArg = action.Arguments.FirstOrDefault(r => r.Id == 2).Arg as CommandArgKeypair;
+								var operArg = matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg as CommandArgKeypair;
 
-								var constArg = action.Arguments.FirstOrDefault(r => r.Id == 2).Arg;
+								var constArg = matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg;
 
 								DbColumn column = null;
 								if ((column = db.Index(dbTblCol)) != null &&
@@ -360,40 +333,28 @@ namespace Csv.CMS.ConsApp
 									con.WriteLine($" ({lista.Count}) match(es)");
 								}
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair),
-							new CommandArgRule(2, (arg) => arg.Key == "/oper" && arg.IsKeyPair),
-							new CommandArgRule(3, (arg) => arg.Type == CommandArgItemType.Integer || arg.Type == CommandArgItemType.String)
 						}
+					).Add(
+						CommandArgRule.KeyTypeAs(CommandArgItemType.String),
+						CommandArgRule.KeyValueEquals("/oper"),
+						CommandArgRule.KeyTypeAs(CommandArgItemType.Integer | CommandArgItemType.String)
 					),
 					new CommandArgRulesAction(
-						() =>
-						{
-							con.WriteLine($" databases:{nl}  {String.Join($"{nl}  ", availableDatabases)}");
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair)
-						}
+						CommandArgRule.Command("display"),
+						() => con.WriteLine($" databases:{nl}  {String.Join($"{nl}  ", availableDatabases)}")
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("display"),
 						() =>
 						{
 							if (!IsObjectNull(db, " there's no database in use"))
 							{
 								ShowAllTableInfo(db);
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg) => arg.Key =="/tables" && !arg.IsKeyPair)
 						}
-					),
+					).Add(CommandArgRule.KeyValueEquals("/tables")),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("display"),
 						() =>
 						{
 							//display index structure
@@ -402,18 +363,16 @@ namespace Csv.CMS.ConsApp
 							{
 								var vis = new Visualizer(db);
 								vis.DisplayItemsPageStructureInfo(
-									action.Arguments.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
+									matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
 								);
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg)=> arg.Key== "/i" && !arg.IsKeyPair),
-							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair)
 						}
+					).Add(
+						CommandArgRule.KeyValueEquals("/i"),
+						CommandArgRule.KeyTypeAs(CommandArgItemType.String)
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("display"),
 						() =>
 						{
 							//display index structure
@@ -422,18 +381,16 @@ namespace Csv.CMS.ConsApp
 							{
 								var vis = new Visualizer(db);
 								vis.DisplayTreeNodePageStructureInfo(
-									action.Arguments.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
+									matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
 								);
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg)=> arg.Key== "/n" && !arg.IsKeyPair),
-							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair)
 						}
+					).Add(
+						CommandArgRule.KeyValueEquals("/n"),
+						CommandArgRule.KeyTypeAs(CommandArgItemType.String)
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("display"),
 						() =>
 						{
 							//display index page
@@ -441,9 +398,9 @@ namespace Csv.CMS.ConsApp
 							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 							{
 								DbColumn column = null;
-								if (!int.TryParse(action.Arguments.FirstOrDefault(r => r.Id == 3).Arg.GetValue(),
+								if (!int.TryParse(matchedRule.Rules.FirstOrDefault(r => r.Id == 3).Arg.GetValue(),
 														out int offset) ||
-									(column = db.Index(action.Arguments.FirstOrDefault( r => r.Id == 2).Arg.GetKey())) == null)
+									(column = db.Index(matchedRule.Rules.FirstOrDefault( r => r.Id == 2).Arg.GetKey())) == null)
 								{
 									con.WriteLine(" \r\n error: invalid table column or id/offset of page");
 								}
@@ -455,17 +412,14 @@ namespace Csv.CMS.ConsApp
 										new object[] { column, offset });
 								}
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg)=> arg.Key== "/p" && !arg.IsKeyPair),
-							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair),
-							new CommandArgRule(3, (arg) => arg.Key == "/offset" && arg.IsKeyPair &&
-								((CommandArgKeypair)arg).ValueType == CommandArgItemType.Integer)
 						}
+					).Add(
+						CommandArgRule.KeyValueEquals("/p"),
+						CommandArgRule.KeyTypeAs(CommandArgItemType.String),
+						CommandArgRule.KeyPairAs("/offset", CommandArgItemType.Integer)
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("display"),
 						() =>
 						{
 							//display index page
@@ -473,10 +427,10 @@ namespace Csv.CMS.ConsApp
 							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 							{
 								DbColumn column = null;
-								if (!int.TryParse(action.Arguments.FirstOrDefault(r => r.Id == 3).Arg.GetKey(), 
+								if (!int.TryParse(matchedRule.Rules.FirstOrDefault(r => r.Id == 3).Arg.GetKey(),
 												out int count) ||
 									(column = db.Index(
-											action.Arguments.FirstOrDefault( r => r.Id == 2).Arg.GetKey()
+											matchedRule.Rules.FirstOrDefault( r => r.Id == 2).Arg.GetKey()
 										)) == null)
 								{
 									con.WriteLine(" \r\n  error: invalid data");
@@ -489,16 +443,14 @@ namespace Csv.CMS.ConsApp
 										new object[] { column, count });
 								}
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "display" && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg)=> arg.Key== "/r" && !arg.IsKeyPair),
-							new CommandArgRule(2, (arg) => arg.Type == CommandArgItemType.String && !arg.IsKeyPair),
-							new CommandArgRule(3, (arg) => arg.Type == CommandArgItemType.Integer && !arg.IsKeyPair)
 						}
+					).Add(
+						CommandArgRule.KeyValueEquals("/r"),
+						CommandArgRule.KeyTypeAs(CommandArgItemType.String),
+						CommandArgRule.KeyTypeAs(CommandArgItemType.Integer)
 					),
 					new CommandArgRulesAction(
+						CommandArgRule.Command("test"),
 						() =>
 						{
 							//display index page
@@ -525,13 +477,8 @@ namespace Csv.CMS.ConsApp
 								}
 								con.WriteLine($" generated agency class: {(agencyObject != null).ToYesNo()}");
 							}
-						},
-						new CommandArgRule[]
-						{
-							new CommandArgRule(0, (arg) => arg.Key == "test" && !arg.IsKeyPair),
-							new CommandArgRule(1, (arg)=> arg.Key== "/t:1" && arg.IsKeyPair)
 						}
-					)
+					).Add(CommandArgRule.KeyPairEquals("/t", "1"))  // "/t:1"
 				}
 			);
 
@@ -542,17 +489,17 @@ namespace Csv.CMS.ConsApp
 				var args = new CommandLineParser(con.ReadLine()).Arguments();
 
 				//here we should have only one rule match
-				var matches = actions.Actions.Where(a => a.Match(args)).ToList();
+				var matches = ruleCollection.Actions.Where(a => a.Match(args)).ToList();
 				if (matches.Count != 1)
 				{
 					con.WriteLine(" no command or too many matches");
 				}
 				else
 				{
-					(action = matches[0]).Action?.Invoke();
+					(matchedRule = matches[0]).Action?.Invoke();
 				}
 				//clear action rules
-				actions.Clear();
+				ruleCollection.Clear();
 			}
 			return true;
 		}
