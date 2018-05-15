@@ -564,6 +564,20 @@ namespace CsvDb
 		}
 
 		/// <summary>
+		/// Creates a new command (key, pair) with an specific key, and any value
+		/// </summary>
+		/// <param name="key">key string</param>
+		/// <returns></returns>
+		public static CommandArgRule KeyPairKeyEquals(string key)
+		{
+			if (key == null)
+			{
+				throw new ArgumentException("invalid rule key is null");
+			}
+			return new CommandArgRule((arg) => arg.IsKeyPair && arg.Key == key.Trim());
+		}
+
+		/// <summary>
 		/// Creates a new command (key, pair) equals 
 		/// </summary>
 		/// <param name="key">key string value</param>
@@ -639,14 +653,23 @@ namespace CsvDb
 		public Action Action { get; }
 
 		/// <summary>
+		/// Indexer of rules
+		/// </summary>
+		/// <param name="id">1-based rule Id</param>
+		/// <returns></returns>
+		public CommandArgRule this[int id] => dictionaryOfRules.TryGetValue(id, out CommandArgRule rule) ? rule : null;
+
+		/// <summary>
 		/// List of all rules
 		/// </summary>
-		public List<CommandArgRule> Rules { get; }
+		public IEnumerable<CommandArgRule> Rules => dictionaryOfRules.Values;
+
+		private readonly Dictionary<int, CommandArgRule> dictionaryOfRules;
 
 		/// <summary>
 		/// Gets the amount of rules without the command entry
 		/// </summary>
-		public int Count => Rules.Count;
+		public int Count => dictionaryOfRules.Count;
 
 		/// <summary>
 		/// Get the command or first rule
@@ -675,9 +698,14 @@ namespace CsvDb
 			Command.Id = 0;
 
 			Action = action;
-			Rules = (ruleCollection == null) ?
+
+			dictionaryOfRules = new Dictionary<int, CommandArgRule>();
+
+			var rules = (ruleCollection == null) ?
 				new List<CommandArgRule>() :
 				new List<CommandArgRule>(ruleCollection);
+
+			Add(rules.ToArray());
 		}
 
 		/// <summary>
@@ -695,9 +723,12 @@ namespace CsvDb
 					{
 						throw new ArgumentException("cannot add empty rule");
 					}
-					Rules.Add(rule);
 					// 1-based, command has Id = 0
-					rule.Id = Count;
+					var id = Count + 1;
+
+					dictionaryOfRules.Add(id, rule);
+
+					rule.Id = id;
 				}
 			}
 			return this;
@@ -709,7 +740,10 @@ namespace CsvDb
 		public void Clear()
 		{
 			Command.Clear();
-			Rules.ForEach(rule => rule.Clear());
+			foreach (var rule in Rules)
+			{
+				rule.Clear();
+			}
 		}
 
 		/// <summary>
@@ -741,7 +775,7 @@ namespace CsvDb
 			return Rules.All(rule => rule.Matched);
 		}
 
-		public override string ToString() => $"{Name} ({Rules.Count}) rule(s)";
+		public override string ToString() => $"{Name} ({Count}) rule(s)";
 
 	}
 

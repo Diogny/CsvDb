@@ -101,7 +101,7 @@ namespace Csv.CMS.ConsApp
 				con.WriteLine("	│      WHERE                                                                                         │");
 				con.WriteLine("	│      [INNER|CROSS|(LEFT|RIGHT|FULL) OUTER] JOIN table0 t0 ON expr:<left> oper <right>              │");
 				con.WriteLine("	└────────────────────────────────────────────────────────────────────────────────────────────────────┘");
-				
+
 				// ORDER BY 
 
 				//	SELECT * FROM [table] t
@@ -137,7 +137,7 @@ namespace Csv.CMS.ConsApp
 				new CommandArgRulesAction[]
 				{
 					new CommandArgRulesAction(
-						CommandArgRule.Command("quit", "q"),
+						CommandArgRule.Command("q", "quit"),
 						() =>
 							{
 								end = true;
@@ -147,7 +147,7 @@ namespace Csv.CMS.ConsApp
 								}
 							}
 					),
-					new CommandArgRulesAction(CommandArgRule.Command("help", "h"), () => displayHelp()),
+					new CommandArgRulesAction(CommandArgRule.Command("h", "help"), () => displayHelp()),
 					new CommandArgRulesAction(CommandArgRule.Command("c", "clear"), () => con.Clear()),
 					new CommandArgRulesAction(
 						CommandArgRule.Command("k", "kill"),
@@ -169,7 +169,7 @@ namespace Csv.CMS.ConsApp
 							if (!IsObjectNull(db, $"\r\nplease first unmount current database", testFor: false))
 							{
 								if ((db = OpenDatabase(
-									dbName: matchedRule.Rules.FirstOrDefault().Arg.GetKey(),
+									dbName: matchedRule[1].Arg.GetKey(),
 									logTimes: true)) != null)
 								{
 									con.WriteLine($"\r\nUsing database: {db.Name}{db.IsBinary.IfTrue(" [Binary]")}{db.IsCsv.IfTrue(" [Csv]")}");
@@ -178,7 +178,7 @@ namespace Csv.CMS.ConsApp
 						}
 					).Add(CommandArgRule.KeyTypeAs(CommandArgItemType.Identifier | CommandArgItemType.String)),
 					new CommandArgRulesAction(
-						CommandArgRule.Command("search"),
+						CommandArgRule.Command("s", "search"),
 						() =>
 						{
 							if (!IsObjectNull(db, " there's no database in use"))
@@ -310,11 +310,11 @@ namespace Csv.CMS.ConsApp
 							//display "routes.route_id" /oper:>= 250
 							if (!IsObjectNull(db, " there's no database in use"))
 							{
-								var dbTblCol = matchedRule.Rules.FirstOrDefault(r => r.Id == 1).Arg.GetKey();
+								var dbTblCol = matchedRule[1].Arg.GetKey();
 
-								var operArg = matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg as CommandArgKeypair;
+								var operArg = matchedRule[2].Arg as CommandArgKeypair;
 
-								var constArg = matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg;
+								var constArg = matchedRule[3].Arg;
 
 								DbColumn column = null;
 								if ((column = db.Index(dbTblCol)) != null &&
@@ -336,7 +336,7 @@ namespace Csv.CMS.ConsApp
 						}
 					).Add(
 						CommandArgRule.KeyTypeAs(CommandArgItemType.String),
-						CommandArgRule.KeyValueEquals("/oper"),
+						CommandArgRule.KeyPairKeyEquals("/oper"),
 						CommandArgRule.KeyTypeAs(CommandArgItemType.Integer | CommandArgItemType.String)
 					),
 					new CommandArgRulesAction(
@@ -363,7 +363,7 @@ namespace Csv.CMS.ConsApp
 							{
 								var vis = new Visualizer(db);
 								vis.DisplayItemsPageStructureInfo(
-									matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
+									matchedRule[2].Arg.GetKey()
 								);
 							}
 						}
@@ -381,7 +381,7 @@ namespace Csv.CMS.ConsApp
 							{
 								var vis = new Visualizer(db);
 								vis.DisplayTreeNodePageStructureInfo(
-									matchedRule.Rules.FirstOrDefault(r => r.Id == 2).Arg.GetKey()
+									matchedRule[2].Arg.GetKey()
 								);
 							}
 						}
@@ -398,9 +398,9 @@ namespace Csv.CMS.ConsApp
 							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 							{
 								DbColumn column = null;
-								if (!int.TryParse(matchedRule.Rules.FirstOrDefault(r => r.Id == 3).Arg.GetValue(),
+								if (!int.TryParse(matchedRule[3].Arg.GetValue(),
 														out int offset) ||
-									(column = db.Index(matchedRule.Rules.FirstOrDefault( r => r.Id == 2).Arg.GetKey())) == null)
+									(column = db.Index(matchedRule[2].Arg.GetKey())) == null)
 								{
 									con.WriteLine(" \r\n error: invalid table column or id/offset of page");
 								}
@@ -427,10 +427,10 @@ namespace Csv.CMS.ConsApp
 							if (!IsObjectNull(db, $"\r\nno database in use to show info"))
 							{
 								DbColumn column = null;
-								if (!int.TryParse(matchedRule.Rules.FirstOrDefault(r => r.Id == 3).Arg.GetKey(),
+								if (!int.TryParse(matchedRule[3].Arg.GetKey(),
 												out int count) ||
 									(column = db.Index(
-											matchedRule.Rules.FirstOrDefault( r => r.Id == 2).Arg.GetKey()
+											matchedRule[2].Arg.GetKey()
 										)) == null)
 								{
 									con.WriteLine(" \r\n  error: invalid data");
